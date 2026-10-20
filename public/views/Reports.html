@@ -1,0 +1,19 @@
+<section id="view-reports" class="view" hidden>
+  <div class="toolbar"><select id="rp_id" aria-label="Report"></select><button id="rp_run">Run report</button><span class="sp"></span>
+    <button class="ghost" id="rp_export">Export CSV</button><button class="ghost" id="rp_print">Print</button></div>
+  <div class="toolbar" id="rp_filters"></div>
+  <div class="tablewrap"><table><thead id="rp_head"></thead><tbody id="rp_body"></tbody></table></div>
+  <div class="pager"><span class="note" id="rp_info"></span><button class="ghost" id="rp_prev">Previous</button><button class="ghost" id="rp_next">Next</button></div>
+</section>
+<section id="view-executive" class="view" hidden>
+  <div class="toolbar" id="ex_filters"></div>
+  <div class="toolbar"><button id="ex_run">Apply filters</button><button class="ghost" id="ex_print">Print / save as PDF</button><span class="note" id="ex_period"></span></div>
+  <div class="kpis" id="ex_kpis"></div>
+  <div class="grid" id="ex_charts"></div>
+  <div class="grid" id="ex_tables" style="margin-top:16px"></div>
+  <div class="panel" style="margin-top:16px"><h2>Notes and upcoming data</h2><ul class="obs" id="ex_notes"></ul></div>
+</section>
+<section id="view-audit" class="view" hidden>
+  <p class="note">Most recent 300 events. Field values are never stored in the log.</p>
+  <div class="tablewrap"><table><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Record</th><th>Detail</th></tr></thead><tbody id="au_body"></tbody></table></div>
+</section>

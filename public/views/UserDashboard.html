@@ -1,0 +1,236 @@
+<section id="view-user-dashboard" class="view" hidden>
+  <section class="panel">
+    <h2>My submitted forms</h2>
+    <p id="uf_assigned_head" class="note"></p>
+    <p class="note">Track the status of forms you have submitted. Only you can view your submissions.</p>
+    <p id="uf_global_feedback" class="okmsg" hidden></p>
+    <div class="user-form-summary" aria-label="Form submission summary">
+      <article class="user-form-stat"><span>Total submitted</span><strong id="uf_total">0</strong></article>
+      <article class="user-form-stat"><span>Pending</span><strong id="uf_pending">0</strong></article>
+      <article class="user-form-stat"><span>Approved</span><strong id="uf_approved">0</strong></article>
+      <article class="user-form-stat"><span>Rejected</span><strong id="uf_rejected">0</strong></article>
+    </div>
+    <div class="toolbar form-filters">
+      <label for="uf_history_status">Status
+        <select id="uf_history_status">
+          <option value="">All statuses</option>
+          <option value="PENDING">Pending</option>
+          <option value="APPROVED">Approved</option>
+          <option value="REJECTED">Rejected</option>
+        </select>
+      </label>
+      <label for="uf_history_type">Form type
+        <select id="uf_history_type"><option value="">All form types</option></select>
+      </label>
+      <label class="form-search" for="uf_history_search">Search
+        <input id="uf_history_search" type="search" placeholder="Serial number, form, or details">
+      </label>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Serial Number</th><th>Form</th><th>Days pending</th><th>Submitted</th><th>Status</th><th>Review reason</th><th>Actions</th></tr></thead>
+        <tbody id="uf_history"></tbody>
+      </table>
+    </div>
+  </section>
+</section>
+
+<section id="view-user-forms" class="view" hidden>
+  <p class="note">Choose a form template to complete and submit it for review.</p>
+  <div id="uf_form_catalog" class="grid form-catalog"></div>
+</section>
+
+<section id="view-head-forms" class="view" hidden>
+  <section class="panel">
+    <div class="account-heading">
+      <h2>Manage Forms</h2>
+      <button id="uf_head_refresh" class="ghost" type="button">Refresh</button>
+    </div>
+    <p class="note">Review submissions assigned to you and open completed forms to view their signatures.</p>
+    <p id="uf_head_feedback" class="okmsg" hidden></p>
+    <div class="user-form-summary" aria-label="Forms assigned to this Head">
+      <article class="user-form-stat"><span>Total assigned</span><strong id="uf_head_total">0</strong></article>
+      <article class="user-form-stat"><span>Awaiting signature</span><strong id="uf_head_pending">0</strong></article>
+      <article class="user-form-stat"><span>Approved by HR/Admin</span><strong id="uf_head_approved">0</strong></article>
+      <article class="user-form-stat"><span>Rejected</span><strong id="uf_head_rejected">0</strong></article>
+    </div>
+    <div class="toolbar form-filters">
+      <label for="uf_head_status">Status
+        <select id="uf_head_status">
+          <option value="">All statuses</option>
+          <option value="PENDING">Pending</option>
+          <option value="APPROVED">Approved</option>
+          <option value="REJECTED">Rejected</option>
+        </select>
+      </label>
+      <label for="uf_head_type">Form type
+        <select id="uf_head_type"><option value="">All form types</option></select>
+      </label>
+      <label class="form-search" for="uf_head_search">Search
+        <input id="uf_head_search" type="search" placeholder="Serial number, form, applicant, or details">
+      </label>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Serial Number</th><th>Form</th><th>Applicant</th><th>Submitted</th><th>Status</th><th>Review</th></tr></thead>
+        <tbody id="uf_head_review"></tbody>
+      </table>
+    </div>
+  </section>
+</section>
+
+<section id="view-leave-requests" class="view" hidden>
+  <section class="panel">
+    <div class="account-heading">
+      <h2>Manage Forms</h2>
+      <button id="uf_review_refresh" class="ghost" type="button">Refresh</button>
+    </div>
+    <p class="note">Review forms that reached HR/Admin and open completed forms, including Head rejections, to view their details and signatures.</p>
+    <div class="user-form-summary" aria-label="Submitted form status summary">
+      <article class="user-form-stat"><span>Total Requested</span><strong id="uf_review_total">0</strong></article>
+      <article class="user-form-stat"><span>Pending</span><strong id="uf_review_pending">0</strong></article>
+      <article class="user-form-stat"><span>Approved</span><strong id="uf_review_approved">0</strong></article>
+      <article class="user-form-stat"><span>Rejected</span><strong id="uf_review_rejected">0</strong></article>
+    </div>
+    <div class="toolbar form-filters">
+      <label for="uf_review_status">Status
+        <select id="uf_review_status">
+          <option value="">All statuses</option>
+          <option value="PENDING">Pending</option>
+          <option value="APPROVED">Approved</option>
+          <option value="REJECTED">Rejected</option>
+        </select>
+      </label>
+      <label for="uf_review_type">Form type
+        <select id="uf_review_type"><option value="">All form types</option></select>
+      </label>
+      <label class="form-search" for="uf_review_search">Search
+        <input id="uf_review_search" type="search" placeholder="Serial number, form, applicant, or details">
+      </label>
+    </div>
+    <div class="tablewrap">
+      <table>
+      <thead><tr><th>Serial Number</th><th>Form</th><th>Applicant</th><th>Submitted</th><th>Status</th><th>Review</th></tr></thead>
+        <tbody id="uf_review"></tbody>
+      </table>
+    </div>
+  </section>
+</section>
+
+<dialog id="leave-form-dialog">
+  <form id="leave-form">
+    <h2>Leave Application</h2>
+    <p class="note">Your name and filing date are attached automatically.</p>
+    <div class="fgrid">
+      <label>Name<input name="name_display" type="text" readonly disabled aria-label="Name from approved account"></label>
+      <label>Position<input name="position" maxlength="191" required></label>
+      <label>Department<input name="department" maxlength="191" required></label>
+      <label>Type of leave
+        <select name="leaveType" required>
+          <option value="">Choose a leave type</option>
+          <option>Vacation Leave (VL)</option>
+          <option>Sick Leave (SL)</option>
+          <option>SIL (Service Incentive Leave)</option>
+          <option>Emergency Leave</option>
+          <option>Maternity/Paternity Leave</option>
+          <option>Others</option>
+        </select>
+      </label>
+      <label id="leave-other-wrap" hidden>Other leave type<input name="otherLeaveType" maxlength="100"></label>
+      <label>From<input name="dateFrom" type="date" required></label>
+      <label>To<input name="dateTo" type="date" required></label>
+      <label>No. of days<input name="days" type="number" min="0.5" max="365" step="0.5" required></label>
+    </div>
+    <label class="leave-reason">Reason<textarea name="reason" maxlength="500" rows="3" required></textarea></label>
+    <fieldset>
+      <legend>Leave pay</legend>
+      <label><input name="payType" type="radio" value="WITH_PAY" required> With pay</label>
+      <label><input name="payType" type="radio" value="WITHOUT_PAY" required> Without pay</label>
+    </fieldset>
+    <label class="leave-confirm"><input name="confirmation" type="checkbox" required> I confirm that the information in this form is accurate.</label>
+    <div class="signature-pad-field">
+      <span>Electronic signature</span>
+      <canvas id="leave-signature-pad" class="signature-pad" aria-label="Draw your electronic signature" tabindex="0"></canvas>
+      <button id="leave-signature-clear" class="ghost" type="button">Clear signature</button>
+    </div>
+    <p id="uf_submit_feedback" class="okmsg" hidden></p>
+    <div class="actions">
+      <button type="submit">Submit for review</button>
+      <button id="uf_cancel_leave" class="ghost" type="button">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="leave-view-dialog">
+  <div class="form-view-header">
+    <h2 id="uf_form_view_title">Submitted form</h2>
+    <button id="uf_close_view" class="ghost" type="button">Close</button>
+  </div>
+  <div id="uf_form_view"></div>
+</dialog>
+
+<dialog id="user-template-dialog">
+  <form id="user-template-form">
+    <h2 id="user-template-title"></h2>
+    <p id="user-template-feedback" class="errs" hidden></p>
+    <div id="user-template-fields" class="fgrid"></div>
+    <label class="leave-confirm"><input name="confirmation" type="checkbox" required> I confirm that the information in this form is accurate.</label>
+    <div class="signature-pad-field">
+      <span>Electronic signature</span>
+      <canvas id="template-signature-pad" class="signature-pad" aria-label="Draw your electronic signature" tabindex="0"></canvas>
+      <button id="template-signature-clear" class="ghost" type="button">Clear signature</button>
+    </div>
+    <div class="actions">
+      <button type="submit">Submit for review</button>
+      <button id="user-template-cancel" class="ghost" type="button">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="head-signature-dialog">
+  <form id="head-signature-form">
+    <h2>Sign and forward form</h2>
+    <p id="head-signature-control" class="note"></p>
+    <div class="signature-pad-field">
+      <span>Head signature</span>
+      <canvas id="head-signature-pad" class="signature-pad" aria-label="Draw your electronic signature" tabindex="0"></canvas>
+      <button id="head-signature-clear" class="ghost" type="button">Clear signature</button>
+    </div>
+    <p id="head-signature-feedback" class="errs" hidden></p>
+    <div class="actions">
+      <button type="submit">Sign and forward to HR/Admin</button>
+      <button id="head-signature-cancel" class="ghost" type="button">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="hr-signature-dialog">
+  <form id="hr-signature-form">
+    <h2>Sign and approve form</h2>
+    <p id="hr-signature-control" class="note"></p>
+    <div class="signature-pad-field">
+      <span>HR/Admin signature</span>
+      <canvas id="hr-signature-pad" class="signature-pad" aria-label="Draw your electronic signature" tabindex="0"></canvas>
+      <button id="hr-signature-clear" class="ghost" type="button">Clear signature</button>
+    </div>
+    <p id="hr-signature-feedback" class="errs" hidden></p>
+    <div class="actions">
+      <button type="submit">Sign and approve</button>
+      <button id="hr-signature-cancel" class="ghost" type="button">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="form-rejection-dialog" class="decision-dialog">
+  <form id="form-rejection-form">
+    <h2>Reject form</h2>
+    <p id="form-rejection-control" class="note"></p>
+    <label for="form-rejection-reason">Reason for rejection</label>
+    <textarea id="form-rejection-reason" maxlength="500" rows="4" required></textarea>
+    <p id="form-rejection-feedback" class="errs" hidden></p>
+    <div class="actions">
+      <button type="submit">Reject form</button>
+      <button id="form-rejection-cancel" class="ghost" type="button">Cancel</button>
+    </div>
+  </form>
+</dialog>

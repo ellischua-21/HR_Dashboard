@@ -1,0 +1,28 @@
+<section id="view-employees" class="view" hidden>
+  <div class="toolbar">
+    <input id="e_search" type="search" placeholder="Search name or employee number" aria-label="Search">
+    <select id="e_company" aria-label="Company"></select><select id="e_department" aria-label="Department"></select><select id="e_status" aria-label="Status"></select>
+    <button id="e_go">Search</button><span class="sp"></span>
+    <button class="ghost" id="e_import">Import</button><button class="ghost" id="e_export">Export CSV</button><button id="e_add">Add employee</button>
+  </div>
+  <div id="importPanel" class="panel" hidden>
+    <h2>Import employees from Excel or CSV</h2>
+    <p class="note">Choose a file, check how its columns map to employee fields, validate, then import. Employee numbers must be unique.</p>
+    <div class="toolbar"><input type="file" id="i_file" accept=".csv,.xlsx,.xls"><button class="ghost" id="i_tpl">Download template</button></div>
+    <div class="tablewrap" id="i_map" hidden></div>
+    <div class="actions" id="i_act" hidden><button class="ghost" id="i_validate">Validate</button><button id="i_commit" disabled>Import valid rows</button></div>
+    <div id="i_result"></div>
+  </div>
+  <div class="tablewrap"><table><thead id="e_head"></thead><tbody id="e_body"></tbody></table></div>
+  <div class="pager"><span class="note" id="e_info"></span><button class="ghost" id="e_prev">Previous</button><button class="ghost" id="e_next">Next</button></div>
+  <dialog id="profile"><div id="p_body"></div>
+    <div class="actions"><button id="p_edit">Edit</button><button class="ghost" id="p_print">Print</button><button class="ghost" id="p_archive">Archive</button><button class="ghost" id="p_close">Close</button></div></dialog>
+</section>
+<section id="view-register" class="view" hidden>
+  <p class="note" id="r_mode"></p>
+  <div id="r_form"></div>
+  <div class="actions"><button id="r_preview">Review and save</button><button class="ghost" id="r_cancel">Cancel</button></div>
+  <div id="r_msg"></div>
+  <dialog id="preview"><h2 style="margin-top:0">Review before saving</h2><div id="pv_body"></div><div id="pv_err"></div>
+    <div class="actions"><button id="pv_save">Save employee</button><button class="ghost" id="pv_back">Back to form</button></div></dialog>
+</section>

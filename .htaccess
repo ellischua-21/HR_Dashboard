@@ -1,0 +1,13 @@
+<FilesMatch "^(?:\.env(?:\..*)?|server\.js|package(?:-lock)?\.json|README\.md)$">
+  Require all denied
+</FilesMatch>
+
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /HR_Dashboard/
+  RewriteRule ^$ public/ [R=302,L]
+  RewriteRule ^(?:node_modules|server|scripts|tests)(?:/|$) - [F,L,NC]
+  RewriteRule ^shared/(?!FormTemplates\.js$).* - [F,L,NC]
+</IfModule>

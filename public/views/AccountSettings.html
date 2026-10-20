@@ -1,0 +1,15 @@
+<section id="view-account-settings" class="view" hidden>
+  <section class="panel password-panel">
+    <h2>Change Password</h2>
+    <p class="note">Enter your current password and choose a new password with 12–128 characters.</p>
+    <form id="account-password-form" class="password-form">
+      <label>Current password<input name="currentPassword" type="password" autocomplete="current-password" required></label>
+      <label>New password<input name="newPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+      <label>Confirm new password<input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+      <div class="actions">
+        <button type="submit">Update Password</button>
+      </div>
+      <p id="account-password-feedback" class="okmsg" hidden></p>
+    </form>
+  </section>
+</section>
