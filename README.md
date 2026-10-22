@@ -99,6 +99,7 @@ Create local accounts separately with `npm.cmd run create-user`; Google account 
 - The Node API runs separately from Apache. XAMPP's MySQL stores employees, user roles, lookup values, audit events, and system settings.
 - ADMIN Audit Logs can be filtered by a start/end time and exact user email. Filter validation and SQL parameterization are enforced by the API.
 - HR and ADMIN can publish announcements from the Announcements tab. STAFF and HEAD see unacknowledged announcements in a blurred modal after login; acknowledging records that announcement as seen for that account.
+- All roles have an Inbox. STAFF and HEAD see new and previously acknowledged HR announcements; HEAD also sees forms awaiting their review. HR and ADMIN see forms awaiting HR/Admin review. Inbox filters support item type and status, and form items link to Manage Forms.
 - Existing report, import, export, employee privacy, audit, and role-permission rules are enforced by the API, not by the browser.
 
 ## Checks and sample records

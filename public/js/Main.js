@@ -31,6 +31,7 @@ const KPIS = [
 const NAV = [
   ['dashboard', 'Dashboard', 'dash.view', true],
   ['leave-requests', 'Manage Forms', 'forms.review', true],
+  ['inbox', 'Inbox', 'inbox.read', true],
   ['employees', 'Employee Master List', 'emp.read', true],
   ['register', 'Employee Registration', 'emp.write', true],
   ['executive', 'Executive Summary', 'exec.view', true],
@@ -42,6 +43,7 @@ const NAV = [
 ];
 const USER_NAV = [
   ['user-dashboard', 'Submitted Forms', 'forms.self', true],
+  ['inbox', 'Inbox', 'inbox.read', true],
   ['user-forms', 'Forms', 'forms.self', true],
   ['account-settings', 'Account Management', 'account.password', true]
 ];
@@ -60,7 +62,7 @@ async function init() {
     const isHead = session.role === 'HEAD';
     const navItems = isFormSubmitter
       ? isHead
-        ? [USER_NAV[0], HEAD_NAV, USER_NAV[1], USER_NAV[2]]
+        ? [USER_NAV[0], USER_NAV[1], HEAD_NAV, USER_NAV[2], USER_NAV[3]]
         : USER_NAV
       : NAV.filter(item => item[0] !== 'account-settings' || !session.perms.includes('admin.manage'));
     navItems.filter(n => session.perms.includes(n[2])).forEach(n => {

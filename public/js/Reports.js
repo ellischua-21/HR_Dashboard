@@ -85,6 +85,67 @@ $('au_clear').onclick = guard(async () => {
   await loadAuditLogs();
 });
 
+/* ---------- Inbox ---------- */
+let inboxItems = [];
+
+async function loadInbox() {
+  inboxItems = await api('getInbox');
+  renderInbox();
+}
+
+function renderInbox() {
+  const items = $('inbox-items');
+  const type = $('inbox-type-filter').value;
+  const status = $('inbox-status-filter').value;
+  const visibleItems = inboxItems.filter(item =>
+    (!type || item.type === type) && (!status || item.status === status));
+  items.replaceChildren();
+  $('inbox-empty').hidden = visibleItems.length > 0;
+
+  visibleItems.forEach(item => {
+    const card = el('article', undefined, 'announcement-card inbox-card');
+    const heading = el('div', undefined, 'inbox-heading');
+    heading.appendChild(el('h3', item.title));
+    heading.appendChild(el('span', item.status.replaceAll('_', ' '), 'badge'));
+    card.appendChild(heading);
+    card.appendChild(el('p', item.message, 'announcement-message'));
+    const detail = item.type === 'ANNOUNCEMENT'
+      ? `From ${item.createdBy} · ${new Date(item.createdAt).toLocaleString()}`
+      : `Received ${new Date(item.createdAt).toLocaleString()}`;
+    card.appendChild(el('p', detail, 'note'));
+
+    if (item.type === 'ANNOUNCEMENT' && item.status === 'NEW') {
+      const acknowledge = el('button', 'Acknowledge');
+      acknowledge.type = 'button';
+      acknowledge.onclick = guard(async () => {
+        acknowledge.disabled = true;
+        try {
+          await api('markAnnouncementsSeen', [item.announcementId]);
+          await loadInbox();
+        } finally {
+          acknowledge.disabled = false;
+        }
+      });
+      card.appendChild(acknowledge);
+    } else if (item.type === 'FORM') {
+      const target = item.target === 'head-forms'
+        ? ['head-forms', 'Manage Forms', 'forms.head-review', true]
+        : ['leave-requests', 'Manage Forms', 'forms.review', true];
+      const view = el('button', 'View in Manage Forms');
+      view.type = 'button';
+      view.onclick = () => go(target);
+      card.appendChild(view);
+    }
+
+    items.appendChild(card);
+  });
+}
+
+VIEWS.inbox = guard(loadInbox);
+$('inbox-refresh').onclick = guard(loadInbox);
+$('inbox-type-filter').onchange = renderInbox;
+$('inbox-status-filter').onchange = renderInbox;
+
 /* ---------- HR announcements ---------- */
 async function loadAnnouncementsForManagement() {
   const announcements = await api('listAnnouncementsForManagement');

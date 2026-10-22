@@ -5,6 +5,33 @@
   <div class="tablewrap"><table><thead id="rp_head"></thead><tbody id="rp_body"></tbody></table></div>
   <div class="pager"><span class="note" id="rp_info"></span><button class="ghost" id="rp_prev">Previous</button><button class="ghost" id="rp_next">Next</button></div>
 </section>
+<section id="view-inbox" class="view" hidden>
+  <section class="panel">
+    <div class="account-heading">
+      <h2>Inbox</h2>
+      <button id="inbox-refresh" class="ghost" type="button">Refresh</button>
+    </div>
+    <div class="toolbar form-filters">
+      <label for="inbox-type-filter">Type
+        <select id="inbox-type-filter">
+          <option value="">All types</option>
+          <option value="ANNOUNCEMENT">Announcements</option>
+          <option value="FORM">Forms</option>
+        </select>
+      </label>
+      <label for="inbox-status-filter">Status
+        <select id="inbox-status-filter">
+          <option value="">All statuses</option>
+          <option value="NEW">New</option>
+          <option value="PREVIOUS">Previous</option>
+          <option value="ACTION_REQUIRED">Action required</option>
+        </select>
+      </label>
+    </div>
+    <p id="inbox-empty" class="note" hidden>No inbox items match these filters.</p>
+    <div id="inbox-items" class="announcement-list"></div>
+  </section>
+</section>
 <section id="view-executive" class="view" hidden>
   <div class="toolbar" id="ex_filters"></div>
   <div class="toolbar"><button id="ex_run">Apply filters</button><button class="ghost" id="ex_print">Print / save as PDF</button><span class="note" id="ex_period"></span></div>

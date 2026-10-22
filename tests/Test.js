@@ -40,8 +40,8 @@ test('employee display name uses the original surname-first format', () => {
 
 test('requested account roles map to the intended permission profiles', () => {
   assert.equal(ACCOUNT_ROLE_MAP.STAFF, 'STAFF');
-  assert.deepEqual(ROLE_PERMS.STAFF, ['forms.self', 'announcements.read', 'account.password']);
-  assert.deepEqual(ROLE_PERMS.HEAD, ['forms.self', 'forms.head-review', 'announcements.read', 'account.password']);
+  assert.deepEqual(ROLE_PERMS.STAFF, ['forms.self', 'announcements.read', 'inbox.read', 'account.password']);
+  assert.deepEqual(ROLE_PERMS.HEAD, ['forms.self', 'forms.head-review', 'announcements.read', 'inbox.read', 'account.password']);
   assert.ok(ROLE_PERMS.STAFF.includes('forms.self'));
   assert.ok(!ROLE_PERMS.STAFF.includes('forms.head-review'));
   assert.equal(ROLE_PERMS.MANAGER, undefined);
@@ -54,7 +54,9 @@ test('requested account roles map to the intended permission profiles', () => {
   assert.equal(ACCOUNT_ROLE_MAP.ADMIN, 'ADMIN');
   assert.ok(ROLE_PERMS.ADMIN.includes('admin.manage'));
   assert.ok(ROLE_PERMS.ADMIN.includes('announcements.manage'));
+  assert.ok(ROLE_PERMS.ADMIN.includes('inbox.read'));
   assert.ok(ROLE_PERMS.HR.includes('announcements.manage'));
+  assert.ok(ROLE_PERMS.HR.includes('inbox.read'));
   assert.ok(!ROLE_PERMS.HR.includes('admin.manage'));
   assert.ok(!ROLE_PERMS.HEAD.includes('forms.review'));
 });

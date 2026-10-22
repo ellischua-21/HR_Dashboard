@@ -74,6 +74,8 @@ dialog.announcement-dialog .announcement-message,.announcement-message{white-spa
 .announcement-list{display:grid;gap:10px}
 .announcement-card{border:1px solid var(--rule);border-radius:6px;background:#fff;padding:14px}
 .announcement-card h3{margin-top:0}
+.inbox-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.inbox-heading h3{margin:0}
 form#announcement-create-form>label{display:block;margin:10px 0 4px}
 form#announcement-create-form>input,form#announcement-create-form>textarea{display:block;width:100%;padding:8px;border:1px solid var(--rule);border-radius:4px;font:inherit}
 form#announcement-create-form>textarea{resize:vertical}
