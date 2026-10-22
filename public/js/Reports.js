@@ -66,8 +66,21 @@ async function loadExec() {
 $('ex_run').onclick = guard(loadExec); $('ex_print').onclick = () => window.print();
 
 /* ---------- Audit logs ---------- */
-VIEWS.audit = guard(async () => {
-  const rows = await api('getAuditLogs', 300), b = $('au_body'); b.innerHTML = '';
+async function loadAuditLogs() {
+  const filters = {
+    from: $('au_from').value,
+    to: $('au_to').value,
+    user: $('au_user').value.trim()
+  };
+  const rows = await api('getAuditLogs', 300, filters), b = $('au_body'); b.innerHTML = '';
   rows.forEach(r => { const t = el('tr'); r.forEach(v => t.appendChild(el('td', v))); b.appendChild(t); });
-  if (!rows.length) { const t = el('tr'), d = el('td', 'No audit events yet.'); d.colSpan = 5; t.appendChild(d); b.appendChild(t); }
+  if (!rows.length) { const t = el('tr'), d = el('td', 'No audit events match these filters.'); d.colSpan = 5; t.appendChild(d); b.appendChild(t); }
+}
+VIEWS.audit = guard(loadAuditLogs);
+$('au_apply').onclick = guard(loadAuditLogs);
+$('au_clear').onclick = guard(async () => {
+  $('au_from').value = '';
+  $('au_to').value = '';
+  $('au_user').value = '';
+  await loadAuditLogs();
 });

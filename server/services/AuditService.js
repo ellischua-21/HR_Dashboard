@@ -1,4 +1,56 @@
 const { pool } = require('../db/database');
+const { isValidDate } = require('../utils/Validation');
+
+function normalizeAuditDateTime(value, label) {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/.test(value) ||
+      !isValidDate(value.slice(0, 10))) {
+    const error = new Error(`Enter a valid ${label} date and time.`);
+    error.status = 400;
+    throw error;
+  }
+  return value.replace('T', ' ');
+}
+
+function normalizeAuditFilters(filters = {}) {
+  if (!filters || typeof filters !== 'object' || Array.isArray(filters)) {
+    const error = new Error('Audit filters must be an object.');
+    error.status = 400;
+    throw error;
+  }
+  const from = normalizeAuditDateTime(filters.from, 'start');
+  const to = normalizeAuditDateTime(filters.to, 'end');
+  const user = String(filters.user || '').trim().toLowerCase();
+  if (user.length > 191 || (user && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user))) {
+    const error = new Error('Enter a valid user email address.');
+    error.status = 400;
+    throw error;
+  }
+  if (from && to && from > to) {
+    const error = new Error('The start date and time must be before the end date and time.');
+    error.status = 400;
+    throw error;
+  }
+
+  const conditions = [];
+  const values = [];
+  if (from) {
+    conditions.push('event_time >= ?');
+    values.push(`${from}:00`);
+  }
+  if (to) {
+    conditions.push('event_time <= ?');
+    values.push(`${to}:59`);
+  }
+  if (user) {
+    conditions.push('user_email = ?');
+    values.push(user);
+  }
+  return {
+    where: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '',
+    values
+  };
+}
 
 async function logAudit(userEmail, action, recordId, detail, connection = pool) {
   if (['CREATE', 'UPDATE', 'ARCHIVE'].includes(action)) {
@@ -11,12 +63,15 @@ async function logAudit(userEmail, action, recordId, detail, connection = pool) 
     [userEmail || 'unknown', action, recordId || '', String(detail || '').slice(0, 500)]);
 }
 
-async function getAuditLogs(req, limit) {
+async function getAuditLogs(req, limit, filters) {
   await require('../middleware/Auth').requirePerm(req, 'audit.read');
   const take = Math.min(Math.max(Number(limit) || 200, 1), 1000);
+  const normalizedFilters = normalizeAuditFilters(filters);
   const [rows] = await pool.execute(
-    `SELECT event_time, user_email, action, record_id, detail FROM audit_logs ORDER BY id DESC LIMIT ${take}`);
+    `SELECT event_time, user_email, action, record_id, detail
+     FROM audit_logs ${normalizedFilters.where} ORDER BY id DESC LIMIT ${take}`,
+    normalizedFilters.values);
   return rows.map(row => [row.event_time, row.user_email, row.action, row.record_id, row.detail]);
 }
 
-module.exports = { logAudit, getAuditLogs };
+module.exports = { logAudit, getAuditLogs, normalizeAuditFilters };

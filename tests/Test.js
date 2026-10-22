@@ -4,6 +4,7 @@ const { sanitize, validateEmployee, cleanField, fullName, isValidDate } = requir
 const { EMP_FIELDS, ACCOUNT_ROLE_MAP, ROLE_PERMS } = require('../server/config/Config');
 const { hashPassword, verifyPassword } = require('../server/utils/Password');
 const { validateHeadAssignment } = require('../server/services/AccountService');
+const { normalizeAuditFilters } = require('../server/services/AuditService');
 const { validateLeaveForm, validateUserForm, validateApprovalSignature, formatSerialNumber, currentSerialYear, canEditForm } = require('../server/services/FormService');
 const FORM_TEMPLATES = require('../shared/FormTemplates');
 
@@ -165,6 +166,21 @@ test('only STAFF and HEAD can edit forms pending with an assigned Head', () => {
   assert.equal(canEditForm('STAFF', { ...pendingForHead, status: 'REJECTED' }), false);
   assert.equal(canEditForm('STAFF', { ...pendingForHead, status: 'APPROVED' }), false);
   assert.equal(canEditForm('HEAD', { ...pendingForHead, head_reviewer_email: null }), false);
+});
+
+test('audit log filters validate time range and exact user email', () => {
+  assert.deepEqual(normalizeAuditFilters({
+    from: '2026-10-22T09:30',
+    to: '2026-10-22T10:45',
+    user: 'Admin@example.com'
+  }), {
+    where: 'WHERE event_time >= ? AND event_time <= ? AND user_email = ?',
+    values: ['2026-10-22 09:30:00', '2026-10-22 10:45:59', 'admin@example.com']
+  });
+  assert.deepEqual(normalizeAuditFilters({}), { where: '', values: [] });
+  assert.throws(() => normalizeAuditFilters({ from: '2026-02-30T09:30' }), { status: 400 });
+  assert.throws(() => normalizeAuditFilters({ from: '2026-10-22T10:00', to: '2026-10-22T09:59' }), { status: 400 });
+  assert.throws(() => normalizeAuditFilters({ user: 'not-an-email' }), { status: 400 });
 });
 
 test('user forms require a bounded PNG electronic signature', () => {

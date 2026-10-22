@@ -14,6 +14,19 @@
   <div class="panel" style="margin-top:16px"><h2>Notes and upcoming data</h2><ul class="obs" id="ex_notes"></ul></div>
 </section>
 <section id="view-audit" class="view" hidden>
-  <p class="note">Most recent 300 events. Field values are never stored in the log.</p>
+  <p class="note">Most recent 300 matching events. Field values are never stored in the log.</p>
+  <div class="toolbar form-filters">
+    <label for="au_from">From
+      <input id="au_from" type="datetime-local">
+    </label>
+    <label for="au_to">To
+      <input id="au_to" type="datetime-local">
+    </label>
+    <label for="au_user">User email
+      <input id="au_user" type="email" maxlength="191" placeholder="Exact user email">
+    </label>
+    <button id="au_apply" type="button">Apply filters</button>
+    <button id="au_clear" class="ghost" type="button">Clear</button>
+  </div>
   <div class="tablewrap"><table><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Record</th><th>Detail</th></tr></thead><tbody id="au_body"></tbody></table></div>
 </section>

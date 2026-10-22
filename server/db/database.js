@@ -142,8 +142,14 @@ async function initializeDatabase() {
     record_id VARCHAR(20) NOT NULL DEFAULT '',
     detail VARCHAR(500) NOT NULL DEFAULT '',
     PRIMARY KEY (id),
-    KEY idx_audit_time (event_time)
+    KEY idx_audit_time (event_time),
+    KEY idx_audit_user_time (user_email, event_time)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  const [auditUserTimeIndexes] = await pool.query(
+    "SHOW INDEX FROM audit_logs WHERE Key_name = 'idx_audit_user_time'");
+  if (!auditUserTimeIndexes.length) {
+    await pool.query('ALTER TABLE audit_logs ADD KEY idx_audit_user_time (user_email, event_time)');
+  }
 
   await pool.query(`CREATE TABLE IF NOT EXISTS system_settings (
     setting_key VARCHAR(100) NOT NULL,
