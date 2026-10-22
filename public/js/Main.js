@@ -36,6 +36,7 @@ const NAV = [
   ['executive', 'Executive Summary', 'exec.view', true],
   ['reports', 'HR Reports', 'report.run', true],
   ['audit', 'Audit Logs', 'audit.read', true],
+  ['announcements', 'Announcements', 'announcements.manage', true],
   ['accounts', 'Manage Accounts', 'admin.manage', true],
   ['account-settings', 'Account Management', 'account.password', true]
 ];
@@ -87,6 +88,9 @@ async function init() {
     };
     if (isFormSubmitter) {
       go(USER_NAV[0]);
+      if (session.perms.includes('announcements.read')) {
+        window.showPendingAnnouncements().catch(error => showErr(error.message || String(error)));
+      }
       if (isHead) {
         window.refreshSubmittedFormsBadge().catch(error => showErr(error.message || String(error)));
         window.setInterval(() => {

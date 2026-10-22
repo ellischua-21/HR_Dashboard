@@ -5,6 +5,7 @@ const { EMP_FIELDS, ACCOUNT_ROLE_MAP, ROLE_PERMS } = require('../server/config/C
 const { hashPassword, verifyPassword } = require('../server/utils/Password');
 const { validateHeadAssignment } = require('../server/services/AccountService');
 const { normalizeAuditFilters } = require('../server/services/AuditService');
+const { normalizeAnnouncementText } = require('../server/services/AnnouncementService');
 const { validateLeaveForm, validateUserForm, validateApprovalSignature, formatSerialNumber, currentSerialYear, canEditForm } = require('../server/services/FormService');
 const FORM_TEMPLATES = require('../shared/FormTemplates');
 
@@ -39,8 +40,8 @@ test('employee display name uses the original surname-first format', () => {
 
 test('requested account roles map to the intended permission profiles', () => {
   assert.equal(ACCOUNT_ROLE_MAP.STAFF, 'STAFF');
-  assert.deepEqual(ROLE_PERMS.STAFF, ['forms.self', 'account.password']);
-  assert.deepEqual(ROLE_PERMS.HEAD, ['forms.self', 'forms.head-review', 'account.password']);
+  assert.deepEqual(ROLE_PERMS.STAFF, ['forms.self', 'announcements.read', 'account.password']);
+  assert.deepEqual(ROLE_PERMS.HEAD, ['forms.self', 'forms.head-review', 'announcements.read', 'account.password']);
   assert.ok(ROLE_PERMS.STAFF.includes('forms.self'));
   assert.ok(!ROLE_PERMS.STAFF.includes('forms.head-review'));
   assert.equal(ROLE_PERMS.MANAGER, undefined);
@@ -52,6 +53,8 @@ test('requested account roles map to the intended permission profiles', () => {
   assert.equal(ACCOUNT_ROLE_MAP.HR, 'HR');
   assert.equal(ACCOUNT_ROLE_MAP.ADMIN, 'ADMIN');
   assert.ok(ROLE_PERMS.ADMIN.includes('admin.manage'));
+  assert.ok(ROLE_PERMS.ADMIN.includes('announcements.manage'));
+  assert.ok(ROLE_PERMS.HR.includes('announcements.manage'));
   assert.ok(!ROLE_PERMS.HR.includes('admin.manage'));
   assert.ok(!ROLE_PERMS.HEAD.includes('forms.review'));
 });
@@ -181,6 +184,12 @@ test('audit log filters validate time range and exact user email', () => {
   assert.throws(() => normalizeAuditFilters({ from: '2026-02-30T09:30' }), { status: 400 });
   assert.throws(() => normalizeAuditFilters({ from: '2026-10-22T10:00', to: '2026-10-22T09:59' }), { status: 400 });
   assert.throws(() => normalizeAuditFilters({ user: 'not-an-email' }), { status: 400 });
+});
+
+test('announcement text is required, bounded, and stripped of HTML delimiters', () => {
+  assert.equal(normalizeAnnouncementText('  <Update>  ', 'title', 160), 'Update');
+  assert.throws(() => normalizeAnnouncementText(' ', 'title', 160), { status: 400 });
+  assert.throws(() => normalizeAnnouncementText('x'.repeat(161), 'title', 160), { status: 400 });
 });
 
 test('user forms require a bounded PNG electronic signature', () => {

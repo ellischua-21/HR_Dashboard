@@ -84,3 +84,41 @@ $('au_clear').onclick = guard(async () => {
   $('au_user').value = '';
   await loadAuditLogs();
 });
+
+/* ---------- HR announcements ---------- */
+async function loadAnnouncementsForManagement() {
+  const announcements = await api('listAnnouncementsForManagement');
+  const list = $('announcement-list');
+  list.replaceChildren();
+  if (!announcements.length) {
+    list.appendChild(el('p', 'No announcements have been published.'));
+    return;
+  }
+  announcements.forEach(announcement => {
+    const card = el('article', undefined, 'announcement-card');
+    card.appendChild(el('h3', announcement.title));
+    card.appendChild(el('p', announcement.message, 'announcement-message'));
+    card.appendChild(el('p',
+      `Published by ${announcement.created_by_name} · ${new Date(announcement.created_at).toLocaleString()}`,
+      'note'));
+    list.appendChild(card);
+  });
+}
+
+VIEWS.announcements = guard(loadAnnouncementsForManagement);
+$('announcement-create-form').onsubmit = guard(async event => {
+  event.preventDefault();
+  const feedback = $('announcement-create-feedback');
+  const submit = $('announcement-create-form').querySelector('[type="submit"]');
+  submit.disabled = true;
+  feedback.hidden = true;
+  try {
+    await api('createAnnouncement', $('announcement-title').value, $('announcement-message').value);
+    $('announcement-create-form').reset();
+    feedback.textContent = 'Announcement published for STAFF and HEAD accounts.';
+    feedback.hidden = false;
+    await loadAnnouncementsForManagement();
+  } finally {
+    submit.disabled = false;
+  }
+});

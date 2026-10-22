@@ -872,6 +872,50 @@ async function refreshSubmittedFormsBadge() {
 
 window.refreshSubmittedFormsBadge = refreshSubmittedFormsBadge;
 
+let pendingAnnouncements = [];
+
+async function showPendingAnnouncements() {
+  pendingAnnouncements = await api('listUnseenAnnouncements');
+  if (!pendingAnnouncements.length) return;
+  const list = $('staff-announcements-list');
+  list.replaceChildren();
+  pendingAnnouncements.forEach(announcement => {
+    const card = document.createElement('article');
+    card.className = 'announcement-card';
+    const title = document.createElement('h3');
+    title.textContent = announcement.title;
+    const message = document.createElement('p');
+    message.className = 'announcement-message';
+    message.textContent = announcement.message;
+    const details = document.createElement('p');
+    details.className = 'note';
+    details.textContent = `From ${announcement.created_by_name} · ${userDate(announcement.created_at)}`;
+    card.append(title, message, details);
+    list.appendChild(card);
+  });
+  $('staff-announcements-feedback').hidden = true;
+  $('staff-announcements-dialog').showModal();
+}
+
+async function acknowledgePendingAnnouncements() {
+  const button = $('staff-announcements-acknowledge');
+  const feedback = $('staff-announcements-feedback');
+  button.disabled = true;
+  feedback.hidden = true;
+  try {
+    await api('markAnnouncementsSeen', pendingAnnouncements.map(announcement => announcement.id));
+    pendingAnnouncements = [];
+    $('staff-announcements-dialog').close();
+  } catch (error) {
+    feedback.textContent = error.message || String(error);
+    feedback.hidden = false;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+window.showPendingAnnouncements = showPendingAnnouncements;
+
 VIEWS['user-dashboard'] = guard(loadMyForms);
 VIEWS['user-forms'] = () => {};
 VIEWS['leave-requests'] = guard(loadFormsForReview);
@@ -920,3 +964,5 @@ $('form-rejection-cancel').onclick = () => {
   $('form-rejection-dialog').close();
   formToReject = null;
 };
+$('staff-announcements-acknowledge').onclick = acknowledgePendingAnnouncements;
+$('staff-announcements-dialog').addEventListener('cancel', event => event.preventDefault());

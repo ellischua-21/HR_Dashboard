@@ -98,6 +98,7 @@ Create local accounts separately with `npm.cmd run create-user`; Google account 
 - The API listens on `127.0.0.1:3001` by default. If Apache uses a nonstandard host/port, add its origin (for example `http://localhost:8080`) to `CORS_ORIGINS`.
 - The Node API runs separately from Apache. XAMPP's MySQL stores employees, user roles, lookup values, audit events, and system settings.
 - ADMIN Audit Logs can be filtered by a start/end time and exact user email. Filter validation and SQL parameterization are enforced by the API.
+- HR and ADMIN can publish announcements from the Announcements tab. STAFF and HEAD see unacknowledged announcements in a blurred modal after login; acknowledging records that announcement as seen for that account.
 - Existing report, import, export, employee privacy, audit, and role-permission rules are enforced by the API, not by the browser.
 
 ## Checks and sample records

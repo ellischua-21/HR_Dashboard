@@ -93,10 +93,10 @@ const F = {
 };
 
 const ROLE_PERMS = {
-  ADMIN: ['dash.view', 'exec.view', 'emp.read', 'emp.write', 'emp.sensitive', 'emp.export', 'emp.archive', 'admin.manage', 'audit.read', 'report.run', 'forms.review', 'account.password'],
-  HR: ['dash.view', 'exec.view', 'emp.read', 'emp.write', 'emp.export', 'emp.archive', 'report.run', 'forms.review', 'account.password'],
-  HEAD: ['forms.self', 'forms.head-review', 'account.password'],
-  STAFF: ['forms.self', 'account.password']
+  ADMIN: ['dash.view', 'exec.view', 'emp.read', 'emp.write', 'emp.sensitive', 'emp.export', 'emp.archive', 'admin.manage', 'audit.read', 'report.run', 'forms.review', 'announcements.manage', 'account.password'],
+  HR: ['dash.view', 'exec.view', 'emp.read', 'emp.write', 'emp.export', 'emp.archive', 'report.run', 'forms.review', 'announcements.manage', 'account.password'],
+  HEAD: ['forms.self', 'forms.head-review', 'announcements.read', 'account.password'],
+  STAFF: ['forms.self', 'announcements.read', 'account.password']
 };
 
 const ACCOUNT_ROLE_MAP = {

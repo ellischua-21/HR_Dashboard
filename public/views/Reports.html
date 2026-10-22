@@ -30,3 +30,21 @@
   </div>
   <div class="tablewrap"><table><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Record</th><th>Detail</th></tr></thead><tbody id="au_body"></tbody></table></div>
 </section>
+<section id="view-announcements" class="view" hidden>
+  <section class="panel">
+    <h2>Create announcement</h2>
+    <p class="note">New announcements appear once for each STAFF and HEAD account after login, until acknowledged.</p>
+    <form id="announcement-create-form">
+      <label for="announcement-title">Title</label>
+      <input id="announcement-title" type="text" maxlength="160" required>
+      <label for="announcement-message">Message</label>
+      <textarea id="announcement-message" maxlength="5000" rows="5" required></textarea>
+      <p id="announcement-create-feedback" class="okmsg" hidden></p>
+      <div class="actions"><button type="submit">Publish announcement</button></div>
+    </form>
+  </section>
+  <section class="panel">
+    <h2>Previous announcements</h2>
+    <div id="announcement-list" class="announcement-list"></div>
+  </section>
+</section>

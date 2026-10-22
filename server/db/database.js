@@ -151,6 +151,24 @@ async function initializeDatabase() {
     await pool.query('ALTER TABLE audit_logs ADD KEY idx_audit_user_time (user_email, event_time)');
   }
 
+  await pool.query(`CREATE TABLE IF NOT EXISTS hr_announcements (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    title VARCHAR(160) NOT NULL,
+    message TEXT NOT NULL,
+    created_by VARCHAR(191) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_announcement_created (created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS announcement_views (
+    announcement_id BIGINT UNSIGNED NOT NULL,
+    user_email VARCHAR(191) NOT NULL,
+    viewed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (announcement_id, user_email),
+    KEY idx_announcement_view_user (user_email, viewed_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
   await pool.query(`CREATE TABLE IF NOT EXISTS system_settings (
     setting_key VARCHAR(100) NOT NULL,
     setting_value VARCHAR(255) NOT NULL,
