@@ -4,7 +4,7 @@ const { sanitize, validateEmployee, cleanField, fullName, isValidDate } = requir
 const { EMP_FIELDS, ACCOUNT_ROLE_MAP, ROLE_PERMS } = require('../server/config/Config');
 const { hashPassword, verifyPassword } = require('../server/utils/Password');
 const { validateHeadAssignment } = require('../server/services/AccountService');
-const { validateLeaveForm, validateUserForm, validateApprovalSignature, formatSerialNumber } = require('../server/services/FormService');
+const { validateLeaveForm, validateUserForm, validateApprovalSignature, formatSerialNumber, currentSerialYear } = require('../server/services/FormService');
 const FORM_TEMPLATES = require('../shared/FormTemplates');
 
 test('sanitization removes markup and neutralizes formula input', () => {
@@ -142,6 +142,14 @@ test('serial numbers use configurable form prefixes and sequence widths', () => 
   assert.equal(formatSerialNumber(travel, 2026, 12), 'TRV-2026-000012');
   assert.equal(formatSerialNumber({ ...leave, prefix: 'CUSTOM', sequenceWidth: 4 }, 2027, 12), 'CUSTOM-2027-0012');
   assert.equal(new Set(FORM_TEMPLATES.map(template => template.prefix)).size, FORM_TEMPLATES.length);
+});
+
+test('serial number year follows the Manila calendar year at New Year', () => {
+  assert.equal(currentSerialYear(new Date('2026-12-31T15:59:59.000Z')), 2026);
+  assert.equal(currentSerialYear(new Date('2026-12-31T16:00:00.000Z')), 2027);
+  const authorityToDeduct = FORM_TEMPLATES.find(template => template.key === 'authority-to-deduct');
+  assert.equal(formatSerialNumber(authorityToDeduct, currentSerialYear(new Date('2026-12-31T16:00:00.000Z')), 1),
+    'ATD-2027-000001');
 });
 
 test('user forms require a bounded PNG electronic signature', () => {

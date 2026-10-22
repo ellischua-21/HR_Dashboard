@@ -122,6 +122,13 @@ function formatSerialNumber(template, year, sequence) {
   return `${template.prefix}-${year}-${serialSequence.toString().padStart(width, '0')}`;
 }
 
+function currentSerialYear(date = new Date()) {
+  return Number(new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric'
+  }).format(date));
+}
+
 function parseForm(row) {
   return {
     ...row,
@@ -238,8 +245,7 @@ async function persistUserForm(email, role, headEmail, templateKey, formData, de
        VALUES (NULL, ?, ?, ?, 'PENDING', ?, ?)`,
       [email, templateKey, JSON.stringify(formData), headEmail ? 'HEAD' : 'HR', headEmail]);
     const id = result.insertId;
-    const [[yearRow]] = await connection.query('SELECT YEAR(CURRENT_DATE()) AS year');
-    const year = Number(yearRow.year);
+    const year = currentSerialYear();
     const [[existingSequence]] = await connection.execute(
       `SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(control_no, '-', -1) AS UNSIGNED)), 0) AS sequence_value
        FROM user_forms WHERE template_key = ? AND control_no LIKE ?`,
@@ -392,4 +398,4 @@ async function reviewUserForm(req, formId, decision, reason = '', signature = ''
   }
 }
 
-module.exports = { LEAVE_TYPES, validateLeaveForm, validateUserForm, validateApprovalSignature, formatSerialNumber, listMyForms, submitLeaveForm, submitUserForm, listFormsForReview, getFormReviewSummaryForUser, reviewUserForm };
+module.exports = { LEAVE_TYPES, validateLeaveForm, validateUserForm, validateApprovalSignature, formatSerialNumber, currentSerialYear, listMyForms, submitLeaveForm, submitUserForm, listFormsForReview, getFormReviewSummaryForUser, reviewUserForm };
