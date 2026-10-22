@@ -4,7 +4,7 @@ const { sanitize, validateEmployee, cleanField, fullName, isValidDate } = requir
 const { EMP_FIELDS, ACCOUNT_ROLE_MAP, ROLE_PERMS } = require('../server/config/Config');
 const { hashPassword, verifyPassword } = require('../server/utils/Password');
 const { validateHeadAssignment } = require('../server/services/AccountService');
-const { validateLeaveForm, validateUserForm, validateApprovalSignature, formatSerialNumber, currentSerialYear } = require('../server/services/FormService');
+const { validateLeaveForm, validateUserForm, validateApprovalSignature, formatSerialNumber, currentSerialYear, canEditForm } = require('../server/services/FormService');
 const FORM_TEMPLATES = require('../shared/FormTemplates');
 
 test('sanitization removes markup and neutralizes formula input', () => {
@@ -150,6 +150,21 @@ test('serial number year follows the Manila calendar year at New Year', () => {
   const authorityToDeduct = FORM_TEMPLATES.find(template => template.key === 'authority-to-deduct');
   assert.equal(formatSerialNumber(authorityToDeduct, currentSerialYear(new Date('2026-12-31T16:00:00.000Z')), 1),
     'ATD-2027-000001');
+});
+
+test('only STAFF and HEAD can edit forms pending with an assigned Head', () => {
+  const pendingForHead = {
+    status: 'PENDING',
+    review_stage: 'HEAD',
+    head_reviewer_email: 'head@example.com'
+  };
+  assert.equal(canEditForm('STAFF', pendingForHead), true);
+  assert.equal(canEditForm('HEAD', pendingForHead), true);
+  assert.equal(canEditForm('HR', pendingForHead), false);
+  assert.equal(canEditForm('STAFF', { ...pendingForHead, review_stage: 'HR' }), false);
+  assert.equal(canEditForm('STAFF', { ...pendingForHead, status: 'REJECTED' }), false);
+  assert.equal(canEditForm('STAFF', { ...pendingForHead, status: 'APPROVED' }), false);
+  assert.equal(canEditForm('HEAD', { ...pendingForHead, head_reviewer_email: null }), false);
 });
 
 test('user forms require a bounded PNG electronic signature', () => {

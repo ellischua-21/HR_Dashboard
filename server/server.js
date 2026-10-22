@@ -99,6 +99,7 @@ const methods = {
   listMyForms: req => userForms.listMyForms(req),
   submitLeaveForm: (req, data) => userForms.submitLeaveForm(req, data),
   submitUserForm: (req, templateKey, data) => userForms.submitUserForm(req, templateKey, data),
+  updateMyForm: (req, formId, templateKey, data) => userForms.updateMyForm(req, formId, templateKey, data),
   listFormsForReview: req => userForms.listFormsForReview(req),
   getFormReviewSummary: req => userForms.getFormReviewSummaryForUser(req),
   reviewUserForm: (req, formId, decision, notes, signature) => userForms.reviewUserForm(req, formId, decision, notes, signature)

@@ -2,6 +2,7 @@ let mySubmittedForms = [];
 let formsForReview = [];
 let formToSign = null;
 let formToApprove = null;
+let formBeingEdited = null;
 
 const userCell = value => {
   const cell = document.createElement('td');
@@ -90,6 +91,13 @@ function updateFormSummary(summary) {
   $('uf_pending').textContent = String(summary.pending);
   $('uf_approved').textContent = String(summary.approved);
   $('uf_rejected').textContent = String(summary.rejected);
+}
+
+function canEditSubmittedForm(form) {
+  return ['STAFF', 'HEAD'].includes(session.role) &&
+    form.status === 'PENDING' &&
+    form.review_stage === 'HEAD' &&
+    Boolean(form.head_reviewer_email);
 }
 
 function appendFormField(parent, label, value, className = '') {
@@ -345,7 +353,18 @@ function renderMyForms() {
     print.className = 'ghost';
     print.textContent = 'Print / Save PDF';
     print.onclick = () => printSavedForm(form);
-    actions.append(view, print);
+    actions.append(view);
+    if (canEditSubmittedForm(form)) {
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'ghost';
+      edit.textContent = 'Edit';
+      edit.onclick = () => form.template_key === 'leave-2026'
+        ? openLeaveForm(form)
+        : openTemplateForm(formTemplate(form.template_key), form);
+      actions.appendChild(edit);
+    }
+    actions.appendChild(print);
     row.append(notes, actions);
     body.appendChild(row);
   });
@@ -373,12 +392,14 @@ function buildFormCatalog() {
   });
 }
 
-function openTemplateForm(template) {
+function openTemplateForm(template, existingForm = null) {
   const form = $('user-template-form');
   form.reset();
+  formBeingEdited = existingForm;
   form.dataset.templateKey = template.key;
-  $('user-template-title').textContent = template.title;
+  $('user-template-title').textContent = existingForm ? `Edit ${template.title}` : template.title;
   $('user-template-feedback').hidden = true;
+  $('user-template-edit-note').hidden = !existingForm;
   const fields = $('user-template-fields');
   fields.replaceChildren();
   template.fields.forEach(field => {
@@ -394,7 +415,13 @@ function openTemplateForm(template) {
     if (field.step !== undefined) input.step = String(field.step);
     label.appendChild(input);
     fields.appendChild(label);
+    if (existingForm) {
+      input.value = existingForm.form_data[field.name] === undefined
+        ? ''
+        : String(existingForm.form_data[field.name]);
+    }
   });
+  $('user-template-submit').textContent = existingForm ? 'Save changes' : 'Submit for review';
   $('user-template-dialog').showModal();
   templateSignaturePad.clear();
 }
@@ -405,12 +432,24 @@ function setOtherLeaveVisibility() {
   $('leave-form').elements.otherLeaveType.required = isOther;
 }
 
-function openLeaveForm() {
+function openLeaveForm(existingForm = null) {
   const form = $('leave-form');
   form.reset();
+  formBeingEdited = existingForm;
   form.elements.name_display.value = session.full_name || session.email;
+  $('leave-form-title').textContent = existingForm ? 'Edit Leave Application' : 'Leave Application';
+  $('leave-form-edit-note').hidden = !existingForm;
+  $('leave-form-submit').textContent = existingForm ? 'Save changes' : 'Submit for review';
   $('leave-form').elements.otherLeaveType.required = false;
-  $('leave-other-wrap').hidden = true;
+  if (existingForm) {
+    const data = existingForm.form_data;
+    ['position', 'department', 'leaveType', 'otherLeaveType', 'dateFrom', 'dateTo', 'days', 'reason']
+      .forEach(name => { form.elements[name].value = data[name] === undefined ? '' : data[name]; });
+    form.querySelectorAll('[name="payType"]').forEach(option => {
+      option.checked = option.value === data.payType;
+    });
+  }
+  setOtherLeaveVisibility();
   $('uf_submit_feedback').hidden = true;
   $('leave-form-dialog').showModal();
   leaveSignaturePad.clear();
@@ -442,10 +481,17 @@ async function submitLeaveRequest(event) {
       payType: values.get('payType'),
       signature: leaveSignaturePad.toDataURL()
     };
-    const result = await api('submitLeaveForm', formData);
+    const result = formBeingEdited
+      ? await api('updateMyForm', formBeingEdited.id, formBeingEdited.template_key, formData)
+      : await api('submitLeaveForm', formData);
     $('leave-form-dialog').close();
-    go(USER_NAV[0]);
-    $('uf_global_feedback').textContent = `Form ${result.controlNo} submitted. Status: Pending review.`;
+    const wasEdited = Boolean(formBeingEdited);
+    formBeingEdited = null;
+    if (wasEdited) await loadMyForms();
+    else go(USER_NAV[0]);
+    $('uf_global_feedback').textContent = wasEdited
+      ? `Form ${result.controlNo} changes saved.`
+      : `Form ${result.controlNo} submitted. Status: Pending review.`;
     $('uf_global_feedback').hidden = false;
   } catch (error) {
     showErr(error.message || String(error));
@@ -798,11 +844,18 @@ async function submitTemplateForm(event) {
     const data = {};
     template.fields.forEach(field => { data[field.name] = values.get(field.name) || ''; });
     data.signature = templateSignaturePad.toDataURL();
-    const result = await api('submitUserForm', template.key, data);
+    const result = formBeingEdited
+      ? await api('updateMyForm', formBeingEdited.id, template.key, data)
+      : await api('submitUserForm', template.key, data);
     $('user-template-dialog').close();
     form.dataset.templateKey = '';
-    go(USER_NAV[0]);
-    $('uf_global_feedback').textContent = `Form ${result.controlNo} submitted. Status: Pending review.`;
+    const wasEdited = Boolean(formBeingEdited);
+    formBeingEdited = null;
+    if (wasEdited) await loadMyForms();
+    else go(USER_NAV[0]);
+    $('uf_global_feedback').textContent = wasEdited
+      ? `Form ${result.controlNo} changes saved.`
+      : `Form ${result.controlNo} submitted. Status: Pending review.`;
     $('uf_global_feedback').hidden = false;
   } catch (error) {
     feedback.textContent = error.message || String(error);
@@ -841,7 +894,10 @@ $('uf_head_type').onchange = renderFormsForReview;
 $('uf_head_search').oninput = renderFormsForReview;
 $('leave-form').elements.leaveType.onchange = setOtherLeaveVisibility;
 $('leave-form').onsubmit = submitLeaveRequest;
-$('uf_cancel_leave').onclick = () => $('leave-form-dialog').close();
+$('uf_cancel_leave').onclick = () => {
+  $('leave-form-dialog').close();
+  formBeingEdited = null;
+};
 $('uf_close_view').onclick = () => $('leave-view-dialog').close();
 $('user-template-form').onsubmit = submitTemplateForm;
 $('head-signature-form').onsubmit = signAndForwardForm;
@@ -857,6 +913,7 @@ $('head-signature-cancel').onclick = () => {
 $('user-template-cancel').onclick = () => {
   $('user-template-dialog').close();
   $('user-template-form').dataset.templateKey = '';
+  formBeingEdited = null;
 };
 $('form-rejection-form').onsubmit = rejectSelectedForm;
 $('form-rejection-cancel').onclick = () => {

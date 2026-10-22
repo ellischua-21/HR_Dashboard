@@ -129,6 +129,13 @@ function currentSerialYear(date = new Date()) {
   }).format(date));
 }
 
+function canEditForm(role, form) {
+  return ['STAFF', 'HEAD'].includes(role) &&
+    form.status === 'PENDING' &&
+    form.review_stage === 'HEAD' &&
+    Boolean(form.head_reviewer_email);
+}
+
 function parseForm(row) {
   return {
     ...row,
@@ -148,7 +155,7 @@ async function listMyForms(req) {
   const [rows] = await pool.execute(
     `SELECT f.id, f.control_no, f.template_key, f.form_data, f.status, f.review_stage,
             f.head_signature, f.head_signed_by, f.head_signed_at, f.hr_signature,
-            f.submitted_at, f.reviewed_by, f.reviewed_at, f.review_notes,
+            f.submitted_at, f.reviewed_by, f.reviewed_at, f.review_notes, f.head_reviewer_email,
             COALESCE(NULLIF(reviewer.full_name, ''), 'HR/Admin') AS reviewed_by_name,
             reviewer.role AS reviewed_by_role,
             CASE WHEN f.status = 'PENDING' THEN DATEDIFF(CURRENT_DATE(), DATE(f.submitted_at)) ELSE NULL END AS days_pending
@@ -231,6 +238,73 @@ async function submitUserForm(req, templateKey, data = {}) {
   cleanData.name = sanitize(accounts[0].full_name);
   const template = FORM_TEMPLATES.find(item => item.key === templateKey);
   return persistUserForm(user.email, user.role, headEmail, templateKey, cleanData, template.title);
+}
+
+async function updateMyForm(req, formId, templateKey, data = {}) {
+  const user = await requirePerm(req, 'forms.self');
+  if (!['STAFF', 'HEAD'].includes(user.role)) {
+    throw httpError('Only STAFF and HEAD accounts can edit submitted forms.', 403);
+  }
+
+  const template = FORM_TEMPLATES.find(item => item.key === templateKey);
+  if (!template) throw httpError('Choose a valid form template.', 400);
+  let cleanData;
+  if (templateKey === 'leave-2026') {
+    const errors = validateLeaveForm(data);
+    if (errors.length) throw httpError(errors.join(' '), 400);
+    cleanData = {
+      position: sanitize(data.position),
+      department: sanitize(data.department),
+      leaveType: sanitize(data.leaveType),
+      otherLeaveType: sanitize(data.otherLeaveType),
+      dateFrom: data.dateFrom,
+      dateTo: data.dateTo,
+      days: Number(data.days),
+      reason: sanitize(data.reason),
+      payType: data.payType,
+      signature: data.signature
+    };
+  } else {
+    const result = validateUserForm(templateKey, data);
+    if (result.errors.length) throw httpError(result.errors.join(' '), 400);
+    cleanData = result.data;
+  }
+
+  const [[account]] = await pool.execute(
+    'SELECT full_name FROM user_roles WHERE email = ? AND active = 1 LIMIT 1',
+    [user.email]);
+  if (!account) throw httpError('Your account is not active.', 401);
+  cleanData.name = sanitize(account.full_name);
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [rows] = await connection.execute(
+      `SELECT id, control_no, template_key, status, review_stage, head_reviewer_email
+       FROM user_forms WHERE id = ? AND user_email = ? FOR UPDATE`,
+      [formId, user.email]);
+    if (!rows.length) throw httpError('This form does not exist in your submissions.', 404);
+    const existingForm = rows[0];
+    if (existingForm.template_key !== templateKey) {
+      throw httpError('The form type cannot be changed while editing.', 400);
+    }
+    if (!canEditForm(user.role, existingForm)) {
+      throw httpError('This form can no longer be edited. It must still be pending with its assigned Head.', 409);
+    }
+
+    await connection.execute(
+      'UPDATE user_forms SET form_data = ? WHERE id = ?',
+      [JSON.stringify(cleanData), existingForm.id]);
+    await logAudit(user.email, 'FORM_UPDATED', String(existingForm.id),
+      `${existingForm.control_no} updated before Head approval`, connection);
+    await connection.commit();
+    return { ok: true, id: existingForm.id, controlNo: existingForm.control_no, status: existingForm.status };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 async function persistUserForm(email, role, headEmail, templateKey, formData, description) {
@@ -398,4 +472,4 @@ async function reviewUserForm(req, formId, decision, reason = '', signature = ''
   }
 }
 
-module.exports = { LEAVE_TYPES, validateLeaveForm, validateUserForm, validateApprovalSignature, formatSerialNumber, currentSerialYear, listMyForms, submitLeaveForm, submitUserForm, listFormsForReview, getFormReviewSummaryForUser, reviewUserForm };
+module.exports = { LEAVE_TYPES, validateLeaveForm, validateUserForm, validateApprovalSignature, formatSerialNumber, currentSerialYear, canEditForm, listMyForms, submitLeaveForm, submitUserForm, updateMyForm, listFormsForReview, getFormReviewSummaryForUser, reviewUserForm };

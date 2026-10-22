@@ -119,7 +119,8 @@
 
 <dialog id="leave-form-dialog">
   <form id="leave-form">
-    <h2>Leave Application</h2>
+    <h2 id="leave-form-title">Leave Application</h2>
+    <p id="leave-form-edit-note" class="note" hidden>Draw your electronic signature again to save your changes.</p>
     <p class="note">Your name and filing date are attached automatically.</p>
     <div class="fgrid">
       <label>Name<input name="name_display" type="text" readonly disabled aria-label="Name from approved account"></label>
@@ -155,7 +156,7 @@
     </div>
     <p id="uf_submit_feedback" class="okmsg" hidden></p>
     <div class="actions">
-      <button type="submit">Submit for review</button>
+      <button id="leave-form-submit" type="submit">Submit for review</button>
       <button id="uf_cancel_leave" class="ghost" type="button">Cancel</button>
     </div>
   </form>
@@ -172,6 +173,7 @@
 <dialog id="user-template-dialog">
   <form id="user-template-form">
     <h2 id="user-template-title"></h2>
+    <p id="user-template-edit-note" class="note" hidden>Draw your electronic signature again to save your changes.</p>
     <p id="user-template-feedback" class="errs" hidden></p>
     <div id="user-template-fields" class="fgrid"></div>
     <label class="leave-confirm"><input name="confirmation" type="checkbox" required> I confirm that the information in this form is accurate.</label>
@@ -181,7 +183,7 @@
       <button id="template-signature-clear" class="ghost" type="button">Clear signature</button>
     </div>
     <div class="actions">
-      <button type="submit">Submit for review</button>
+      <button id="user-template-submit" type="submit">Submit for review</button>
       <button id="user-template-cancel" class="ghost" type="button">Cancel</button>
     </div>
   </form>
