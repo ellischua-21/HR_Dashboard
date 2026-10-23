@@ -38,7 +38,8 @@ test('structured employee fields are allowlisted and bounded', () => {
 test('employee display name uses the original surname-first format', () => {
   assert.equal(fullName({ last_name: 'Rivera', first_name: 'Alex', middle_name: 'M' }), 'Rivera, Alex M');
   assert.equal(EMP_FIELDS.some(field => field[0] === 'nexus_email'), false);
-  assert.equal(EMP_FIELDS.find(field => field[0] === 'corp_email')[1], 'Personal Email');
+  assert.equal(EMP_FIELDS.find(field => field[0] === 'personal_email')[1], 'Personal Email');
+  assert.equal(EMP_FIELDS.some(field => ['email', 'corp_email'].includes(field[0])), false);
 });
 
 test('requested account roles map to the intended permission profiles', () => {

@@ -168,7 +168,7 @@ async function saveEmployee(req, data = {}) {
     await logAudit(user.email, 'CREATE', recordId, 'Employee created', connection);
     await createEmployeeAccountRequest(req, clean, data.accountAccess, connection);
     await connection.commit();
-    return { ok: true, record_id: recordId, accountRequestSubmitted: true, accountEmail: clean.corp_email };
+    return { ok: true, record_id: recordId, accountRequestSubmitted: true, accountEmail: clean.personal_email };
   } catch (error) {
     await connection.rollback();
     if (error.code === 'ER_DUP_ENTRY') return { ok: false, errors: ['Employee Number already exists'] };

@@ -56,7 +56,7 @@ async function createEmployeeAccountRequest(req, employee, accountData, connecti
   const role = String(accountData && accountData.role || '').trim().toUpperCase();
   const assignedHeadEmail = sanitize(accountData && accountData.assignedHeadEmail).toLowerCase() || null;
   const password = accountData && accountData.password;
-  const email = sanitize(employee.corp_email).toLowerCase();
+  const email = sanitize(employee.personal_email).toLowerCase();
   const name = sanitize(employee.name);
   if (!['STAFF', 'HEAD', 'HR'].includes(role)) {
     throw Object.assign(new Error('Choose STAFF, HEAD, or HR for the account role.'), { status: 400 });

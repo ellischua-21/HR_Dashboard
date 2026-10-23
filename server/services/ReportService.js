@@ -18,7 +18,7 @@ const REPORTS = {
   hmo: { t: 'Employee HMO Enrollment Report', type: 'list', cols: ['emp_no', 'name', 'company', 'hmo'], blank: { hmo: 'Not enrolled' } },
   gov_complete: { t: 'Government Information Completeness', type: 'gov' },
   quality: { t: 'Employee Data Quality Report', type: 'quality' },
-  directory: { t: 'Employee Directory', type: 'list', cols: ['name', 'position', 'department', 'company', 'location', 'corp_email', 'company_contact_no'] }
+  directory: { t: 'Employee Directory', type: 'list', cols: ['name', 'position', 'department', 'company', 'location', 'personal_email', 'company_contact_no'] }
 };
 
 async function listReports(req) {

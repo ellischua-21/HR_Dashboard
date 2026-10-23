@@ -40,6 +40,22 @@ async function initializeDatabase() {
     KEY idx_employee_employment_date (${quote('date_employed')})
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
+  // Keep the existing personal login address while removing the obsolete Email and
+  // Corporate Email employee fields. Older installs used corp_email for Personal Email.
+  const [personalEmailColumn] = await pool.query("SHOW COLUMNS FROM employees LIKE 'personal_email'");
+  const [legacyCorpEmailColumn] = await pool.query("SHOW COLUMNS FROM employees LIKE 'corp_email'");
+  if (!personalEmailColumn.length) {
+    if (legacyCorpEmailColumn.length) {
+      await pool.query('ALTER TABLE employees CHANGE COLUMN corp_email personal_email TEXT NULL');
+    } else {
+      await pool.query('ALTER TABLE employees ADD COLUMN personal_email TEXT NULL');
+    }
+  }
+  for (const obsoleteColumn of ['corp_email', 'email']) {
+    const [column] = await pool.query(`SHOW COLUMNS FROM employees LIKE '${obsoleteColumn}'`);
+    if (column.length) await pool.query(`ALTER TABLE employees DROP COLUMN \`${obsoleteColumn}\``);
+  }
+
   await pool.query(`CREATE TABLE IF NOT EXISTS user_roles (
     email VARCHAR(191) NOT NULL,
     full_name VARCHAR(191) NOT NULL DEFAULT '',
@@ -179,6 +195,15 @@ async function initializeDatabase() {
     viewed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (announcement_id, user_email),
     KEY idx_announcement_view_user (user_email, viewed_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS inbox_views (
+    user_email VARCHAR(191) NOT NULL,
+    item_type VARCHAR(16) NOT NULL,
+    item_id BIGINT UNSIGNED NOT NULL,
+    viewed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_email, item_type, item_id),
+    KEY idx_inbox_view_user (user_email, viewed_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
   await pool.query(`CREATE TABLE IF NOT EXISTS system_settings (

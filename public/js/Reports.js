@@ -89,8 +89,11 @@ $('au_clear').onclick = guard(async () => {
 let inboxItems = [];
 
 async function loadInbox() {
+  setInboxCount(0);
+  await api('markInboxSeen');
   inboxItems = await api('getInbox');
   renderInbox();
+  await refreshInboxBadge();
 }
 
 function renderInbox() {

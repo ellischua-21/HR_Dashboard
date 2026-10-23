@@ -3,7 +3,7 @@ let META = null, EQ = { page: 1, sortKey: 'name', sortDir: 'asc' }, PENDING = nu
 const SECTIONS = [
   ['Personal information', ['last_name', 'first_name', 'middle_name', 'birthday', 'age', 'birth_place', 'gender', 'civil_status', 'education']],
   ['Employment information', ['emp_no', 'company', 'location', 'position', 'department', 'rank', 'reports_to', 'date_employed', 'status', 'function_type', 'network', 'transfer_eff']],
-  ['Contact information', ['address', 'permanent_address', 'contact_no', 'landline_no', 'email', 'corp_email', 'company_contact_no']],
+  ['Contact information', ['address', 'permanent_address', 'contact_no', 'landline_no', 'personal_email', 'company_contact_no']],
   ['Family background', ['father_name', 'father_occupation', 'mother_maiden', 'mother_occupation', 'siblings', 'spouse_name', 'children']],
   ['Church and Organizations/Memberships', ['church_has', 'church_position', 'orgs']],
   ['Contact in case of emergency', ['emergency_name', 'emergency_address', 'emergency_no', 'emergency_relationship']],
@@ -209,7 +209,7 @@ const formData = () => {
 $('r_preview').onclick = () => {
   const d = formData(), miss = META.fields.filter(f => f.required && !d[f.key]).map(f => f.label);
   if (!CUR || !CUR.record_id) {
-    if (!d.corp_email) miss.push('Personal Email');
+    if (!d.personal_email) miss.push('Personal Email');
     if (d.accountAccess.role === 'STAFF' && !d.accountAccess.assignedHeadEmail) miss.push('Assigned Head');
     if (d.accountAccess.password.length < 12 || d.accountAccess.password.length > 128) miss.push('Initial password (12–128 characters)');
     if (d.accountAccess.password !== $('r_account_password_confirm').value) miss.push('Matching password confirmation');
@@ -232,7 +232,7 @@ $('pv_save').onclick = guard(async () => {
   if (!r.ok) { const e = el('div', undefined, 'errs'); r.errors.forEach(x => e.appendChild(el('div', '• ' + x))); $('pv_err').innerHTML = ''; $('pv_err').appendChild(e); return; }
   $('preview').close();
   showErr('');
-  $('r_msg').textContent = `Employee ${r.record_id} was saved. The ${r.accountRequestRole || $('r_account_role').value} account request for ${r.accountEmail || $('ff_corp_email').value} is pending ADMIN approval.`;
+  $('r_msg').textContent = `Employee ${r.record_id} was saved. The ${r.accountRequestRole || $('r_account_role').value} account request for ${r.accountEmail || $('ff_personal_email').value} is pending ADMIN approval.`;
   $('r_msg').hidden = false;
   $('r_preview').disabled = true;
 });

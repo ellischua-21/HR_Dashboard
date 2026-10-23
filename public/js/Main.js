@@ -74,6 +74,13 @@ async function init() {
         count.hidden = true;
         count.setAttribute('aria-label', 'pending submissions');
         a.appendChild(count);
+      } else if (n[0] === 'inbox') {
+        const count = document.createElement('span');
+        count.id = 'inbox-count';
+        count.className = 'nav-count';
+        count.hidden = true;
+        count.setAttribute('aria-label', 'unseen inbox entries');
+        a.appendChild(count);
       }
       a.onclick = () => go(n); a.onkeydown = e => { if (e.key === 'Enter') go(n); };
       $('nav').appendChild(a);
@@ -88,6 +95,15 @@ async function init() {
         showErr(error.message || String(error));
       }
     };
+    if (session.perms.includes('inbox.read')) {
+      window.refreshInboxBadge().catch(error => showErr(error.message || String(error)));
+      window.setInterval(() => {
+        if (!document.hidden) window.refreshInboxBadge().catch(error => showErr(error.message || String(error)));
+      }, 60000);
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) window.refreshInboxBadge().catch(error => showErr(error.message || String(error)));
+      });
+    }
     if (isFormSubmitter) {
       go(USER_NAV[0]);
       if (session.perms.includes('announcements.read')) {
@@ -217,6 +233,22 @@ function setSubmittedFormsCount(count) {
   link.setAttribute('aria-label', `Submitted Forms, ${pending} pending`);
   link.title = `${pending} pending submission${pending === 1 ? '' : 's'}`;
 }
+
+function setInboxCount(count) {
+  const badge = $('inbox-count');
+  if (!badge) return;
+  const unseen = Number(count) || 0;
+  badge.textContent = unseen > 99 ? '99+' : String(unseen);
+  badge.hidden = unseen === 0;
+  const link = badge.parentElement;
+  link.setAttribute('aria-label', `Inbox, ${unseen} unseen item${unseen === 1 ? '' : 's'}`);
+  link.title = `${unseen} unseen inbox item${unseen === 1 ? '' : 's'}`;
+}
+
+async function refreshInboxBadge() {
+  setInboxCount(await api('getInboxNotificationCount'));
+}
+window.refreshInboxBadge = refreshInboxBadge;
 
 async function loadOptions() {
   const o = await api('getFilterOptions');
