@@ -7,10 +7,10 @@ function sanitize(value) {
   return text.slice(0, 500);
 }
 
-function validateEmployee(data, lists) {
+function validateEmployee(data, lists, includeSensitive = true) {
   const errors = [];
   EMP_FIELDS.forEach(field => {
-    if (F.has(field, 'C')) return;
+    if (F.has(field, 'C') || (F.has(field, 'S') && !includeSensitive)) return;
     const value = data[field[0]];
     if (F.has(field, 'R') && (value === '' || value === undefined || value === null)) {
       errors.push(field[1] + ' is required');

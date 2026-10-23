@@ -1,9 +1,9 @@
 window.VIEWS = {};
-let META = null, EQ = { page: 1, sortKey: 'name', sortDir: 'asc' }, PENDING = null, CUR = null, IMP = null;
+let META = null, EQ = { page: 1, sortKey: 'name', sortDir: 'asc' }, PENDING = null, CUR = null, IMP = null, HEAD_OPTIONS = [];
 const SECTIONS = [
   ['Personal information', ['last_name', 'first_name', 'middle_name', 'birthday', 'age', 'birth_place', 'gender', 'civil_status', 'education']],
   ['Employment information', ['emp_no', 'company', 'location', 'position', 'department', 'rank', 'reports_to', 'date_employed', 'status', 'function_type', 'network', 'transfer_eff']],
-  ['Contact information', ['address', 'permanent_address', 'contact_no', 'landline_no', 'email', 'corp_email', 'nexus_email', 'company_contact_no']],
+  ['Contact information', ['address', 'permanent_address', 'contact_no', 'landline_no', 'email', 'corp_email', 'company_contact_no']],
   ['Family background', ['father_name', 'father_occupation', 'mother_maiden', 'mother_occupation', 'siblings', 'spouse_name', 'children']],
   ['Church and Organizations/Memberships', ['church_has', 'church_position', 'orgs']],
   ['Contact in case of emergency', ['emergency_name', 'emergency_address', 'emergency_no', 'emergency_relationship']],
@@ -105,8 +105,15 @@ $('p_archive').onclick = guard(async () => { if (!confirm('Archive ' + CUR.name 
 /* ---------- Registration / update form ---------- */
 VIEWS.register = guard(async () => {
   await ensureMeta(); const rec = PENDING; PENDING = null; CUR = rec;
+  HEAD_OPTIONS = rec ? [] : await api('listAssignableHeads');
   $('r_mode').textContent = rec ? 'Editing ' + rec.name + ' (' + rec.record_id + ')' : 'New employee. Fields marked * are required.';
-  $('r_msg').innerHTML = ''; const box = $('r_form'); box.innerHTML = '';
+  $('r_msg').textContent = ''; $('r_msg').hidden = true;
+  $('r_account_access').hidden = Boolean(rec);
+  $('r_account_role').disabled = Boolean(rec);
+  $('r_account_password').disabled = Boolean(rec);
+  $('r_account_password_confirm').disabled = Boolean(rec);
+  $('r_preview').disabled = false;
+  const box = $('r_form'); box.innerHTML = '';
   SECTIONS.forEach(([title, keys]) => {
     const fs = el('fieldset'), g = el('div', undefined, 'fgrid'), tabs = []; fs.appendChild(el('legend', title));
     keys.forEach(k => {
@@ -116,26 +123,118 @@ VIEWS.register = guard(async () => {
       const lab = el('label', f.label + (f.required ? ' *' : '')); let inp;
       if (f.type === 'list') { inp = el('select'); [''].concat(META.lists[f.list]).forEach(v => { const o = el('option', v || 'Select…'); o.value = v; inp.appendChild(o); }); }
       else { inp = el('input'); inp.type = f.type === 'date' ? 'date' : f.type === 'email' ? 'email' : f.type === 'number' ? 'number' : 'text'; if (f.type === 'number') { inp.step = '0.01'; if (k === 'fte') { inp.min = 0; inp.max = 1; } } }
-      inp.id = 'ff_' + k; if (rec && rec[k] !== undefined) inp.value = rec[k]; lab.appendChild(inp); g.appendChild(lab);
+      inp.id = 'ff_' + k;
+      if (rec && rec[k] !== undefined) inp.value = rec[k];
+      if (k === 'reports_to' && !rec) {
+        inp.type = 'search';
+        inp.placeholder = 'Search Head name or email';
+        inp.autocomplete = 'off';
+        inp.setAttribute('role', 'combobox');
+        inp.setAttribute('aria-autocomplete', 'list');
+        const selectedHead = el('input');
+        selectedHead.type = 'hidden';
+        selectedHead.id = 'ff_assigned_head_email';
+        const results = el('div', undefined, 'head-search-results');
+        results.id = 'r_assigned_head_results';
+        results.hidden = true;
+        inp.oninput = () => renderAssignableHeadOptions(inp, selectedHead, results);
+        lab.append(inp, selectedHead, results);
+      } else {
+        lab.appendChild(inp);
+      }
+      g.appendChild(lab);
     });
     if (!g.childElementCount && !tabs.length) return;
     fs.appendChild(g); tabs.forEach(f => fs.appendChild(tableEditor(f.key, rec && rec[f.key]))); box.appendChild(fs);
   });
+  $('r_account_role').value = 'STAFF';
+  $('r_account_role').onchange = updateRegistrationRoleHelp;
+  if ($('ff_assigned_head_email')) $('ff_assigned_head_email').value = '';
+  updateRegistrationRoleHelp();
   const calc = () => { const b = $('ff_birthday') && $('ff_birthday').value; if ($('ff_age')) $('ff_age').value = b ? Math.floor((Date.now() - new Date(b)) / 31557600000) : ''; };
   if ($('ff_birthday')) { $('ff_birthday').onchange = calc; calc(); }
 });
-const formData = () => { const d = {}; META.fields.forEach(f => { if (f.type === 'json') d[f.key] = collect(f.key); else { const i = $('ff_' + f.key); if (i) d[f.key] = i.value.trim(); } }); if (CUR && CUR.record_id) d.record_id = CUR.record_id; return d; };
+function updateRegistrationRoleHelp() {
+  const role = $('r_account_role').value;
+  $('r_head_assignment_note').textContent = role === 'STAFF'
+    ? 'Assign a Head to this STAFF account. Pending Head requests can be selected, but must be approved first.'
+    : role === 'HEAD'
+      ? 'Assigning a Head is optional. If selected, approve that Head account first.'
+      : 'HR accounts do not have an assigned Head.';
+  if (role === 'HR') {
+    const assignedHead = $('ff_assigned_head_email');
+    if (assignedHead) assignedHead.value = '';
+    const results = $('r_assigned_head_results');
+    if (results) results.hidden = true;
+  }
+}
+function renderAssignableHeadOptions(input, selected, results) {
+  selected.value = '';
+  const term = input.value.trim().toLocaleLowerCase();
+  results.replaceChildren();
+  const matches = term
+    ? HEAD_OPTIONS.filter(head => `${head.full_name} ${head.email}`.toLocaleLowerCase().includes(term)).slice(0, 8)
+    : [];
+  matches.forEach(head => {
+    const assignmentStatus = head.assignment_status === 'PENDING' ? ' · pending approval' : '';
+    const option = el('button', `${head.full_name || head.email} (${head.email})${assignmentStatus}`);
+    option.type = 'button';
+    option.setAttribute('role', 'option');
+    option.onclick = () => {
+      input.value = head.full_name || head.email;
+      selected.value = head.email;
+      results.hidden = true;
+    };
+    results.appendChild(option);
+  });
+  results.hidden = matches.length === 0;
+}
+const formData = () => {
+  const d = {};
+  META.fields.forEach(f => {
+    if (f.type === 'json') d[f.key] = collect(f.key);
+    else {
+      const i = $('ff_' + f.key);
+      if (i) d[f.key] = i.value.trim();
+    }
+  });
+  if (CUR && CUR.record_id) d.record_id = CUR.record_id;
+  else d.accountAccess = {
+    role: $('r_account_role').value,
+    password: $('r_account_password').value,
+    assignedHeadEmail: $('ff_assigned_head_email') ? $('ff_assigned_head_email').value : ''
+  };
+  return d;
+};
 $('r_preview').onclick = () => {
   const d = formData(), miss = META.fields.filter(f => f.required && !d[f.key]).map(f => f.label);
+  if (!CUR || !CUR.record_id) {
+    if (!d.corp_email) miss.push('Personal Email');
+    if (d.accountAccess.role === 'STAFF' && !d.accountAccess.assignedHeadEmail) miss.push('Assigned Head');
+    if (d.accountAccess.password.length < 12 || d.accountAccess.password.length > 128) miss.push('Initial password (12–128 characters)');
+    if (d.accountAccess.password !== $('r_account_password_confirm').value) miss.push('Matching password confirmation');
+  }
   if (miss.length) { showErr('Please complete: ' + miss.join(', ')); return; } showErr('');
   const dl = el('dl'); META.fields.forEach(f => { const v = d[f.key]; if (Array.isArray(v) ? v.length : v) { dl.appendChild(el('dt', f.label)); dl.appendChild(el('dd', Array.isArray(v) ? v.length + ' row(s): ' + v.map(r => Object.values(r).filter(Boolean).join(' / ')).join('; ') : v)); } });
+  if (!CUR || !CUR.record_id) {
+    dl.appendChild(el('dt', 'Account role'));
+    dl.appendChild(el('dd', d.accountAccess.role));
+    dl.appendChild(el('dt', 'Assigned Head'));
+    dl.appendChild(el('dd', d.accountAccess.assignedHeadEmail || 'None'));
+    dl.appendChild(el('dt', 'Account approval'));
+    dl.appendChild(el('dd', 'Pending ADMIN approval'));
+  }
   $('pv_body').innerHTML = ''; $('pv_body').appendChild(dl); $('pv_err').innerHTML = ''; $('preview').showModal();
 };
 $('pv_back').onclick = () => $('preview').close();
 $('pv_save').onclick = guard(async () => {
   const r = await api('saveEmployee', formData());
   if (!r.ok) { const e = el('div', undefined, 'errs'); r.errors.forEach(x => e.appendChild(el('div', '• ' + x))); $('pv_err').innerHTML = ''; $('pv_err').appendChild(e); return; }
-  $('preview').close(); go(NAV.find(n => n[0] === 'employees')); showErr('');
+  $('preview').close();
+  showErr('');
+  $('r_msg').textContent = `Employee ${r.record_id} was saved. The ${r.accountRequestRole || $('r_account_role').value} account request for ${r.accountEmail || $('ff_corp_email').value} is pending ADMIN approval.`;
+  $('r_msg').hidden = false;
+  $('r_preview').disabled = true;
 });
 $('r_cancel').onclick = () => go(NAV.find(n => n[0] === 'employees'));
 

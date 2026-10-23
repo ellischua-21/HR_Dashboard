@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { sanitize, validateEmployee, cleanField, fullName, isValidDate } = require('../server/utils/Validation');
 const { EMP_FIELDS, ACCOUNT_ROLE_MAP, ROLE_PERMS } = require('../server/config/Config');
 const { hashPassword, verifyPassword } = require('../server/utils/Password');
-const { validateHeadAssignment } = require('../server/services/AccountService');
+const { validateHeadAssignment, requestAccount } = require('../server/services/AccountService');
 const { normalizeAuditFilters } = require('../server/services/AuditService');
 const { normalizeAnnouncementText } = require('../server/services/AnnouncementService');
 const { validateLeaveForm, validateUserForm, validateApprovalSignature, formatSerialNumber, currentSerialYear, canEditForm } = require('../server/services/FormService');
@@ -21,6 +21,7 @@ test('required fields and lookup values are validated', () => {
   assert.ok(missing.includes('Company Name is required'));
   const invalid = validateEmployee({ company: 'Unknown' }, lists);
   assert.ok(invalid.includes('Company Name has an invalid value'));
+  assert.ok(!validateEmployee({}, lists, false).includes('Birthday is required'));
 });
 
 test('date validation rejects malformed and impossible dates', () => {
@@ -36,9 +37,12 @@ test('structured employee fields are allowlisted and bounded', () => {
 
 test('employee display name uses the original surname-first format', () => {
   assert.equal(fullName({ last_name: 'Rivera', first_name: 'Alex', middle_name: 'M' }), 'Rivera, Alex M');
+  assert.equal(EMP_FIELDS.some(field => field[0] === 'nexus_email'), false);
+  assert.equal(EMP_FIELDS.find(field => field[0] === 'corp_email')[1], 'Personal Email');
 });
 
 test('requested account roles map to the intended permission profiles', () => {
+  assert.equal(requestAccount, undefined);
   assert.equal(ACCOUNT_ROLE_MAP.STAFF, 'STAFF');
   assert.deepEqual(ROLE_PERMS.STAFF, ['forms.self', 'announcements.read', 'inbox.read', 'account.password']);
   assert.deepEqual(ROLE_PERMS.HEAD, ['forms.self', 'forms.head-review', 'announcements.read', 'inbox.read', 'account.password']);
@@ -49,6 +53,8 @@ test('requested account roles map to the intended permission profiles', () => {
   assert.ok(!ROLE_PERMS.STAFF.includes('dash.view'));
   assert.ok(!ROLE_PERMS.STAFF.includes('emp.read'));
   assert.ok(ROLE_PERMS.HR.includes('forms.review'));
+  assert.ok(ROLE_PERMS.HR.includes('emp.write'));
+  assert.ok(ROLE_PERMS.ADMIN.includes('emp.write'));
   Object.values(ROLE_PERMS).forEach(permissions => assert.ok(permissions.includes('account.password')));
   assert.equal(ACCOUNT_ROLE_MAP.HR, 'HR');
   assert.equal(ACCOUNT_ROLE_MAP.ADMIN, 'ADMIN');

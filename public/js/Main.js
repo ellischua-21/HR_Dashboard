@@ -129,43 +129,18 @@ function showLogin(message = '', isError = false) {
   const card = document.createElement('form');
   card.className = 'login-card';
   main.replaceChildren(card);
-  let mode = 'login';
   let feedback = message;
   let feedbackIsError = isError;
   const render = () => {
     card.replaceChildren();
     const title = document.createElement('h1');
     title.textContent = 'HR Management System';
-    const tabs = document.createElement('div');
-    tabs.className = 'login-tabs';
-    [['login', 'Sign in'], ['request', 'Request an account']].forEach(([id, label]) => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = id === mode ? 'login-tab active' : 'login-tab';
-      button.textContent = label;
-      button.onclick = () => { mode = id; feedback = ''; render(); };
-      tabs.appendChild(button);
-    });
     const note = document.createElement('p');
     note.className = 'note';
-    note.textContent = mode === 'login'
-      ? 'Sign in with your approved dashboard account.'
-      : 'Submit your details to request an account. An administrator must approve it before you can sign in.';
-    card.append(title, tabs, note);
-
-    if (mode === 'request') {
-      addLoginInput(card, 'Full name', 'name', 'text', 'name', true);
-    }
+    note.textContent = 'Sign in with your approved dashboard account. Contact HR or ADMIN if you need an account.';
+    card.append(title, note);
     const email = addLoginInput(card, 'Email', 'email', 'email', 'username', true);
-    const password = addLoginInput(card, 'Password', 'password', 'password', mode === 'login' ? 'current-password' : 'new-password', true);
-    let confirmPassword;
-    if (mode === 'request') {
-      confirmPassword = addLoginInput(card, 'Confirm password', 'confirmPassword', 'password', 'new-password', true);
-      password.minLength = 12;
-      password.maxLength = 128;
-      confirmPassword.minLength = 12;
-      confirmPassword.maxLength = 128;
-    }
+    const password = addLoginInput(card, 'Password', 'password', 'password', 'current-password', true);
     const error = document.createElement('p');
     error.className = feedbackIsError ? 'login-error' : 'login-message';
     error.textContent = feedback;
@@ -173,7 +148,7 @@ function showLogin(message = '', isError = false) {
     card.appendChild(error);
     const submit = document.createElement('button');
     submit.type = 'submit';
-    submit.textContent = mode === 'login' ? 'Sign in' : 'Submit request';
+    submit.textContent = 'Sign in';
     card.appendChild(submit);
 
     card.onsubmit = async event => {
@@ -181,27 +156,14 @@ function showLogin(message = '', isError = false) {
       error.hidden = true;
       submit.disabled = true;
       try {
-        if (mode === 'login') {
-          const response = await fetch(API_BASE + '/login', {
-            method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: email.value, password: password.value })
-          });
-          const result = await response.json();
-          if (!response.ok) throw new Error(result.error || 'Sign in failed.');
-          location.reload();
-          return;
-        }
-
-        if (password.value !== confirmPassword.value) throw new Error('The passwords do not match.');
-        const result = await api('requestAccount', {
-          name: card.elements.name.value,
-          email: email.value,
-          password: password.value
+        const response = await fetch(API_BASE + '/login', {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.value, password: password.value })
         });
-        mode = 'login';
-        feedback = result.message;
-        feedbackIsError = false;
-        render();
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Sign in failed.');
+        location.reload();
+        return;
       } catch (cause) {
         error.textContent = cause.message || String(cause);
         error.hidden = false;

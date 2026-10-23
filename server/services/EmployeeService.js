@@ -4,6 +4,7 @@ const { requirePerm } = require('../middleware/Auth');
 const { logAudit } = require('./AuditService');
 const { sanitize, validateEmployee, cleanField, fullName } = require('../utils/Validation');
 const { withCalc, normalizeEmployee } = require('./DashboardService');
+const { createEmployeeAccountRequest } = require('./AccountService');
 
 const LIGHT = ['record_id', 'name', 'emp_no', 'company', 'location', 'position', 'department', 'rank', 'date_employed', 'status'];
 
@@ -101,8 +102,14 @@ async function saveEmployee(req, data = {}) {
   const user = await requirePerm(req, 'emp.write');
   const canSensitive = user.perms.includes('emp.sensitive');
   const clean = cleanEmployee(data, canSensitive);
-  const errors = validateEmployee(clean, await getLists());
+  const errors = validateEmployee(clean, await getLists(), canSensitive);
   if (errors.length) return { ok: false, errors };
+  if (!data.record_id && !data.accountAccess) {
+    return { ok: false, errors: ['Complete the account access section to submit this employee for ADMIN approval.'] };
+  }
+  if (data.record_id && data.accountAccess) {
+    return { ok: false, errors: ['Account requests can only be submitted for a new employee.'] };
+  }
 
   const connection = await pool.getConnection();
   try {
@@ -129,6 +136,7 @@ async function saveEmployee(req, data = {}) {
       EMP_FIELDS.forEach(field => {
         const key = field[0];
         if (key === 'name') next.name = clean.name;
+        else if (!Object.prototype.hasOwnProperty.call(data, key)) return;
         else if (!F.has(field, 'C') && !(F.has(field, 'S') && !canSensitive)) {
           if (String(old[key]) !== String(clean[key])) changed.push(key);
           next[key] = clean[key];
@@ -136,7 +144,9 @@ async function saveEmployee(req, data = {}) {
       });
       next.modified_at = new Date();
       next.modified_by = user.email;
-      const updateKeys = keys.filter(key => key !== 'record_id');
+      const updateKeys = keys.filter(key =>
+        key !== 'record_id' &&
+        (Object.prototype.hasOwnProperty.call(data, key) || ['name', 'modified_at', 'modified_by'].includes(key)));
       await connection.execute(
         `UPDATE employees SET ${updateKeys.map(key => `${quote(key)} = ?`).join(', ')} WHERE record_id = ?`,
         [...updateKeys.map(key => dbValue(F.get(key), next[key])), old.record_id]);
@@ -156,8 +166,9 @@ async function saveEmployee(req, data = {}) {
       `INSERT INTO employees (${keys.map(quote).join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`,
       keys.map(key => dbValue(F.get(key), record[key])));
     await logAudit(user.email, 'CREATE', recordId, 'Employee created', connection);
+    await createEmployeeAccountRequest(req, clean, data.accountAccess, connection);
     await connection.commit();
-    return { ok: true, record_id: recordId };
+    return { ok: true, record_id: recordId, accountRequestSubmitted: true, accountEmail: clean.corp_email };
   } catch (error) {
     await connection.rollback();
     if (error.code === 'ER_DUP_ENTRY') return { ok: false, errors: ['Employee Number already exists'] };

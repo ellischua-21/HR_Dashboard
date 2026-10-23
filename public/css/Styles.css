@@ -79,6 +79,11 @@ dialog.announcement-dialog .announcement-message,.announcement-message{white-spa
 form#announcement-create-form>label{display:block;margin:10px 0 4px}
 form#announcement-create-form>input,form#announcement-create-form>textarea{display:block;width:100%;padding:8px;border:1px solid var(--rule);border-radius:4px;font:inherit}
 form#announcement-create-form>textarea{resize:vertical}
+.fgrid label{position:relative}
+.head-search-results{position:absolute;z-index:5;display:grid;gap:2px;max-height:220px;overflow:auto;background:#fff;border:1px solid var(--rule);border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.12)}
+.head-search-results[hidden]{display:none}
+.head-search-results button{border:0;border-radius:0;text-align:left;background:#fff;color:var(--ink);padding:8px 10px}
+.head-search-results button:hover,.head-search-results button:focus{background:#f6e9ed}
 dialog.decision-dialog h2{font-size:18px;margin:0 0 8px}
 dialog.decision-dialog label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
 dialog.decision-dialog textarea{display:block;width:100%;font:inherit;border:1px solid var(--rule);border-radius:4px;padding:8px;resize:vertical}

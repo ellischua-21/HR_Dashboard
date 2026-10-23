@@ -24,33 +24,28 @@ async function loadAccountManagement() {
   requests.replaceChildren();
 
   if (!result.requests.length) {
-    appendEmptyRow(requests, 5, 'No pending account requests.');
+    appendEmptyRow(requests, 6, 'No pending account requests.');
   }
   result.requests.forEach(request => {
     const row = document.createElement('tr');
-    row.append(accountCell(request.full_name), accountCell(request.email), accountCell(formatAccountDate(request.requested_at)));
-    const roleCell = document.createElement('td');
-    const role = document.createElement('select');
-    role.setAttribute('aria-label', 'Role for ' + request.email);
-    ['STAFF', 'HEAD', 'HR', 'ADMIN'].forEach(value => {
-      const option = document.createElement('option');
-      option.value = value;
-      option.textContent = value;
-      role.appendChild(option);
-    });
-    roleCell.appendChild(role);
-    row.appendChild(roleCell);
+    row.append(
+      accountCell(request.full_name),
+      accountCell(request.email),
+      accountCell(request.assigned_role),
+      accountCell(request.assigned_head_name
+        ? `${request.assigned_head_name}${request.assigned_head_email ? ` (${request.assigned_head_email})` : ''}`
+        : request.assigned_head_email || '—'),
+      accountCell(formatAccountDate(request.requested_at)));
 
     const actions = document.createElement('td');
     const approve = document.createElement('button');
     approve.type = 'button';
     approve.textContent = 'Approve';
     approve.onclick = async () => {
-      if (role.value === 'ADMIN' && !confirm(`Approve ${request.email} as ADMIN? This grants full system access.`)) return;
-      if (role.value !== 'ADMIN' && !confirm(`Approve ${request.email} as ${role.value}?`)) return;
+      if (!confirm(`Approve ${request.email} as ${request.assigned_role}?`)) return;
       approve.disabled = true;
       try {
-        await api('approveAccountRequest', request.id, role.value);
+        await api('approveAccountRequest', request.id);
         await loadAccountManagement();
       } catch (error) {
         showErr(error.message || String(error));

@@ -67,18 +67,18 @@ Apache uses the root `.htaccess` file to redirect `http://localhost/HR_Dashboard
 
 ## Account registration and management
 
-Visitors can choose **Request an account** on the sign-in screen. They submit their name, email, and a password (minimum 12 characters); the password is stored as a hash and the new account remains unable to sign in until approved. This local workflow does not verify email ownership, so confirm a requester's identity before approving it.
+There is no public account-request option on the sign-in screen. HR and ADMIN create account requests through **Employee Registration** using the employee's Personal Email, a role (STAFF, HEAD, or HR), an initial password, and an optional assigned Head. STAFF requests require an assigned Head. New accounts remain unable to sign in until an ADMIN approves them.
 
 Users and HR can use **Account Management** to change their own password by entering the current password and a new password (12–128 characters). System Administrators can change their password in **Manage Accounts**, alongside registration requests, role assignment, and account lists.
 
-Only an account with the `ADMIN` role sees **Manage Accounts** and can approve or reject requests. On approval, the administrator assigns one of these access levels:
+Only an account with the `ADMIN` role sees **Manage Accounts** and can approve or reject requests. The role and assigned Head appear in each request and are fixed when approved:
 
 - **STAFF**: a personal dashboard for submitted-form history and status, plus form templates. STAFF cannot access employee records or the HR dashboard.
 - **HEAD**: the STAFF dashboard and form templates, plus a queue for forms assigned to the account. HEAD can sign and forward forms or reject them with a reason.
 - **HR**: dashboard, employee read/write, and reports, plus the HR form-review queue.
 - **ADMIN**: full system access, including account management and sensitive employee records.
 
-The account-management screen lists approved accounts by role and lets Admin assign a direct Head to each STAFF account and optionally assign any active HEAD to another HEAD account. STAFF must have an active assigned Head before submitting forms; HEAD accounts may have no assigned Head, and no top-level Head role is required. Each form is routed only to its directly assigned Head before HR/Admin, so Head-to-Head assignments do not recursively route forms. STAFF and HEAD can see their assigned Head on their submitted-forms page. At API startup, legacy USER, MANAGER, and EXECUTIVE accounts are migrated to STAFF; HR_STAFF and HR_ADMIN migrate to HR; SYSTEM_ADMIN migrates to ADMIN. Bootstrap the initial administrator with the `create-user` command above. Grant **ADMIN** only to trusted administrators.
+The account-registration form uses a searchable Reports To field to select active or pending HEAD accounts. Approve a pending Head before approving requests assigned to them. The account-management screen lists approved accounts by role and lets only ADMIN change Head assignments after approval. STAFF must have an active assigned Head before submitting forms; HEAD accounts may have no assigned Head, and no top-level Head role is required. Each form is routed only to its directly assigned Head before HR/Admin, so Head-to-Head assignments do not recursively route forms. STAFF and HEAD can see their assigned Head on their submitted-forms page. At API startup, legacy USER, MANAGER, and EXECUTIVE accounts are migrated to STAFF; HR_STAFF and HR_ADMIN migrate to HR; SYSTEM_ADMIN migrates to ADMIN. Bootstrap the initial administrator with the `create-user` command above. Grant **ADMIN** only to trusted administrators.
 
 ## User forms and leave requests
 
@@ -90,7 +90,7 @@ When submitted by STAFF or an assigned HEAD, a form first enters the submitter's
 
 Export the current employee rows from the source spreadsheet to CSV or Excel, then use **Employee master list → Import** in the local dashboard. Map the spreadsheet headers to the matching employee fields, validate, and import. The normal validation, duplicate employee-number check, permissions, and audit logging apply. Lookup values start with the defaults in the original Apps Script configuration; add any organization-specific values to the `lookup_values` table before importing those values.
 
-Create local accounts separately with `npm.cmd run create-user`; Google account roles are not copied automatically. The existing import/export feature does not carry supporting-document files, matching the original report behavior.
+For manual account provisioning, bootstrap or recovery administrators can use `npm.cmd run create-user`; routine STAFF/HEAD/HR account creation should use Employee Registration so an ADMIN can approve it. Google account roles are not copied automatically. The existing import/export feature does not carry supporting-document files, matching the original report behavior.
 
 ## Configuration and data
 
@@ -98,6 +98,7 @@ Create local accounts separately with `npm.cmd run create-user`; Google account 
 - The API listens on `127.0.0.1:3001` by default. If Apache uses a nonstandard host/port, add its origin (for example `http://localhost:8080`) to `CORS_ORIGINS`.
 - The Node API runs separately from Apache. XAMPP's MySQL stores employees, user roles, lookup values, audit events, and system settings.
 - ADMIN Audit Logs can be filtered by a start/end time and exact user email. Filter validation and SQL parameterization are enforced by the API.
+- Only HR and ADMIN can create accounts, using Employee Registration. Personal Email is the login email; HR/ADMIN select STAFF, HEAD, or HR and set an initial password. New accounts remain pending until an ADMIN approves them in Manage Accounts. STAFF and HEAD need a Head selected in the searchable Reports To field; pending Head requests can be selected but must be approved first.
 - HR and ADMIN can publish announcements from the Announcements tab. STAFF and HEAD see unacknowledged announcements in a blurred modal after login; acknowledging records that announcement as seen for that account.
 - All roles have an Inbox. STAFF and HEAD see new and previously acknowledged HR announcements; HEAD also sees forms awaiting their review. HR and ADMIN see forms awaiting HR/Admin review. Inbox filters support item type and status, and form items link to Manage Forms.
 - Existing report, import, export, employee privacy, audit, and role-permission rules are enforced by the API, not by the browser.

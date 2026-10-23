@@ -21,8 +21,28 @@
 <section id="view-register" class="view" hidden>
   <p class="note" id="r_mode"></p>
   <div id="r_form"></div>
+  <section id="r_account_access" class="panel">
+    <h2>Account access request</h2>
+    <p class="note">This section requests account access for the employee. Personal Email becomes the account login; an ADMIN must approve the request before the account is activated.</p>
+    <div class="fgrid">
+      <label for="r_account_role">Assigned role
+        <select id="r_account_role">
+          <option value="STAFF">STAFF</option>
+          <option value="HEAD">HEAD</option>
+          <option value="HR">HR</option>
+        </select>
+      </label>
+      <label for="r_account_password">Initial password
+        <input id="r_account_password" type="password" minlength="12" maxlength="128" autocomplete="new-password" required>
+      </label>
+      <label for="r_account_password_confirm">Confirm initial password
+        <input id="r_account_password_confirm" type="password" minlength="12" maxlength="128" autocomplete="new-password" required>
+      </label>
+    </div>
+    <p id="r_head_assignment_note" class="note"></p>
+  </section>
   <div class="actions"><button id="r_preview">Review and save</button><button class="ghost" id="r_cancel">Cancel</button></div>
-  <div id="r_msg"></div>
+  <p id="r_msg" class="okmsg" hidden></p>
   <dialog id="preview"><h2 style="margin-top:0">Review before saving</h2><div id="pv_body"></div><div id="pv_err"></div>
     <div class="actions"><button id="pv_save">Save employee</button><button class="ghost" id="pv_back">Back to form</button></div></dialog>
 </section>

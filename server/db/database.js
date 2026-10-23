@@ -68,12 +68,24 @@ async function initializeDatabase() {
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     full_name VARCHAR(191) NOT NULL,
     email VARCHAR(191) NOT NULL,
+    assigned_role VARCHAR(16) NOT NULL DEFAULT 'STAFF',
+    assigned_head_email VARCHAR(191) NULL,
     password_hash VARCHAR(255) NOT NULL,
     requested_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uq_account_request_email (email),
     KEY idx_account_request_date (requested_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  const accountRequestColumns = [
+    ['assigned_role', "VARCHAR(16) NOT NULL DEFAULT 'STAFF' AFTER email"],
+    ['assigned_head_email', 'VARCHAR(191) NULL AFTER assigned_role']
+  ];
+  for (const [column, definition] of accountRequestColumns) {
+    const [existing] = await pool.query(`SHOW COLUMNS FROM account_requests LIKE '${column}'`);
+    if (!existing.length) {
+      await pool.query(`ALTER TABLE account_requests ADD COLUMN \`${column}\` ${definition}`);
+    }
+  }
 
   await pool.query(`CREATE TABLE IF NOT EXISTS user_forms (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
