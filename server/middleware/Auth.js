@@ -9,10 +9,10 @@ async function getCurrentUser(req) {
     'SELECT email, full_name, role, active, extra_perms, is_hr_head FROM user_roles WHERE email = ? LIMIT 1', [email]);
   const row = rows[0];
   if (!row || !row.active) return null;
-  const extra = String(row.extra_perms || '').split(',').map(value => value.trim()).filter(Boolean);
+  const extra = String(row.extra_perms || '').split(',').map(value => value.trim())
+    .filter(value => value && value !== 'forms.head-review');
   const basePermissions = Object.prototype.hasOwnProperty.call(ROLE_PERMS, row.role) ? ROLE_PERMS[row.role] : [];
   const perms = [...basePermissions, ...extra];
-  if (row.role === 'HR' && row.is_hr_head) perms.push('forms.head-review');
   return { email: row.email, full_name: row.full_name, role: row.role, is_hr_head: Boolean(row.is_hr_head), perms };
 }
 

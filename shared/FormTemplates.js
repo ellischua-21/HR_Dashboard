@@ -21,10 +21,15 @@
       sequenceWidth: 6,
       description: 'Authorize an account deduction by listing its particulars and amount.',
       fields: [
+        { name: 'name', label: 'Employee name', type: 'text', required: true, maxLength: 191 },
+        { name: 'employeeNo', label: 'Employee number', type: 'text', required: true, maxLength: 191 },
+        { name: 'department', label: 'Department', type: 'text', required: true, maxLength: 191 },
         { name: 'date', label: 'Date', type: 'date', required: true },
         { name: 'particulars', label: 'Particulars', type: 'textarea', required: true, maxLength: 500 },
-        { name: 'amount', label: 'Amount', type: 'number', required: true, min: 0.01, max: 10000000, step: 0.01 }
-      ]
+        { name: 'amount', label: 'Amount', type: 'number', required: true, min: 0.01, max: 10000000, step: 0.01 },
+        { name: 'employeeAcknowledgment', label: 'THIS IS TO ACKNOWLEDGE AND AUTHORIZE THE ACCOUNTING TO DEDUCTON MY ACCOUNT STATED ABOVE AMOUNT.', type: 'checkbox', required: true }
+      ],
+      hrSignatureRequired: false
     },
     {
       key: 'nexus-no-in-out',
@@ -34,6 +39,7 @@
       sequenceWidth: 6,
       description: 'Report a missed time-in or time-out with the reason and recorded time details.',
       fields: [
+        { name: 'name', label: 'Employee name', type: 'text', required: true, maxLength: 191 },
         { name: 'date', label: 'Date', type: 'date', required: true },
         { name: 'department', label: 'Department', type: 'text', required: true, maxLength: 191 },
         { name: 'employeeNo', label: 'Employee number', type: 'text', required: true, maxLength: 191 },
@@ -57,13 +63,16 @@
       sequenceWidth: 6,
       description: 'Request an official trip with its destination, purpose, and travel schedule.',
       fields: [
+        { name: 'name', label: 'Employee name', type: 'text', required: true, maxLength: 191 },
+        { name: 'employeeNo', label: 'Employee number', type: 'text', required: true, maxLength: 191 },
         { name: 'department', label: 'Department', type: 'text', required: true, maxLength: 191 },
         { name: 'position', label: 'Position', type: 'text', required: true, maxLength: 191 },
         { name: 'destination', label: 'Destination', type: 'text', required: true, maxLength: 191 },
         { name: 'purpose', label: 'Purpose', type: 'textarea', required: true, maxLength: 500 },
         { name: 'departure', label: 'Date/time of departure', type: 'datetime-local', required: true },
         { name: 'return', label: 'Date/time of return', type: 'datetime-local', required: true }
-      ]
+      ],
+      hrSignatureRequired: false
     },
     {
       key: 'ot-slip',
@@ -73,6 +82,8 @@
       sequenceWidth: 6,
       description: 'Request overtime by entering your regular shift, authorized hours, and reason.',
       fields: [
+        { name: 'name', label: 'Employee name', type: 'text', required: true, maxLength: 191 },
+        { name: 'employeeNo', label: 'Employee number', type: 'text', required: true, maxLength: 191 },
         { name: 'department', label: 'Department', type: 'text', required: true, maxLength: 191 },
         { name: 'regularShiftTime', label: 'Regular shift time', type: 'text', required: true, maxLength: 100 },
         { name: 'overtimeDate', label: 'Date of authorized overtime', type: 'date', required: true },
@@ -90,6 +101,9 @@
       sequenceWidth: 6,
       description: 'Submit a daily time-in/out record, including break times when applicable.',
       fields: [
+        { name: 'name', label: 'Employee name', type: 'text', required: true, maxLength: 191 },
+        { name: 'employeeNo', label: 'Employee number', type: 'text', required: true, maxLength: 191 },
+        { name: 'department', label: 'Department', type: 'text', required: true, maxLength: 191 },
         { name: 'date', label: 'Date', type: 'date', required: true },
         { name: 'inStart', label: 'Time in / start', type: 'time' },
         { name: 'amBreakOut', label: 'AM break out', type: 'time' },
@@ -99,7 +113,8 @@
         { name: 'pmBreakOut', label: 'PM break out', type: 'time' },
         { name: 'pmBreakIn', label: 'PM break in', type: 'time' },
         { name: 'outEnd', label: 'Time out / end', type: 'time' }
-      ]
+      ],
+      hrSignatureRequired: false
     }
   ];
 });

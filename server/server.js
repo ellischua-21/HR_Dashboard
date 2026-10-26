@@ -113,7 +113,7 @@ const methods = {
   updateMyForm: (req, formId, templateKey, data) => userForms.updateMyForm(req, formId, templateKey, data),
   listFormsForReview: (req, scope) => userForms.listFormsForReview(req, scope),
   getFormReviewSummary: (req, scope) => userForms.getFormReviewSummaryForUser(req, scope),
-  reviewUserForm: (req, formId, decision, notes, signature) => userForms.reviewUserForm(req, formId, decision, notes, signature)
+  reviewUserForm: (req, formId, decision, notes, signature, hrFields) => userForms.reviewUserForm(req, formId, decision, notes, signature, hrFields)
 };
 
 app.post('/api/:method', async (req, res, next) => {

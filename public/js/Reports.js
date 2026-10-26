@@ -109,7 +109,8 @@ function renderInbox() {
     const card = el('article', undefined, 'announcement-card inbox-card');
     const heading = el('div', undefined, 'inbox-heading');
     heading.appendChild(el('h3', item.title));
-    heading.appendChild(el('span', item.status.replaceAll('_', ' '), 'badge'));
+    const displayStatus = item.status.toLowerCase().replaceAll('_', ' ').replace(/\b\w/g, letter => letter.toUpperCase());
+    heading.appendChild(el('span', displayStatus, 'badge'));
     card.appendChild(heading);
     card.appendChild(el('p', item.message, 'announcement-message'));
     const detail = item.type === 'ANNOUNCEMENT'
@@ -131,9 +132,7 @@ function renderInbox() {
       });
       card.appendChild(acknowledge);
     } else if (item.type === 'FORM') {
-      const target = item.target === 'head-forms'
-        ? ['head-forms', 'Manage Forms', 'forms.head-review', true]
-        : ['leave-requests', 'Manage Forms', 'forms.review', true];
+      const target = ['leave-requests', 'Manage Forms', item.reviewPermission, true];
       const view = el('button', 'View in Manage Forms');
       view.type = 'button';
       view.onclick = () => go(target);

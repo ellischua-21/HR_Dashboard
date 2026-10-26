@@ -8,14 +8,14 @@
     ['user-dashboard-fragment', 'views/UserDashboard.html']
   ];
   for (const [target, path] of fragments) {
-    const response = await fetch(`${path}?v=20261026-3`);
+    const response = await fetch(`${path}?v=20261026-16`);
     if (!response.ok) throw new Error(`Could not load ${path} (${response.status}).`);
     document.getElementById(target).innerHTML = await response.text();
   }
   for (const path of ['../shared/FormTemplates.js', 'js/Main.js', 'js/Employees.js', 'js/Reports.js', 'js/Accounts.js', 'js/UserDashboard.js', 'js/AccountSettings.js']) {
     await new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = `${path}?v=20261026-3`;
+      script.src = `${path}?v=20261026-16`;
       script.onload = resolve;
       script.onerror = () => reject(new Error(`Could not load ${path}.`));
       document.body.appendChild(script);

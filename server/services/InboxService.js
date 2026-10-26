@@ -12,6 +12,10 @@ function formTitle(templateKey) {
   return template ? template.title : 'Submitted form';
 }
 
+function displayStatus(status) {
+  return String(status || '').toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase());
+}
+
 async function getInbox(req) {
   const user = await requirePerm(req, 'inbox.read');
   const items = [];
@@ -45,37 +49,37 @@ async function getInbox(req) {
   const targets = [];
   if (FORM_REVIEW_TARGETS[user.role]) targets.push({ target: FORM_REVIEW_TARGETS[user.role], stage: 'HR' });
   if (user.role === 'HEAD' || (user.role === 'HR' && user.is_hr_head)) {
-    targets.push({ target: user.role === 'HR' ? 'leave-requests' : 'head-forms', stage: 'HEAD' });
+    targets.push({ target: 'leave-requests', stage: 'HEAD' });
   }
   for (const { target, stage } of targets) {
     const isHead = stage === 'HEAD';
     const excludeOwn = user.role === 'HR' && !isHead;
     const [forms] = await pool.execute(
       `SELECT f.id, f.control_no, f.template_key, f.user_email, f.submitted_at,
+              f.status, f.review_stage,
               CASE WHEN v.item_id IS NULL THEN 1 ELSE 0 END AS unseen,
               COALESCE(NULLIF(u.full_name, ''), f.user_email) AS applicant_name
        FROM user_forms f
        LEFT JOIN user_roles u ON u.email = f.user_email
        LEFT JOIN inbox_views v
          ON v.user_email = ? AND v.item_type = 'FORM' AND v.item_id = f.id
-       WHERE f.status = 'PENDING'
-         AND f.review_stage = ?
-         ${isHead ? 'AND f.head_reviewer_email = ?' : ''}
+       WHERE ${isHead ? 'f.head_reviewer_email = ?' : 'f.review_stage = ?'}
          ${excludeOwn ? 'AND f.user_email <> ?' : ''}
        ORDER BY f.submitted_at DESC, f.id DESC LIMIT 500`,
-      [user.email, stage, ...(isHead ? [user.email] : []), ...(excludeOwn ? [user.email] : [])]);
+      [user.email, ...(isHead ? [user.email] : [stage]), ...(excludeOwn ? [user.email] : [])]);
     forms.forEach(form => {
       items.push({
         id: `form-${form.id}`,
         type: 'FORM',
-        status: 'ACTION_REQUIRED',
+        status: form.status === 'PENDING' ? 'ACTION_REQUIRED' : form.status,
         unseen: Boolean(form.unseen),
-        title: `${formTitle(form.template_key)} requires review`,
-        message: `${form.applicant_name} submitted Serial Number ${form.control_no}.`,
+        title: `${formTitle(form.template_key)}${form.status === 'PENDING' ? ' requires review' : ' reviewed'}`,
+        message: `${form.applicant_name} submitted Serial Number ${form.control_no}.${form.status === 'PENDING' ? '' : ` Status: ${displayStatus(form.status)}.`}`,
         createdAt: form.submitted_at,
         formId: form.id,
         controlNo: form.control_no,
-        target
+        target,
+        reviewPermission: 'forms.review'
       });
     });
   }

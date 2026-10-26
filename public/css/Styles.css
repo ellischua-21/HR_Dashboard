@@ -154,29 +154,46 @@ fieldset{border:1px solid var(--rule);border-radius:6px;margin:0 0 14px;padding:
 .signature-pad-field small{display:block}
 .signature-pad{display:block;width:100%;height:130px;border:1px solid var(--rule);border-radius:4px;background:#fff;touch-action:none;cursor:crosshair}
 .signature-pad-field button{justify-self:start}
-.leave-sheet-signature img{display:block;width:min(100%,280px);height:56px;object-fit:contain;object-position:center bottom;margin:0 auto -26px}
+.hr-leave-balances{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0;padding:12px;border:1px solid var(--rule);border-radius:4px}
+.hr-leave-balances[hidden]{display:none}
+.hr-leave-balances legend{padding:0 5px;font-size:13px;font-weight:600}
+.hr-leave-balances label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+.hr-leave-balances input{box-sizing:border-box;width:100%;padding:8px;border:1px solid var(--rule);border-radius:4px;color:var(--ink);background:#fff}
+.leave-sheet-signature{position:relative;min-height:108px;padding-top:0}
+.leave-sheet-signature img{position:absolute;top:16px;left:50%;transform:translateX(-50%);display:block;width:min(100%,280px);height:56px;object-fit:fill;object-position:center}
+.leave-sheet-signature span{position:absolute;top:62px;left:0;right:0;height:24px}
+.leave-sheet-signature small{padding-top:88px}
 .form-view-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px}
 .form-view-header h2{font-size:18px;margin:0}
 #uf_form_view .leave-sheet{width:100%;min-width:0}
 #leave-print-root{display:none}
-.leave-sheet{background:#fff;color:#222;padding:28px;border:1px solid #777;font:14px/1.4 Arial,sans-serif}
+.leave-sheet{box-sizing:border-box;width:100%;background:#fff;color:#222;padding:28px;border:1px solid #777;font:14px/1.4 Arial,sans-serif}
 .leave-sheet-heading{text-align:center;border-bottom:2px solid #333;padding-bottom:10px}
 .leave-sheet-heading h1{font-size:22px;margin:0}
 .leave-sheet-heading p{margin:4px 0 0}
 .leave-sheet-topline{text-align:right;font-weight:600;margin:12px 0}
 .leave-sheet h2{font-size:15px;margin:16px 0 6px}
-.leave-sheet-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid #555;border-left:1px solid #555}
-.leave-sheet-field{min-height:56px;padding:7px;border-right:1px solid #555;border-bottom:1px solid #555;overflow-wrap:anywhere}
+.leave-sheet-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid #555;border-left:1px solid #555;box-shadow:inset -1px 0 #555,inset 0 -1px #555;outline:1px solid #555;outline-offset:-1px}
+.leave-sheet-field{box-sizing:border-box;min-width:0;min-height:56px;padding:7px;border-right:1px solid #555;border-bottom:1px solid #555;overflow-wrap:anywhere}
 .leave-sheet-field.wide{grid-column:1/-1}
 .leave-sheet-label{display:block;color:#555;font-size:10px;font-weight:600;margin-bottom:4px}
 .leave-sheet-field strong{display:block;white-space:pre-wrap;font-weight:500}
 .leave-sheet-request{grid-template-columns:repeat(4,minmax(0,1fr))}
 .leave-sheet-status{font-weight:700;margin:12px 0}
 .leave-sheet-signatures{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin:40px 0 24px}
+.leave-sheet-signatures.two-signatures{grid-template-columns:repeat(2,minmax(0,1fr))}
 .leave-sheet-signature span{display:block;height:30px;border-bottom:1px solid #555}
 .leave-sheet-signature small{display:block;text-align:center;margin-top:5px}
 .leave-sheet-hr{border:1px solid #555;padding:10px}
 .leave-sheet-hr h2{margin-top:0}
+.form-acknowledgment{grid-column:1/-1;display:flex!important;flex-direction:row!important;align-items:flex-start;justify-content:flex-start;gap:8px;box-sizing:border-box;width:100%;margin:0;padding:0;color:#222!important;font-family:inherit;font-size:13px;line-height:1.45}
+#leave-form .form-acknowledgment{align-items:flex-start}
+.form-acknowledgment .acknowledgment-checkbox{appearance:none;-webkit-appearance:none;position:relative;display:block;box-sizing:border-box;flex:0 0 14px;width:14px;height:14px;min-width:14px;margin:2px 0 0;padding:0;border:1px solid #767676;border-radius:2px;background:#fff;cursor:pointer}
+.form-acknowledgment .acknowledgment-checkbox:checked{border-color:var(--brand);background:var(--brand)}
+.form-acknowledgment .acknowledgment-checkbox:checked::after{content:"";position:absolute;left:4px;top:1px;width:4px;height:7px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.form-acknowledgment .acknowledgment-checkbox:focus-visible{outline:2px solid #222;outline-offset:2px}
+.form-acknowledgment span{display:block;flex:1 1 auto;min-width:0;color:#222;font:inherit}
+@media(max-width:600px){.leave-sheet{padding:14px}.leave-sheet-grid,.leave-sheet-request{grid-template-columns:repeat(2,minmax(0,1fr))}.leave-sheet-signatures,.leave-sheet-signatures.two-signatures{grid-template-columns:1fr;gap:12px}.hr-leave-balances{grid-template-columns:1fr}}
 @media print{
   body.printing-leave-form{display:block;background:#fff}
   body.printing-leave-form>:not(#leave-print-root){display:none!important}

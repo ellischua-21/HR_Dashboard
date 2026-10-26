@@ -40,52 +40,14 @@
   <div id="uf_form_catalog" class="grid form-catalog"></div>
 </section>
 
-<section id="view-head-forms" class="view" hidden>
-  <section class="panel">
-    <div class="account-heading">
-      <h2>Manage Forms</h2>
-      <button id="uf_head_refresh" class="ghost" type="button">Refresh</button>
-    </div>
-    <p class="note">Review submissions assigned to you and open completed forms to view their signatures.</p>
-    <p id="uf_head_feedback" class="okmsg" hidden></p>
-    <div class="user-form-summary" aria-label="Forms assigned to this Head">
-      <article class="user-form-stat"><span>Total assigned</span><strong id="uf_head_total">0</strong></article>
-      <article class="user-form-stat"><span>Awaiting signature</span><strong id="uf_head_pending">0</strong></article>
-      <article class="user-form-stat"><span>Approved by HR/Admin</span><strong id="uf_head_approved">0</strong></article>
-      <article class="user-form-stat"><span>Rejected</span><strong id="uf_head_rejected">0</strong></article>
-    </div>
-    <div class="toolbar form-filters">
-      <label for="uf_head_status">Status
-        <select id="uf_head_status">
-          <option value="">All statuses</option>
-          <option value="PENDING">Pending</option>
-          <option value="APPROVED">Approved</option>
-          <option value="REJECTED">Rejected</option>
-        </select>
-      </label>
-      <label for="uf_head_type">Form type
-        <select id="uf_head_type"><option value="">All form types</option></select>
-      </label>
-      <label class="form-search" for="uf_head_search">Search
-        <input id="uf_head_search" type="search" placeholder="Serial number, form, applicant, or details">
-      </label>
-    </div>
-    <div class="tablewrap">
-      <table>
-        <thead><tr><th>Serial Number</th><th>Form</th><th>Applicant</th><th>Submitted</th><th>Status</th><th>Review</th></tr></thead>
-        <tbody id="uf_head_review"></tbody>
-      </table>
-    </div>
-  </section>
-</section>
-
 <section id="view-leave-requests" class="view" hidden>
   <section class="panel">
     <div class="account-heading">
       <h2>Manage Forms</h2>
       <button id="uf_review_refresh" class="ghost" type="button">Refresh</button>
     </div>
-    <p id="uf_review_note" class="note">Review forms that reached HR/Admin and open completed forms, including Head rejections, to view their details and signatures.</p>
+    <p id="uf_review_note" class="note">Review forms assigned to you and forms that have reached HR/Admin. Available actions depend on your review permissions.</p>
+    <p id="uf_review_feedback" class="okmsg" hidden></p>
     <div class="user-form-summary" aria-label="Submitted form status summary">
       <article class="user-form-stat"><span>Total Requested</span><strong id="uf_review_total">0</strong></article>
       <article class="user-form-stat"><span>Pending</span><strong id="uf_review_pending">0</strong></article>
@@ -123,7 +85,8 @@
     <p id="leave-form-edit-note" class="note" hidden>Draw your electronic signature again to save your changes.</p>
     <p class="note">Your name and filing date are attached automatically.</p>
     <div class="fgrid">
-      <label>Name<input name="name_display" type="text" readonly disabled aria-label="Name from approved account"></label>
+      <label>Name<input name="name" type="text" maxlength="191" required></label>
+      <label>Employee number<input name="employeeNo" type="text" maxlength="191"></label>
       <label>Position<input name="position" maxlength="191" required></label>
       <label>Department<input name="department" maxlength="191" required></label>
       <label>Type of leave
@@ -148,7 +111,7 @@
       <label><input name="payType" type="radio" value="WITH_PAY" required> With pay</label>
       <label><input name="payType" type="radio" value="WITHOUT_PAY" required> Without pay</label>
     </fieldset>
-    <label class="leave-confirm"><input name="confirmation" type="checkbox" required> I confirm that the information in this form is accurate.</label>
+    <label class="leave-confirm form-acknowledgment"><input class="acknowledgment-checkbox" name="confirmation" type="checkbox" required><span>I confirm that the information in this form is accurate.</span></label>
     <div class="signature-pad-field">
       <span>Electronic signature</span>
       <canvas id="leave-signature-pad" class="signature-pad" aria-label="Draw your electronic signature" tabindex="0"></canvas>
@@ -176,7 +139,7 @@
     <p id="user-template-edit-note" class="note" hidden>Draw your electronic signature again to save your changes.</p>
     <p id="user-template-feedback" class="errs" hidden></p>
     <div id="user-template-fields" class="fgrid"></div>
-    <label class="leave-confirm"><input name="confirmation" type="checkbox" required> I confirm that the information in this form is accurate.</label>
+    <label id="user-template-confirmation" class="form-acknowledgment"><input name="confirmation" type="checkbox" required><span>I confirm that the information in this form is accurate.</span></label>
     <div class="signature-pad-field">
       <span>Electronic signature</span>
       <canvas id="template-signature-pad" class="signature-pad" aria-label="Draw your electronic signature" tabindex="0"></canvas>
@@ -210,6 +173,12 @@
   <form id="hr-signature-form">
     <h2>Sign and approve form</h2>
     <p id="hr-signature-control" class="note"></p>
+    <fieldset id="hr-leave-balances" class="hr-leave-balances" hidden>
+      <legend>For HR use only</legend>
+      <label>VL balance<input name="vlBalance" maxlength="100"></label>
+      <label>SL balance<input name="slBalance" maxlength="100"></label>
+      <label>SIL balance<input name="silBalance" maxlength="100"></label>
+    </fieldset>
     <div class="signature-pad-field">
       <span>HR/Admin signature</span>
       <canvas id="hr-signature-pad" class="signature-pad" aria-label="Draw your electronic signature" tabindex="0"></canvas>
@@ -227,6 +196,12 @@
   <form id="form-rejection-form">
     <h2>Reject form</h2>
     <p id="form-rejection-control" class="note"></p>
+    <fieldset id="form-rejection-leave-balances" class="hr-leave-balances" hidden>
+      <legend>For HR use only</legend>
+      <label>VL balance<input name="vlBalance" maxlength="100"></label>
+      <label>SL balance<input name="slBalance" maxlength="100"></label>
+      <label>SIL balance<input name="silBalance" maxlength="100"></label>
+    </fieldset>
     <label for="form-rejection-reason">Reason for rejection</label>
     <textarea id="form-rejection-reason" maxlength="500" rows="4" required></textarea>
     <p id="form-rejection-feedback" class="errs" hidden></p>

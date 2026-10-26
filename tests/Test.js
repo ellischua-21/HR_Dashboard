@@ -46,9 +46,9 @@ test('requested account roles map to the intended permission profiles', () => {
   assert.equal(requestAccount, undefined);
   assert.equal(ACCOUNT_ROLE_MAP.STAFF, 'STAFF');
   assert.deepEqual(ROLE_PERMS.STAFF, ['forms.self', 'announcements.read', 'inbox.read', 'account.password']);
-  assert.deepEqual(ROLE_PERMS.HEAD, ['forms.self', 'forms.head-review', 'announcements.read', 'inbox.read', 'account.password']);
+  assert.deepEqual(ROLE_PERMS.HEAD, ['forms.self', 'forms.review', 'announcements.read', 'inbox.read', 'account.password']);
   assert.ok(ROLE_PERMS.STAFF.includes('forms.self'));
-  assert.ok(!ROLE_PERMS.STAFF.includes('forms.head-review'));
+  assert.ok(Object.values(ROLE_PERMS).every(perms => !perms.includes('forms.head-review')));
   assert.equal(ROLE_PERMS.MANAGER, undefined);
   assert.equal(ROLE_PERMS.EXECUTIVE, undefined);
   assert.ok(!ROLE_PERMS.STAFF.includes('dash.view'));
@@ -65,7 +65,7 @@ test('requested account roles map to the intended permission profiles', () => {
   assert.ok(ROLE_PERMS.HR.includes('announcements.manage'));
   assert.ok(ROLE_PERMS.HR.includes('inbox.read'));
   assert.ok(!ROLE_PERMS.HR.includes('admin.manage'));
-  assert.ok(!ROLE_PERMS.HEAD.includes('forms.review'));
+  assert.ok(ROLE_PERMS.HEAD.includes('forms.review'));
 });
 
 test('Head assignments allow Head-to-Head links without a top role', () => {
@@ -137,7 +137,7 @@ test('all supplied non-leave form templates accept valid field data', () => {
   templates.forEach(template => {
     const data = Object.fromEntries(template.fields.map(field => [
       field.name,
-      field.type === 'number' ? String(field.min) : values[field.type]
+      field.type === 'checkbox' ? true : field.type === 'number' ? String(field.min) : values[field.type]
     ]));
     data.signature = 'data:image/png;base64,iVBORw0KGgo=';
     const result = validateUserForm(template.key, data);
@@ -203,12 +203,18 @@ test('announcement text is required, bounded, and stripped of HTML delimiters', 
 
 test('user forms require a bounded PNG electronic signature', () => {
   const valid = {
+    name: 'Alex Employee',
+    employeeNo: 'E-1001',
+    department: 'Operations',
     date: '2026-10-19',
     particulars: 'Uniform',
     amount: '10',
+    employeeAcknowledgment: true,
     signature: 'data:image/png;base64,iVBORw0KGgo='
   };
   assert.deepEqual(validateUserForm('authority-to-deduct', valid).errors, []);
+  assert.ok(validateUserForm('authority-to-deduct', { ...valid, employeeAcknowledgment: false }).errors
+    .some(message => message.includes('must be acknowledged')));
   assert.ok(validateUserForm('authority-to-deduct', {
     ...valid,
     signature: 'data:image/svg+xml;base64,PHN2Zz4='
@@ -229,6 +235,10 @@ test('Head and HR/Admin approvals require a valid electronic signature', () => {
     { message: 'Draw your signature before forwarding this form.', status: 400 }
   );
   assert.doesNotThrow(() => validateApprovalSignature(false, 'APPROVED', 'data:image/png;base64,iVBORw0KGgo='));
+  ['authority-to-deduct', 'time-in-out', 'official-business-trip'].forEach(templateKey => {
+    assert.doesNotThrow(() => validateApprovalSignature(false, 'APPROVED', '', templateKey));
+    assert.throws(() => validateApprovalSignature(true, 'APPROVED', '', templateKey), { status: 400 });
+  });
   assert.doesNotThrow(() => validateApprovalSignature(false, 'REJECTED', ''));
 });
 

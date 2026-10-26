@@ -31,6 +31,8 @@ function validateLeaveForm(data = {}) {
   const reason = sanitize(data.reason);
   const payType = data.payType;
 
+  if (sanitize(data.name).length > 191) errors.push('Employee name must be 191 characters or fewer.');
+  if (sanitize(data.employeeNo).length > 191) errors.push('Employee number must be 191 characters or fewer.');
   if (!position || position.length > 191) errors.push('Enter your position (up to 191 characters).');
   if (!department || department.length > 191) errors.push('Enter your department (up to 191 characters).');
   if (!LEAVE_TYPES.includes(leaveType)) errors.push('Choose a valid leave type.');
@@ -64,6 +66,12 @@ function validateUserForm(templateKey, data = {}) {
   if (!validSignature(data.signature)) errors.push('Draw your electronic signature before submitting.');
 
   template.fields.forEach(field => {
+    if (field.type === 'checkbox') {
+      const checked = data[field.name] === true || data[field.name] === 'true' || data[field.name] === 'on';
+      if (field.required && !checked) errors.push(`${field.label} must be acknowledged.`);
+      clean[field.name] = checked;
+      return;
+    }
     const raw = data[field.name] === null || data[field.name] === undefined ? '' : String(data[field.name]).trim();
     const value = sanitize(raw);
     if (field.required && !value) errors.push(`${field.label} is required.`);
@@ -105,8 +113,10 @@ function httpError(message, status) {
   return error;
 }
 
-function validateApprovalSignature(isHead, decision, signature) {
-  if (decision === 'APPROVED' && !validSignature(signature)) {
+function validateApprovalSignature(isHead, decision, signature, templateKey) {
+  const template = FORM_TEMPLATES.find(item => item.key === templateKey);
+  const signatureRequired = isHead || !template || template.hrSignatureRequired !== false;
+  if (decision === 'APPROVED' && signatureRequired && !validSignature(signature)) {
     throw httpError(
       isHead ? 'Draw your signature before forwarding this form.' : 'Draw your signature before approving this form.',
       400);
@@ -145,6 +155,10 @@ function parseForm(row) {
 
 async function listMyForms(req) {
   const user = await requirePerm(req, 'forms.self');
+  const [[employeeProfile]] = await pool.execute(
+    `SELECT name, position, department, emp_no
+     FROM employees WHERE LOWER(personal_email) = LOWER(?)
+     ORDER BY record_id DESC LIMIT 1`, [user.email]);
   const [[summary]] = await pool.execute(
     `SELECT COUNT(*) AS total,
             COALESCE(SUM(status = 'PENDING'), 0) AS pending,
@@ -176,6 +190,7 @@ async function listMyForms(req) {
     [user.email]);
   return {
     forms: rows.map(parseForm),
+    employeeProfile: employeeProfile || null,
     assignedHead: head && head.email
       ? { email: head.email, full_name: head.full_name, active: Boolean(head.active) }
       : null,
@@ -223,9 +238,10 @@ async function submitLeaveForm(req, data = {}) {
     'SELECT full_name FROM user_roles WHERE email = ? AND active = 1 LIMIT 1', [user.email]);
 
   const formData = {
-    name: sanitize(accounts[0].full_name),
+    name: sanitize(data.name) || sanitize(accounts[0].full_name),
     position: sanitize(data.position),
     department: sanitize(data.department),
+    employeeNo: sanitize(data.employeeNo),
     leaveType: sanitize(data.leaveType),
     otherLeaveType: sanitize(data.otherLeaveType),
     dateFrom: data.dateFrom,
@@ -248,7 +264,7 @@ async function submitUserForm(req, templateKey, data = {}) {
   const [accounts] = await pool.execute(
     'SELECT full_name FROM user_roles WHERE email = ? AND active = 1 LIMIT 1', [user.email]);
 
-  cleanData.name = sanitize(accounts[0].full_name);
+  cleanData.name = sanitize(cleanData.name) || sanitize(accounts[0].full_name);
   const template = FORM_TEMPLATES.find(item => item.key === templateKey);
   return persistUserForm(user.email, user.role, headEmail, templateKey, cleanData, template.title);
 }
@@ -263,8 +279,10 @@ async function updateMyForm(req, formId, templateKey, data = {}) {
     const errors = validateLeaveForm(data);
     if (errors.length) throw httpError(errors.join(' '), 400);
     cleanData = {
+      name: sanitize(data.name),
       position: sanitize(data.position),
       department: sanitize(data.department),
+      employeeNo: sanitize(data.employeeNo),
       leaveType: sanitize(data.leaveType),
       otherLeaveType: sanitize(data.otherLeaveType),
       dateFrom: data.dateFrom,
@@ -284,7 +302,7 @@ async function updateMyForm(req, formId, templateKey, data = {}) {
     'SELECT full_name FROM user_roles WHERE email = ? AND active = 1 LIMIT 1',
     [user.email]);
   if (!account) throw httpError('Your account is not active.', 401);
-  cleanData.name = sanitize(account.full_name);
+  cleanData.name = sanitize(cleanData.name) || sanitize(account.full_name);
 
   const connection = await pool.getConnection();
   try {
@@ -366,17 +384,35 @@ async function getFormReviewSummary(reviewer, scope = null) {
   const isHeadReviewer = scope
     ? String(scope).toUpperCase() === 'HEAD'
     : reviewer && (reviewer.role === 'HEAD' || reviewer.is_hr_head);
-  if (combinedQueue && reviewer && reviewer.role === 'HR' && reviewer.is_hr_head) {
+  if (combinedQueue) {
+    const canReviewHead = reviewer.role === 'HEAD' || (reviewer.role === 'HR' && reviewer.is_hr_head);
+    const canReviewHr = reviewer.perms.includes('forms.review') && ['HR', 'ADMIN'].includes(reviewer.role);
+    const scopes = [];
+    const values = [];
+    const pendingScopes = [];
+    if (canReviewHead) {
+      scopes.push(reviewer.role === 'HR'
+        ? "head_reviewer_email = ? AND user_email IN (SELECT email FROM user_roles WHERE role = 'HR')"
+        : "head_reviewer_email = ? AND user_email IN (SELECT email FROM user_roles WHERE role IN ('STAFF', 'HEAD'))");
+      values.push(reviewer.email);
+      pendingScopes.push("(status = 'PENDING' AND review_stage = 'HEAD' AND head_reviewer_email = ?)");
+    }
+    if (canReviewHr) {
+      const reviewerFilter = reviewer.role === 'HR' ? ' AND user_email <> ?' : '';
+      scopes.push(`(review_stage = 'HR'${reviewerFilter})`);
+      if (reviewer.role === 'HR') values.push(reviewer.email);
+      pendingScopes.push(`(status = 'PENDING' AND review_stage = 'HR'${reviewer.role === 'HR' ? ' AND user_email <> ?' : ''})`);
+    }
+    const pendingValues = [];
+    if (canReviewHead) pendingValues.push(reviewer.email);
+    if (canReviewHr && reviewer.role === 'HR') pendingValues.push(reviewer.email);
     const [[summary]] = await pool.execute(
       `SELECT COUNT(*) AS total,
-              COALESCE(SUM(status = 'PENDING' AND ((review_stage = 'HEAD' AND head_reviewer_email = ?)
-                OR (review_stage = 'HR' AND user_email <> ?))), 0) AS pending,
+              COALESCE(SUM(${pendingScopes.length ? pendingScopes.join(' OR ') : '0'}), 0) AS pending,
               COALESCE(SUM(status = 'APPROVED'), 0) AS approved,
               COALESCE(SUM(status = 'REJECTED'), 0) AS rejected
-       FROM user_forms
-       WHERE head_reviewer_email = ?
-          OR ((review_stage = 'HR' OR status IN ('APPROVED', 'REJECTED')) AND user_email <> ?)`,
-      [reviewer.email, reviewer.email, reviewer.email, reviewer.email]);
+       FROM user_forms WHERE ${scopes.length ? scopes.join(' OR ') : '1 = 0'}`,
+      [...pendingValues, ...values]);
     return {
       total: Number(summary.total),
       pending: Number(summary.pending),
@@ -387,8 +423,8 @@ async function getFormReviewSummary(reviewer, scope = null) {
   const where = isHeadReviewer
     ? 'WHERE head_reviewer_email = ?'
     : reviewer && reviewer.role === 'HR'
-      ? "WHERE (review_stage = 'HR' OR status IN ('APPROVED', 'REJECTED')) AND user_email <> ?"
-      : "WHERE review_stage = 'HR' OR status IN ('APPROVED', 'REJECTED')";
+      ? "WHERE review_stage = 'HR' AND user_email <> ?"
+      : "WHERE review_stage = 'HR'";
   const values = isHeadReviewer
     ? [reviewer.email]
     : reviewer && reviewer.role === 'HR' ? [reviewer.email] : [];
@@ -414,15 +450,12 @@ async function listFormsForReview(req, scope = 'HR') {
   const normalizedScope = String(scope).toUpperCase();
   const isCombinedQueue = normalizedScope === 'ALL';
   const isHead = normalizedScope === 'HEAD';
-  if (isCombinedQueue && !(current && current.role === 'HR' && current.is_hr_head)) {
-    throw httpError('Only the designated Head HR can view the combined Manage Forms queue.', 403);
-  }
-  const reviewer = isHead
-    ? await requirePerm(req, 'forms.head-review')
-    : await requirePerm(req, 'forms.review');
-  if (isCombinedQueue) await requirePerm(req, 'forms.head-review');
+  const reviewer = await requirePerm(req, 'forms.review');
   if (isHead && reviewer.role !== 'HEAD' && !(reviewer.role === 'HR' && reviewer.is_hr_head)) {
-    throw httpError('Only a designated Head or Head HR can review this queue.', 403);
+    throw httpError('This account cannot view the Head review queue.', 403);
+  }
+  if (!isCombinedQueue && !isHead && !['HR', 'ADMIN'].includes(reviewer.role)) {
+    throw httpError('This account cannot view the HR review queue.', 403);
   }
   const summary = await getFormReviewSummary(reviewer,
     isCombinedQueue ? 'ALL' : isHead ? 'HEAD' : 'HR');
@@ -437,14 +470,26 @@ async function listFormsForReview(req, scope = 'HR') {
      LEFT JOIN user_roles u ON u.email = f.user_email
      LEFT JOIN user_roles reviewer ON reviewer.email = f.reviewed_by
      WHERE ${isCombinedQueue
-       ? '(f.head_reviewer_email = ? OR ((f.review_stage = \'HR\' OR f.status IN (\'APPROVED\', \'REJECTED\')) AND f.user_email <> ?))'
+       ? `(${[
+           reviewer.role === 'HEAD'
+             ? "(f.head_reviewer_email = ? AND u.role IN ('STAFF', 'HEAD'))"
+             : reviewer.role === 'HR' && reviewer.is_hr_head
+               ? "(f.head_reviewer_email = ? AND u.role = 'HR')"
+               : '',
+           reviewer.perms.includes('forms.review') && ['HR', 'ADMIN'].includes(reviewer.role)
+             ? `(f.review_stage = 'HR'${reviewer.role === 'HR' ? ' AND f.user_email <> ?' : ''})`
+             : ''
+         ].filter(Boolean).join(' OR ') || '1 = 0'})`
        : isHead
        ? 'f.head_reviewer_email = ?'
        : reviewer.role === 'HR'
-         ? "((f.review_stage = 'HR' OR f.status IN ('APPROVED', 'REJECTED')) AND f.user_email <> ?)"
-         : "(f.review_stage = 'HR' OR f.status IN ('APPROVED', 'REJECTED'))"}
+         ? "(f.review_stage = 'HR' AND f.user_email <> ?)"
+         : "(f.review_stage = 'HR')"}
      ORDER BY f.submitted_at DESC, f.id DESC LIMIT 500`,
-    isCombinedQueue ? [reviewer.email, reviewer.email]
+    isCombinedQueue ? [
+      ...(reviewer.role === 'HEAD' || (reviewer.role === 'HR' && reviewer.is_hr_head) ? [reviewer.email] : []),
+      ...(reviewer.perms.includes('forms.review') && reviewer.role === 'HR' ? [reviewer.email] : [])
+    ]
       : isHead || reviewer.role === 'HR' ? [reviewer.email] : []);
   return {
     forms: rows.map(parseForm),
@@ -458,33 +503,28 @@ async function getFormReviewSummaryForUser(req, scope = 'HR') {
   const normalizedScope = String(scope).toUpperCase();
   const isCombinedQueue = normalizedScope === 'ALL';
   if (isCombinedQueue) {
-    if (!(current && current.role === 'HR' && current.is_hr_head)) {
-      throw httpError('Only the designated Head HR can view the combined Manage Forms summary.', 403);
-    }
-    const reviewer = await requirePerm(req, 'forms.head-review');
-    await requirePerm(req, 'forms.review');
+    const reviewer = await requirePerm(req, 'forms.review');
     return getFormReviewSummary(reviewer, 'ALL');
   }
   const isHead = normalizedScope === 'HEAD';
   if (isHead) {
-    const reviewer = await requirePerm(req, 'forms.head-review');
+    const reviewer = await requirePerm(req, 'forms.review');
     if (reviewer.role !== 'HEAD' && !(reviewer.role === 'HR' && reviewer.is_hr_head)) {
       throw httpError('Only a designated Head or Head HR can review this queue.', 403);
     }
     return getFormReviewSummary(reviewer);
   }
-  if (!current.perms.includes('forms.review')) {
+  if (!current.perms.includes('forms.review') || !['HR', 'ADMIN'].includes(current.role)) {
     return { total: 0, pending: 0, approved: 0, rejected: 0 };
   }
   const reviewer = await requirePerm(req, 'forms.review');
   return getFormReviewSummary(reviewer, 'HR');
 }
 
-async function reviewUserForm(req, formId, decision, reason = '', signature = '') {
+async function reviewUserForm(req, formId, decision, reason = '', signature = '', hrFields = null) {
   const current = await getCurrentUser(req);
   if (!current) await requirePerm(req, 'forms.review');
   const reviewer = current;
-  const canReviewAsHead = reviewer.role === 'HEAD' || (reviewer.role === 'HR' && reviewer.is_hr_head);
   if (!['APPROVED', 'REJECTED'].includes(decision)) {
     throw httpError('Choose Approved or Rejected.', 400);
   }
@@ -496,25 +536,28 @@ async function reviewUserForm(req, formId, decision, reason = '', signature = ''
     await connection.beginTransaction();
     const [rows] = await connection.execute(
       `SELECT f.id, f.control_no, f.status, f.review_stage, f.head_reviewer_email,
-              f.user_email, applicant.role AS submitter_role
+              f.user_email, f.template_key, f.form_data, applicant.role AS submitter_role
        FROM user_forms f LEFT JOIN user_roles applicant ON applicant.email = f.user_email
        WHERE f.id = ? FOR UPDATE`, [formId]);
     if (!rows.length) throw httpError('This form does not exist.', 404);
     if (rows[0].status !== 'PENDING') throw httpError('This form has already been reviewed.', 409);
+    if (rows[0].user_email === reviewer.email) throw httpError('You cannot review your own form.', 403);
     const isHead = rows[0].review_stage === 'HEAD';
     if (isHead) {
-      if (!canReviewAsHead) throw httpError('Access denied: this form requires its assigned Head.', 403);
-      await requirePerm(req, 'forms.head-review');
+      await requirePerm(req, 'forms.review');
+      const mayReviewAsHead = (reviewer.role === 'HEAD' && ['STAFF', 'HEAD'].includes(rows[0].submitter_role))
+        || (reviewer.role === 'HR' && reviewer.is_hr_head && rows[0].submitter_role === 'HR');
+      if (!mayReviewAsHead) throw httpError('Access denied: this form requires its assigned Head.', 403);
       if (rows[0].head_reviewer_email !== reviewer.email) {
         throw httpError('This form is not assigned to you.', 403);
       }
     } else {
       await requirePerm(req, 'forms.review');
-      if (reviewer.role === 'HR' && rows[0].user_email === reviewer.email) {
-        throw httpError('You cannot review your own form.', 403);
+      if (!['HR', 'ADMIN'].includes(reviewer.role)) {
+        throw httpError('Only HR or Admin may review forms forwarded to the HR stage.', 403);
       }
     }
-    validateApprovalSignature(isHead, decision, signature);
+    validateApprovalSignature(isHead, decision, signature, rows[0].template_key);
     if (isHead) {
       if (decision === 'APPROVED') {
         if (rows[0].submitter_role === 'HR') {
@@ -541,11 +584,51 @@ async function reviewUserForm(req, formId, decision, reason = '', signature = ''
       throw httpError('This form has not yet been forwarded by its assigned Head.', 409);
     }
 
-    await connection.execute(
-      `UPDATE user_forms SET status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP,
-         review_notes = ?, hr_signature = ?
-       WHERE id = ?`,
-      [decision, reviewer.email, reviewReason, decision === 'APPROVED' ? signature : null, formId]);
+    let updatedFormData = null;
+    if (hrFields !== null && hrFields !== undefined) {
+      if (isHead || rows[0].review_stage !== 'HR' || rows[0].template_key !== 'leave-2026') {
+        throw httpError('HR balances can only be entered by HR when reviewing a Leave form.', 400);
+      }
+      if (!hrFields || typeof hrFields !== 'object' || Array.isArray(hrFields)) {
+        throw httpError('Enter valid Leave balances.', 400);
+      }
+      const allowedBalanceFields = ['vlBalance', 'slBalance', 'silBalance'];
+      const suppliedFields = Object.keys(hrFields);
+      if (suppliedFields.some(field => !allowedBalanceFields.includes(field))) {
+        throw httpError('Only Leave balance fields can be updated during HR review.', 400);
+      }
+      for (const field of allowedBalanceFields) {
+        if (hrFields[field] !== undefined && String(hrFields[field]).length > 100) {
+          throw httpError('Leave balances must be 100 characters or fewer.', 400);
+        }
+      }
+      try {
+        updatedFormData = typeof rows[0].form_data === 'string'
+          ? JSON.parse(rows[0].form_data)
+          : rows[0].form_data;
+      } catch (_) {
+        updatedFormData = {};
+      }
+      if (!updatedFormData || typeof updatedFormData !== 'object' || Array.isArray(updatedFormData)) updatedFormData = {};
+      allowedBalanceFields.forEach(field => {
+        if (hrFields[field] !== undefined) updatedFormData[field] = sanitize(hrFields[field]);
+      });
+    }
+
+    if (updatedFormData) {
+      await connection.execute(
+        `UPDATE user_forms SET status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP,
+           review_notes = ?, hr_signature = ?, form_data = ?
+         WHERE id = ?`,
+        [decision, reviewer.email, reviewReason, decision === 'APPROVED' ? signature : null,
+          JSON.stringify(updatedFormData), formId]);
+    } else {
+      await connection.execute(
+        `UPDATE user_forms SET status = ?, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP,
+           review_notes = ?, hr_signature = ?
+         WHERE id = ?`,
+        [decision, reviewer.email, reviewReason, decision === 'APPROVED' ? signature : null, formId]);
+    }
     await logAudit(reviewer.email, 'FORM_REVIEWED', String(formId),
       `${rows[0].control_no} marked ${decision}`, connection);
     await connection.commit();
