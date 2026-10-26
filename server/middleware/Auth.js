@@ -1,3 +1,4 @@
+const { httpError } = require('../utils/HttpError');
 const { ROLE_PERMS } = require('../config/Config');
 const { pool } = require('../db/database');
 const { logAudit } = require('../services/AuditService');
@@ -19,15 +20,11 @@ async function getCurrentUser(req) {
 async function requirePerm(req, permission) {
   const user = await getCurrentUser(req);
   if (!user) {
-    const error = new Error('Access denied: you are not an authorized user.');
-    error.status = 401;
-    throw error;
+    throw httpError('Access denied: you are not an authorized user.', 401);
   }
   if (!user.perms.includes(permission)) {
     await logAudit(user.email, 'ACCESS_DENIED', '', permission);
-    const error = new Error('Access denied: insufficient permission.');
-    error.status = 403;
-    throw error;
+    throw httpError('Access denied: insufficient permission.', 403);
   }
   return user;
 }

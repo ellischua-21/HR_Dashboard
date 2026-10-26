@@ -1,7 +1,7 @@
 function bindPasswordChange(formId, feedbackId) {
   const form = $(formId);
   const feedback = $(feedbackId);
-  form.onsubmit = async event => {
+  form.onsubmit = async (event) => {
     event.preventDefault();
     const submit = form.querySelector('button[type="submit"]');
     const values = new FormData(form);
@@ -17,14 +17,19 @@ function bindPasswordChange(formId, feedbackId) {
     }
     if (currentPassword === newPassword) {
       feedback.className = 'login-error';
-      feedback.textContent = 'Choose a new password different from your current password.';
+      feedback.textContent =
+        'Choose a new password different from your current password.';
       feedback.hidden = false;
       return;
     }
 
     submit.disabled = true;
     try {
-      const result = await api('changeMyPassword', currentPassword, newPassword);
+      const result = await api(
+        'changeMyPassword',
+        currentPassword,
+        newPassword
+      );
       form.reset();
       feedback.className = 'okmsg';
       feedback.textContent = result.message;

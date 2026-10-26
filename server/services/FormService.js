@@ -3,6 +3,8 @@ const { requirePerm, getCurrentUser } = require('../middleware/Auth');
 const { logAudit } = require('./AuditService');
 const { sanitize, isValidDate } = require('../utils/Validation');
 const FORM_TEMPLATES = require('../../shared/FormTemplates');
+const { httpError } = require('../utils/HttpError');
+const { buildReviewScope } = require('./FormReviewScope');
 
 const LEAVE_TYPES = [
   'Vacation Leave (VL)',
@@ -105,12 +107,6 @@ function validateUserForm(templateKey, data = {}) {
   }
   clean.signature = data.signature;
   return { errors, data: clean };
-}
-
-function httpError(message, status) {
-  const error = new Error(message);
-  error.status = status;
-  return error;
 }
 
 function validateApprovalSignature(isHead, decision, signature, templateKey) {
@@ -379,63 +375,16 @@ async function persistUserForm(email, role, headEmail, templateKey, formData, de
   }
 }
 
-async function getFormReviewSummary(reviewer, scope = null) {
-  const combinedQueue = String(scope || '').toUpperCase() === 'ALL';
-  const isHeadReviewer = scope
-    ? String(scope).toUpperCase() === 'HEAD'
-    : reviewer && (reviewer.role === 'HEAD' || reviewer.is_hr_head);
-  if (combinedQueue) {
-    const canReviewHead = reviewer.role === 'HEAD' || (reviewer.role === 'HR' && reviewer.is_hr_head);
-    const canReviewHr = reviewer.perms.includes('forms.review') && ['HR', 'ADMIN'].includes(reviewer.role);
-    const scopes = [];
-    const values = [];
-    const pendingScopes = [];
-    if (canReviewHead) {
-      scopes.push(reviewer.role === 'HR'
-        ? "head_reviewer_email = ? AND user_email IN (SELECT email FROM user_roles WHERE role = 'HR')"
-        : "head_reviewer_email = ? AND user_email IN (SELECT email FROM user_roles WHERE role IN ('STAFF', 'HEAD'))");
-      values.push(reviewer.email);
-      pendingScopes.push("(status = 'PENDING' AND review_stage = 'HEAD' AND head_reviewer_email = ?)");
-    }
-    if (canReviewHr) {
-      const reviewerFilter = reviewer.role === 'HR' ? ' AND user_email <> ?' : '';
-      scopes.push(`(review_stage = 'HR'${reviewerFilter})`);
-      if (reviewer.role === 'HR') values.push(reviewer.email);
-      pendingScopes.push(`(status = 'PENDING' AND review_stage = 'HR'${reviewer.role === 'HR' ? ' AND user_email <> ?' : ''})`);
-    }
-    const pendingValues = [];
-    if (canReviewHead) pendingValues.push(reviewer.email);
-    if (canReviewHr && reviewer.role === 'HR') pendingValues.push(reviewer.email);
-    const [[summary]] = await pool.execute(
-      `SELECT COUNT(*) AS total,
-              COALESCE(SUM(${pendingScopes.length ? pendingScopes.join(' OR ') : '0'}), 0) AS pending,
-              COALESCE(SUM(status = 'APPROVED'), 0) AS approved,
-              COALESCE(SUM(status = 'REJECTED'), 0) AS rejected
-       FROM user_forms WHERE ${scopes.length ? scopes.join(' OR ') : '1 = 0'}`,
-      [...pendingValues, ...values]);
-    return {
-      total: Number(summary.total),
-      pending: Number(summary.pending),
-      approved: Number(summary.approved),
-      rejected: Number(summary.rejected)
-    };
-  }
-  const where = isHeadReviewer
-    ? 'WHERE head_reviewer_email = ?'
-    : reviewer && reviewer.role === 'HR'
-      ? "WHERE review_stage = 'HR' AND user_email <> ?"
-      : "WHERE review_stage = 'HR'";
-  const values = isHeadReviewer
-    ? [reviewer.email]
-    : reviewer && reviewer.role === 'HR' ? [reviewer.email] : [];
-  const stage = isHeadReviewer ? 'HEAD' : 'HR';
-  const [[summary]] = await pool.query(
+async function getFormReviewSummary(reviewer, scope = null, builtScope = null) {
+  const reviewScope = builtScope || buildReviewScope(reviewer, scope);
+  const [[summary]] = await pool.execute(
     `SELECT COUNT(*) AS total,
-            COALESCE(SUM(status = 'PENDING' AND review_stage = '${stage}'), 0) AS pending,
-            COALESCE(SUM(status = 'APPROVED'), 0) AS approved,
-            COALESCE(SUM(status = 'REJECTED'), 0) AS rejected
-     FROM user_forms ${where}`,
-    values);
+            COALESCE(SUM(${reviewScope.pendingSql}), 0) AS pending,
+            COALESCE(SUM(f.status = 'APPROVED'), 0) AS approved,
+            COALESCE(SUM(f.status = 'REJECTED'), 0) AS rejected
+     FROM user_forms f WHERE ${reviewScope.whereSql}`,
+    [...reviewScope.pendingValues, ...reviewScope.whereValues]
+  );
   return {
     total: Number(summary.total),
     pending: Number(summary.pending),
@@ -457,10 +406,11 @@ async function listFormsForReview(req, scope = 'HR') {
   if (!isCombinedQueue && !isHead && !['HR', 'ADMIN'].includes(reviewer.role)) {
     throw httpError('This account cannot view the HR review queue.', 403);
   }
-  const summary = await getFormReviewSummary(reviewer,
-    isCombinedQueue ? 'ALL' : isHead ? 'HEAD' : 'HR');
+  const reviewScopeName = isCombinedQueue ? 'ALL' : isHead ? 'HEAD' : 'HR';
+  const reviewScope = buildReviewScope(reviewer, reviewScopeName);
+  const summary = await getFormReviewSummary(reviewer, reviewScopeName, reviewScope);
   const [rows] = await pool.execute(
-       `SELECT f.id, f.control_no, f.user_email, u.role AS submitter_role, u.full_name AS applicant_name,
+    `SELECT f.id, f.control_no, f.user_email, u.role AS submitter_role, u.full_name AS applicant_name,
             f.template_key, f.form_data, f.status, f.review_stage, f.head_reviewer_email,
             f.head_signature, f.head_signed_by, f.head_signed_at, f.hr_signature, f.submitted_at,
             f.reviewed_by, f.reviewed_at, f.review_notes,
@@ -469,28 +419,10 @@ async function listFormsForReview(req, scope = 'HR') {
      FROM user_forms f
      LEFT JOIN user_roles u ON u.email = f.user_email
      LEFT JOIN user_roles reviewer ON reviewer.email = f.reviewed_by
-     WHERE ${isCombinedQueue
-       ? `(${[
-           reviewer.role === 'HEAD'
-             ? "(f.head_reviewer_email = ? AND u.role IN ('STAFF', 'HEAD'))"
-             : reviewer.role === 'HR' && reviewer.is_hr_head
-               ? "(f.head_reviewer_email = ? AND u.role = 'HR')"
-               : '',
-           reviewer.perms.includes('forms.review') && ['HR', 'ADMIN'].includes(reviewer.role)
-             ? `(f.review_stage = 'HR'${reviewer.role === 'HR' ? ' AND f.user_email <> ?' : ''})`
-             : ''
-         ].filter(Boolean).join(' OR ') || '1 = 0'})`
-       : isHead
-       ? 'f.head_reviewer_email = ?'
-       : reviewer.role === 'HR'
-         ? "(f.review_stage = 'HR' AND f.user_email <> ?)"
-         : "(f.review_stage = 'HR')"}
+     WHERE ${reviewScope.whereSql}
      ORDER BY f.submitted_at DESC, f.id DESC LIMIT 500`,
-    isCombinedQueue ? [
-      ...(reviewer.role === 'HEAD' || (reviewer.role === 'HR' && reviewer.is_hr_head) ? [reviewer.email] : []),
-      ...(reviewer.perms.includes('forms.review') && reviewer.role === 'HR' ? [reviewer.email] : [])
-    ]
-      : isHead || reviewer.role === 'HR' ? [reviewer.email] : []);
+    reviewScope.whereValues
+  );
   return {
     forms: rows.map(parseForm),
     summary

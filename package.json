@@ -8,7 +8,8 @@
     "setup": "node scripts/Setup.js",
     "create-user": "node scripts/create-user.js",
     "sample-data": "node scripts/SampleData.js",
-    "test": "node --test tests/Test.js"
+    "test": "node --test tests/Test.js",
+    "format": "prettier --write \"public/js/*.js\" \"shared/*.js\""
   },
   "engines": {
     "node": ">=18"
@@ -18,5 +19,8 @@
     "express": "^4.21.2",
     "express-session": "^1.18.1",
     "mysql2": "^3.12.0"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.10"
   }
 }

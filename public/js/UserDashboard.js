@@ -6,7 +6,7 @@ let formBeingEdited = null;
 let activeReviewScope = 'HR';
 let employeeProfile = {};
 
-const userCell = value => {
+const userCell = (value) => {
   const cell = document.createElement('td');
   cell.textContent = value === null || value === undefined ? '' : String(value);
   return cell;
@@ -26,7 +26,7 @@ function fillFormTypeFilter(select) {
   allTypes.value = '';
   allTypes.textContent = 'All form types';
   select.appendChild(allTypes);
-  FORM_TEMPLATES.forEach(template => {
+  FORM_TEMPLATES.forEach((template) => {
     const option = document.createElement('option');
     option.value = template.key;
     option.textContent = template.title;
@@ -53,20 +53,28 @@ function leaveRange(form) {
 }
 
 function formTemplate(templateKey) {
-  return FORM_TEMPLATES.find(template => template.key === templateKey) || {
-    key: templateKey,
-    title: 'Submitted form',
-    fields: []
-  };
+  return (
+    FORM_TEMPLATES.find((template) => template.key === templateKey) || {
+      key: templateKey,
+      title: 'Submitted form',
+      fields: []
+    }
+  );
 }
 
 function formSummary(form) {
   const data = form.form_data;
-  if (form.template_key === 'leave-2026') return `${leaveLabel(form)} · ${leaveRange(form)} · ${data.days} day(s)`;
-  return formTemplate(form.template_key).fields
-    .filter(field => data[field.name] !== '' && data[field.name] !== null && data[field.name] !== undefined)
+  if (form.template_key === 'leave-2026')
+    return `${leaveLabel(form)} · ${leaveRange(form)} · ${data.days} day(s)`;
+  return formTemplate(form.template_key)
+    .fields.filter(
+      (field) =>
+        data[field.name] !== '' &&
+        data[field.name] !== null &&
+        data[field.name] !== undefined
+    )
     .slice(0, 3)
-    .map(field => `${field.label}: ${String(data[field.name]).slice(0, 80)}`)
+    .map((field) => `${field.label}: ${String(data[field.name]).slice(0, 80)}`)
     .join(' · ');
 }
 
@@ -84,7 +92,10 @@ function matchesFormFilters(form, status, search, templateKey = '') {
     form.applicant_name,
     form.user_email,
     JSON.stringify(searchableFormData)
-  ].filter(Boolean).join(' ').toLocaleLowerCase();
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLocaleLowerCase();
   return searchable.includes(search.toLocaleLowerCase());
 }
 
@@ -96,10 +107,12 @@ function updateFormSummary(summary) {
 }
 
 function canEditSubmittedForm(form) {
-  return ['STAFF', 'HEAD', 'HR'].includes(session.role) &&
+  return (
+    ['STAFF', 'HEAD', 'HR'].includes(session.role) &&
     form.status === 'PENDING' &&
     form.review_stage === 'HEAD' &&
-    Boolean(form.head_reviewer_email);
+    Boolean(form.head_reviewer_email)
+  );
 }
 
 function appendFormField(parent, label, value, className = '') {
@@ -109,17 +122,12 @@ function appendFormField(parent, label, value, className = '') {
   caption.className = 'leave-sheet-label';
   caption.textContent = label;
   const content = document.createElement('strong');
-  content.textContent = value === null || value === undefined || value === '' ? '\u00a0' : String(value);
+  content.textContent =
+    value === null || value === undefined || value === ''
+      ? '\u00a0'
+      : String(value);
   item.append(caption, content);
   parent.appendChild(item);
-}
-
-function formStatusLabel(status, reviewStage) {
-  const normalized = String(status || 'PENDING').toUpperCase();
-  if (normalized === 'PENDING') {
-    return reviewStage === 'HEAD' ? 'Pending Head Signature' : 'Pending HR/Admin Review';
-  }
-  return normalized.toLowerCase().replaceAll('_', ' ').replace(/\b\w/g, letter => letter.toUpperCase());
 }
 
 function createSignaturePad(canvas, clearButton) {
@@ -147,7 +155,7 @@ function createSignaturePad(canvas, clearButton) {
     return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
   }
 
-  canvas.addEventListener('pointerdown', event => {
+  canvas.addEventListener('pointerdown', (event) => {
     event.preventDefault();
     drawing = true;
     canvas.setPointerCapture(event.pointerId);
@@ -160,14 +168,16 @@ function createSignaturePad(canvas, clearButton) {
     context.moveTo(point.x, point.y);
     hasSignature = true;
   });
-  canvas.addEventListener('pointermove', event => {
+  canvas.addEventListener('pointermove', (event) => {
     if (!drawing) return;
     const point = position(event);
     context.lineTo(point.x, point.y);
     context.stroke();
     hasSignature = true;
   });
-  const stopDrawing = () => { drawing = false; };
+  const stopDrawing = () => {
+    drawing = false;
+  };
   canvas.addEventListener('pointerup', stopDrawing);
   canvas.addEventListener('pointercancel', stopDrawing);
   clearButton.addEventListener('click', clear);
@@ -178,14 +188,28 @@ function createSignaturePad(canvas, clearButton) {
     hasSignature: () => hasSignature,
     toDataURL: () => {
       if (!hasSignature) return '';
-      const { data, width, height } = context.getImageData(0, 0, canvas.width, canvas.height);
-      let minX = width, minY = height, maxX = -1, maxY = -1;
+      const { data, width, height } = context.getImageData(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+      let minX = width,
+        minY = height,
+        maxX = -1,
+        maxY = -1;
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
           const offset = (y * width + x) * 4;
-          if (data[offset] < 245 || data[offset + 1] < 245 || data[offset + 2] < 245) {
-            minX = Math.min(minX, x); minY = Math.min(minY, y);
-            maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+          if (
+            data[offset] < 245 ||
+            data[offset + 1] < 245 ||
+            data[offset + 2] < 245
+          ) {
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x);
+            maxY = Math.max(maxY, y);
           }
         }
       }
@@ -201,17 +225,38 @@ function createSignaturePad(canvas, clearButton) {
       const scale = Math.min(520 / sourceWidth, 90 / sourceHeight);
       const drawWidth = sourceWidth * scale;
       const drawHeight = sourceHeight * scale;
-      outputContext.drawImage(canvas, minX, minY, sourceWidth, sourceHeight,
-        (output.width - drawWidth) / 2, (output.height - drawHeight) / 2, drawWidth, drawHeight);
+      outputContext.drawImage(
+        canvas,
+        minX,
+        minY,
+        sourceWidth,
+        sourceHeight,
+        (output.width - drawWidth) / 2,
+        (output.height - drawHeight) / 2,
+        drawWidth,
+        drawHeight
+      );
       return output.toDataURL('image/png');
     }
   };
 }
 
-const leaveSignaturePad = createSignaturePad($('leave-signature-pad'), $('leave-signature-clear'));
-const templateSignaturePad = createSignaturePad($('template-signature-pad'), $('template-signature-clear'));
-const headSignaturePad = createSignaturePad($('head-signature-pad'), $('head-signature-clear'));
-const hrSignaturePad = createSignaturePad($('hr-signature-pad'), $('hr-signature-clear'));
+const leaveSignaturePad = createSignaturePad(
+  $('leave-signature-pad'),
+  $('leave-signature-clear')
+);
+const templateSignaturePad = createSignaturePad(
+  $('template-signature-pad'),
+  $('template-signature-clear')
+);
+const headSignaturePad = createSignaturePad(
+  $('head-signature-pad'),
+  $('head-signature-clear')
+);
+const hrSignaturePad = createSignaturePad(
+  $('hr-signature-pad'),
+  $('hr-signature-clear')
+);
 
 function buildLeaveSheet(data, metadata = {}) {
   const sheet = document.createElement('article');
@@ -232,7 +277,12 @@ function buildLeaveSheet(data, metadata = {}) {
 
   const identity = document.createElement('div');
   identity.className = 'leave-sheet-grid';
-  appendFormField(identity, 'NAME', data.name || session.full_name || session.email, 'wide');
+  appendFormField(
+    identity,
+    'NAME',
+    data.name || session.full_name || session.email,
+    'wide'
+  );
   appendFormField(identity, 'EMPLOYEE NUMBER', data.employeeNo);
   appendFormField(identity, 'POSITION', data.position);
   appendFormField(identity, 'DEPARTMENT', data.department);
@@ -243,18 +293,27 @@ function buildLeaveSheet(data, metadata = {}) {
   sheet.appendChild(requestHeading);
   const leave = document.createElement('div');
   leave.className = 'leave-sheet-grid leave-sheet-request';
-  appendFormField(leave, 'TYPE OF LEAVE', leaveLabel({ form_data: data }), 'wide');
+  appendFormField(
+    leave,
+    'TYPE OF LEAVE',
+    leaveLabel({ form_data: data }),
+    'wide'
+  );
   appendFormField(leave, 'FROM', data.dateFrom);
   appendFormField(leave, 'TO', data.dateTo);
   appendFormField(leave, 'NO. OF DAYS', data.days);
   appendFormField(leave, 'REASON', data.reason, 'wide');
   appendFormField(leave, 'WITH PAY', data.payType === 'WITH_PAY' ? 'X' : '');
-  appendFormField(leave, 'WITHOUT PAY', data.payType === 'WITHOUT_PAY' ? 'X' : '');
+  appendFormField(
+    leave,
+    'WITHOUT PAY',
+    data.payType === 'WITHOUT_PAY' ? 'X' : ''
+  );
   sheet.appendChild(leave);
 
   const status = document.createElement('p');
   status.className = 'leave-sheet-status';
-  status.textContent = `Status: ${formStatusLabel(metadata.status, metadata.reviewStage)}`;
+  status.textContent = `Status: ${FormStatus.formatFormStatus(metadata.status, metadata.reviewStage)}`;
   sheet.appendChild(status);
 
   const signatures = document.createElement('div');
@@ -296,49 +355,80 @@ function buildLeaveSheet(data, metadata = {}) {
 }
 
 async function centerSignatureImages(container) {
-  const images = Array.from(container.querySelectorAll('.leave-sheet-signature img'));
-  await Promise.all(images.map(async image => {
-    try {
-      if (!image.complete) await new Promise((resolve, reject) => {
-        image.onload = resolve;
-        image.onerror = reject;
-      });
-      const source = document.createElement('canvas');
-      source.width = image.naturalWidth;
-      source.height = image.naturalHeight;
-      const sourceContext = source.getContext('2d', { willReadFrequently: true });
-      sourceContext.drawImage(image, 0, 0);
-      const { data, width, height } = sourceContext.getImageData(0, 0, source.width, source.height);
-      let minX = width, minY = height, maxX = -1, maxY = -1;
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          const offset = (y * width + x) * 4;
-          if (data[offset + 3] > 0 && (data[offset] < 245 || data[offset + 1] < 245 || data[offset + 2] < 245)) {
-            minX = Math.min(minX, x); minY = Math.min(minY, y);
-            maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+  const images = Array.from(
+    container.querySelectorAll('.leave-sheet-signature img')
+  );
+  await Promise.all(
+    images.map(async (image) => {
+      try {
+        if (!image.complete)
+          await new Promise((resolve, reject) => {
+            image.onload = resolve;
+            image.onerror = reject;
+          });
+        const source = document.createElement('canvas');
+        source.width = image.naturalWidth;
+        source.height = image.naturalHeight;
+        const sourceContext = source.getContext('2d', {
+          willReadFrequently: true
+        });
+        sourceContext.drawImage(image, 0, 0);
+        const { data, width, height } = sourceContext.getImageData(
+          0,
+          0,
+          source.width,
+          source.height
+        );
+        let minX = width,
+          minY = height,
+          maxX = -1,
+          maxY = -1;
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const offset = (y * width + x) * 4;
+            if (
+              data[offset + 3] > 0 &&
+              (data[offset] < 245 ||
+                data[offset + 1] < 245 ||
+                data[offset + 2] < 245)
+            ) {
+              minX = Math.min(minX, x);
+              minY = Math.min(minY, y);
+              maxX = Math.max(maxX, x);
+              maxY = Math.max(maxY, y);
+            }
           }
         }
+        if (maxX < minX || maxY < minY) return;
+        const normalized = document.createElement('canvas');
+        normalized.width = 560;
+        normalized.height = 112;
+        const context = normalized.getContext('2d');
+        context.fillStyle = '#fff';
+        context.fillRect(0, 0, normalized.width, normalized.height);
+        const sourceWidth = maxX - minX + 1;
+        const sourceHeight = maxY - minY + 1;
+        const scale = Math.min(520 / sourceWidth, 90 / sourceHeight);
+        const drawWidth = sourceWidth * scale;
+        const drawHeight = sourceHeight * scale;
+        context.drawImage(
+          source,
+          minX,
+          minY,
+          sourceWidth,
+          sourceHeight,
+          (normalized.width - drawWidth) / 2,
+          (normalized.height - drawHeight) / 2,
+          drawWidth,
+          drawHeight
+        );
+        image.src = normalized.toDataURL('image/png');
+        await image.decode();
+      } catch (_) {
+        // Keep the original signature if the browser cannot normalize its image.
       }
-      if (maxX < minX || maxY < minY) return;
-      const normalized = document.createElement('canvas');
-      normalized.width = 560;
-      normalized.height = 112;
-      const context = normalized.getContext('2d');
-      context.fillStyle = '#fff';
-      context.fillRect(0, 0, normalized.width, normalized.height);
-      const sourceWidth = maxX - minX + 1;
-      const sourceHeight = maxY - minY + 1;
-      const scale = Math.min(520 / sourceWidth, 90 / sourceHeight);
-      const drawWidth = sourceWidth * scale;
-      const drawHeight = sourceHeight * scale;
-      context.drawImage(source, minX, minY, sourceWidth, sourceHeight,
-        (normalized.width - drawWidth) / 2, (normalized.height - drawHeight) / 2, drawWidth, drawHeight);
-      image.src = normalized.toDataURL('image/png');
-      await image.decode();
-    } catch (_) {
-      // Keep the original signature if the browser cannot normalize its image.
-    }
-  }));
+    })
+  );
 }
 
 async function showFormContents(form) {
@@ -359,9 +449,11 @@ async function showFormContents(form) {
     reviewedAt: form.reviewed_at,
     reviewNotes: form.status === 'REJECTED' ? form.review_notes : ''
   };
-  content.replaceChildren(form.template_key === 'leave-2026'
-    ? buildLeaveSheet(form.form_data, metadata)
-    : buildGenericFormSheet(form.form_data, metadata, template));
+  content.replaceChildren(
+    form.template_key === 'leave-2026'
+      ? buildLeaveSheet(form.form_data, metadata)
+      : buildGenericFormSheet(form.form_data, metadata, template)
+  );
   await centerSignatureImages(content);
   $('leave-view-dialog').showModal();
 }
@@ -375,10 +467,12 @@ async function loadMyForms() {
     assignedHeadLabel.textContent = `Your Head: ${result.assignedHead.full_name} (${result.assignedHead.email})${result.assignedHead.active ? '' : ' — inactive'}`;
     assignedHeadLabel.hidden = false;
   } else if (session.role === 'HR' && session.is_hr_head) {
-    assignedHeadLabel.textContent = 'Your forms go directly to the HR review queue.';
+    assignedHeadLabel.textContent =
+      'Your forms go directly to the HR review queue.';
     assignedHeadLabel.hidden = false;
   } else if (session.role === 'HR') {
-    assignedHeadLabel.textContent = 'Your forms are routed to the designated Head HR.';
+    assignedHeadLabel.textContent =
+      'Your forms are routed to the designated Head HR.';
     assignedHeadLabel.hidden = false;
   } else if (session.role === 'STAFF' || session.role === 'USER') {
     assignedHeadLabel.textContent = 'No assigned Head yet';
@@ -397,8 +491,12 @@ function renderMyForms() {
   const templateKey = $('uf_history_type').value;
   const search = $('uf_history_search').value.trim();
   const forms = mySubmittedForms
-    .filter(form => matchesFormFilters(form, status, search, templateKey))
-    .sort((left, right) => new Date(right.submitted_at) - new Date(left.submitted_at) || right.id - left.id);
+    .filter((form) => matchesFormFilters(form, status, search, templateKey))
+    .sort(
+      (left, right) =>
+        new Date(right.submitted_at) - new Date(left.submitted_at) ||
+        right.id - left.id
+    );
   body.replaceChildren();
   if (!mySubmittedForms.length) {
     userEmptyRow(body, 7, 'You have not submitted any forms yet.');
@@ -408,17 +506,18 @@ function renderMyForms() {
     userEmptyRow(body, 7, 'No forms match the selected filters.');
     return;
   }
-  forms.forEach(form => {
+  forms.forEach((form) => {
     const row = document.createElement('tr');
     row.append(
       userCell(form.control_no),
       userCell(formTemplate(form.template_key).title),
       userCell(form.days_pending === null ? '—' : form.days_pending),
       userCell(userDate(form.submitted_at)),
-      userCell(formStatusLabel(form.status, form.review_stage))
+      userCell(FormStatus.formatFormStatus(form.status, form.review_stage))
     );
     const notes = document.createElement('td');
-    notes.textContent = form.status === 'REJECTED' ? form.review_notes || '' : '';
+    notes.textContent =
+      form.status === 'REJECTED' ? form.review_notes || '' : '';
     const actions = document.createElement('td');
     const view = document.createElement('button');
     view.type = 'button';
@@ -436,9 +535,10 @@ function renderMyForms() {
       edit.type = 'button';
       edit.className = 'ghost';
       edit.textContent = 'Edit';
-      edit.onclick = () => form.template_key === 'leave-2026'
-        ? openLeaveForm(form)
-        : openTemplateForm(formTemplate(form.template_key), form);
+      edit.onclick = () =>
+        form.template_key === 'leave-2026'
+          ? openLeaveForm(form)
+          : openTemplateForm(formTemplate(form.template_key), form);
       actions.appendChild(edit);
     }
     actions.appendChild(print);
@@ -450,7 +550,7 @@ function renderMyForms() {
 function buildFormCatalog() {
   const catalog = $('uf_form_catalog');
   catalog.replaceChildren();
-  FORM_TEMPLATES.forEach(template => {
+  FORM_TEMPLATES.forEach((template) => {
     const card = document.createElement('article');
     card.className = 'panel form-template';
     const title = document.createElement('h2');
@@ -462,7 +562,10 @@ function buildFormCatalog() {
     const open = document.createElement('button');
     open.type = 'button';
     open.textContent = 'Fill out form';
-    open.onclick = () => template.key === 'leave-2026' ? openLeaveForm() : openTemplateForm(template);
+    open.onclick = () =>
+      template.key === 'leave-2026'
+        ? openLeaveForm()
+        : openTemplateForm(template);
     actions.appendChild(open);
     card.append(title, description, actions);
     catalog.appendChild(card);
@@ -475,12 +578,14 @@ function openTemplateForm(template, existingForm = null) {
   form.reset();
   formBeingEdited = existingForm;
   form.dataset.templateKey = template.key;
-  $('user-template-title').textContent = existingForm ? `Edit ${template.title}` : template.title;
+  $('user-template-title').textContent = existingForm
+    ? `Edit ${template.title}`
+    : template.title;
   $('user-template-feedback').hidden = true;
   $('user-template-edit-note').hidden = !existingForm;
   const fields = $('user-template-fields');
   fields.replaceChildren();
-  template.fields.forEach(field => {
+  template.fields.forEach((field) => {
     const label = document.createElement('label');
     if (field.type === 'checkbox') {
       const input = document.createElement('input');
@@ -488,7 +593,9 @@ function openTemplateForm(template, existingForm = null) {
       input.className = 'acknowledgment-checkbox';
       input.name = field.name;
       input.required = Boolean(field.required);
-      input.checked = Boolean(existingForm && existingForm.form_data[field.name]);
+      input.checked = Boolean(
+        existingForm && existingForm.form_data[field.name]
+      );
       const text = document.createElement('span');
       text.textContent = field.label;
       label.className = 'form-acknowledgment';
@@ -497,7 +604,9 @@ function openTemplateForm(template, existingForm = null) {
       return;
     }
     label.textContent = field.label;
-    const input = document.createElement(field.type === 'textarea' ? 'textarea' : 'input');
+    const input = document.createElement(
+      field.type === 'textarea' ? 'textarea' : 'input'
+    );
     if (field.type !== 'textarea') input.type = field.type;
     input.name = field.name;
     input.required = Boolean(field.required);
@@ -508,12 +617,19 @@ function openTemplateForm(template, existingForm = null) {
     label.appendChild(input);
     fields.appendChild(label);
     if (existingForm) {
-      input.value = existingForm.form_data[field.name] === undefined
-        ? ''
-        : String(existingForm.form_data[field.name]);
-    } else if (Object.prototype.hasOwnProperty.call(employeeProfile,
-      field.name === 'employeeNo' ? 'emp_no' : field.name)) {
-      input.value = employeeProfile[field.name === 'employeeNo' ? 'emp_no' : field.name] || '';
+      input.value =
+        existingForm.form_data[field.name] === undefined
+          ? ''
+          : String(existingForm.form_data[field.name]);
+    } else if (
+      Object.prototype.hasOwnProperty.call(
+        employeeProfile,
+        field.name === 'employeeNo' ? 'emp_no' : field.name
+      )
+    ) {
+      input.value =
+        employeeProfile[field.name === 'employeeNo' ? 'emp_no' : field.name] ||
+        '';
     } else if (field.name === 'name') {
       input.value = session.full_name || session.email;
     }
@@ -523,7 +639,9 @@ function openTemplateForm(template, existingForm = null) {
   confirmationInput.type = 'checkbox';
   confirmationInput.className = 'acknowledgment-checkbox';
   fields.appendChild(confirmation);
-  $('user-template-submit').textContent = existingForm ? 'Save changes' : 'Submit for review';
+  $('user-template-submit').textContent = existingForm
+    ? 'Save changes'
+    : 'Submit for review';
   $('user-template-dialog').showModal();
   templateSignaturePad.clear();
 }
@@ -538,19 +656,36 @@ function openLeaveForm(existingForm = null) {
   const form = $('leave-form');
   form.reset();
   formBeingEdited = existingForm;
-  form.elements.name.value = employeeProfile.name || session.full_name || session.email;
+  form.elements.name.value =
+    employeeProfile.name || session.full_name || session.email;
   form.elements.employeeNo.value = employeeProfile.emp_no || '';
   form.elements.position.value = employeeProfile.position || '';
   form.elements.department.value = employeeProfile.department || '';
-  $('leave-form-title').textContent = existingForm ? 'Edit Leave Application' : 'Leave Application';
+  $('leave-form-title').textContent = existingForm
+    ? 'Edit Leave Application'
+    : 'Leave Application';
   $('leave-form-edit-note').hidden = !existingForm;
-  $('leave-form-submit').textContent = existingForm ? 'Save changes' : 'Submit for review';
+  $('leave-form-submit').textContent = existingForm
+    ? 'Save changes'
+    : 'Submit for review';
   $('leave-form').elements.otherLeaveType.required = false;
   if (existingForm) {
     const data = existingForm.form_data;
-    ['name', 'employeeNo', 'position', 'department', 'leaveType', 'otherLeaveType', 'dateFrom', 'dateTo', 'days', 'reason']
-      .forEach(name => { form.elements[name].value = data[name] === undefined ? '' : data[name]; });
-    form.querySelectorAll('[name="payType"]').forEach(option => {
+    [
+      'name',
+      'employeeNo',
+      'position',
+      'department',
+      'leaveType',
+      'otherLeaveType',
+      'dateFrom',
+      'dateTo',
+      'days',
+      'reason'
+    ].forEach((name) => {
+      form.elements[name].value = data[name] === undefined ? '' : data[name];
+    });
+    form.querySelectorAll('[name="payType"]').forEach((option) => {
       option.checked = option.value === data.payType;
     });
   }
@@ -589,7 +724,12 @@ async function submitLeaveRequest(event) {
       signature: leaveSignaturePad.toDataURL()
     };
     const result = formBeingEdited
-      ? await api('updateMyForm', formBeingEdited.id, formBeingEdited.template_key, formData)
+      ? await api(
+          'updateMyForm',
+          formBeingEdited.id,
+          formBeingEdited.template_key,
+          formData
+        )
       : await api('submitLeaveForm', formData);
     $('leave-form-dialog').close();
     const wasEdited = Boolean(formBeingEdited);
@@ -641,19 +781,32 @@ function buildGenericFormSheet(formData, metadata, template) {
 
   const fields = document.createElement('div');
   fields.className = 'leave-sheet-grid leave-sheet-request';
-  appendFormField(fields, 'NAME', formData.name || session.full_name || session.email, 'wide');
-  template.fields.forEach(field => {
+  appendFormField(
+    fields,
+    'NAME',
+    formData.name || session.full_name || session.email,
+    'wide'
+  );
+  template.fields.forEach((field) => {
     if (field.name === 'name') return;
-    const value = field.type === 'checkbox'
-      ? formData[field.name] ? 'Acknowledged' : 'Not acknowledged'
-      : formData[field.name];
-    appendFormField(fields, field.label.toUpperCase(), value, field.type === 'textarea' ? 'wide' : '');
+    const value =
+      field.type === 'checkbox'
+        ? formData[field.name]
+          ? 'Acknowledged'
+          : 'Not acknowledged'
+        : formData[field.name];
+    appendFormField(
+      fields,
+      field.label.toUpperCase(),
+      value,
+      field.type === 'textarea' ? 'wide' : ''
+    );
   });
   sheet.appendChild(fields);
 
   const status = document.createElement('p');
   status.className = 'leave-sheet-status';
-  status.textContent = `Status: ${formStatusLabel(metadata.status, metadata.reviewStage)}`;
+  status.textContent = `Status: ${FormStatus.formatFormStatus(metadata.status, metadata.reviewStage)}`;
   sheet.appendChild(status);
 
   const signatures = document.createElement('div');
@@ -662,7 +815,8 @@ function buildGenericFormSheet(formData, metadata, template) {
     ['Employee Signature', formData.signature],
     ['Head Signature', metadata.headSignature]
   ];
-  if (template.hrSignatureRequired !== false) signatureFields.push(['HR Approval', metadata.hrSignature]);
+  if (template.hrSignatureRequired !== false)
+    signatureFields.push(['HR Approval', metadata.hrSignature]);
   signatures.classList.toggle('two-signatures', signatureFields.length === 2);
   signatureFields.forEach(([label, signature]) => {
     const field = document.createElement('div');
@@ -702,18 +856,24 @@ async function printSavedForm(form) {
   }
   const template = formTemplate(form.template_key);
   const root = $('leave-print-root');
-  root.replaceChildren(buildGenericFormSheet(form.form_data, {
-    controlNo: form.control_no,
-    submittedAt: form.submitted_at,
-    status: form.status,
-    headSignature: form.head_signature,
-    hrSignature: form.hr_signature,
-    reviewedByName: form.reviewed_by_name,
-    reviewedByRole: form.reviewed_by_role,
-    reviewedAt: form.reviewed_at,
-    reviewStage: form.review_stage,
-    reviewNotes: form.status === 'REJECTED' ? form.review_notes : ''
-  }, template));
+  root.replaceChildren(
+    buildGenericFormSheet(
+      form.form_data,
+      {
+        controlNo: form.control_no,
+        submittedAt: form.submitted_at,
+        status: form.status,
+        headSignature: form.head_signature,
+        hrSignature: form.hr_signature,
+        reviewedByName: form.reviewed_by_name,
+        reviewedByRole: form.reviewed_by_role,
+        reviewedAt: form.reviewed_at,
+        reviewStage: form.review_stage,
+        reviewNotes: form.status === 'REJECTED' ? form.review_notes : ''
+      },
+      template
+    )
+  );
   await centerSignatureImages(root);
   openPrintDialog();
 }
@@ -733,7 +893,9 @@ function openPrintDialog() {
     window.print();
   } catch (error) {
     cleanup();
-    showErr(`The form was saved, but the print dialog could not be opened. ${error.message || String(error)}`);
+    showErr(
+      `The form was saved, but the print dialog could not be opened. ${error.message || String(error)}`
+    );
   }
 }
 
@@ -744,7 +906,7 @@ function reviewRow(form) {
     userCell(formTemplate(form.template_key).title),
     userCell(`${form.applicant_name || ''} (${form.user_email})`),
     userCell(userDate(form.submitted_at)),
-    userCell(formStatusLabel(form.status, form.review_stage))
+    userCell(FormStatus.formatFormStatus(form.status, form.review_stage))
   );
   const actions = document.createElement('td');
   actions.className = 'form-review-actions';
@@ -755,19 +917,29 @@ function reviewRow(form) {
   view.onclick = () => showFormContents(form);
   actions.appendChild(view);
   const isHead = form.review_stage === 'HEAD';
-  const noHrSignature = !isHead && formTemplate(form.template_key).hrSignatureRequired === false;
+  const noHrSignature =
+    !isHead && formTemplate(form.template_key).hrSignatureRequired === false;
   const canReviewStage = isHead
-    ? (session.role === 'HEAD' && ['STAFF', 'HEAD'].includes(form.submitter_role))
-      || (session.role === 'HR' && session.is_hr_head && form.submitter_role === 'HR')
-    : ['HR', 'ADMIN'].includes(session.role) && session.perms.includes('forms.review');
+    ? (session.role === 'HEAD' &&
+        ['STAFF', 'HEAD'].includes(form.submitter_role)) ||
+      (session.role === 'HR' &&
+        session.is_hr_head &&
+        form.submitter_role === 'HR')
+    : ['HR', 'ADMIN'].includes(session.role) &&
+      session.perms.includes('forms.review');
   const awaitingReviewer = form.status === 'PENDING' && canReviewStage;
   if (awaitingReviewer) {
-    ['APPROVED', 'REJECTED'].forEach(decision => {
+    ['APPROVED', 'REJECTED'].forEach((decision) => {
       const button = document.createElement('button');
       button.type = 'button';
-      button.textContent = decision === 'APPROVED'
-        ? noHrSignature ? 'Approve' : isHead && !(session.is_hr_head && form.submitter_role === 'HR') ? 'Sign and forward' : 'Sign and approve'
-        : 'Reject';
+      button.textContent =
+        decision === 'APPROVED'
+          ? noHrSignature
+            ? 'Approve'
+            : isHead && !(session.is_hr_head && form.submitter_role === 'HR')
+              ? 'Sign and forward'
+              : 'Sign and approve'
+          : 'Reject';
       if (decision === 'REJECTED') button.className = 'ghost';
       button.onclick = async () => {
         if (decision === 'REJECTED') {
@@ -786,20 +958,34 @@ function reviewRow(form) {
       };
       actions.appendChild(button);
     });
-  } else if (form.status === 'PENDING' && form.review_stage === 'HR'
-    && form.head_reviewer_email === session.email && session.role === 'HEAD') {
-    actions.appendChild(document.createTextNode(
-      `Signed and forwarded to HR/Admin · ${form.head_signed_by || ''} ${userDate(form.head_signed_at)}`
-    ));
+  } else if (
+    form.status === 'PENDING' &&
+    form.review_stage === 'HR' &&
+    form.head_reviewer_email === session.email &&
+    session.role === 'HEAD'
+  ) {
+    actions.appendChild(
+      document.createTextNode(
+        `Signed and forwarded to HR/Admin · ${form.head_signed_by || ''} ${userDate(form.head_signed_at)}`
+      )
+    );
   } else {
-    const reviewerAction = form.status === 'APPROVED'
-      ? `Approved by ${form.reviewed_by_role === 'ADMIN' ? 'Admin' : 'HR'}: ${form.reviewed_by_name || 'HR/Admin'}`
-      : form.status === 'REJECTED'
-        ? `Rejected by ${form.reviewed_by_role === 'HEAD' ? 'Head' : form.reviewed_by_role === 'ADMIN' ? 'Admin' : 'HR'}: ${form.reviewed_by_name || 'reviewer'}`
-        : form.reviewed_by_name;
+    const reviewerAction =
+      form.status === 'APPROVED'
+        ? `Approved by ${form.reviewed_by_role === 'ADMIN' ? 'Admin' : 'HR'}: ${form.reviewed_by_name || 'HR/Admin'}`
+        : form.status === 'REJECTED'
+          ? `Rejected by ${form.reviewed_by_role === 'HEAD' ? 'Head' : form.reviewed_by_role === 'ADMIN' ? 'Admin' : 'HR'}: ${form.reviewed_by_name || 'reviewer'}`
+          : form.reviewed_by_name;
     const reviewDetails = document.createElement('span');
-    reviewDetails.textContent = [reviewerAction, userDate(form.reviewed_at),
-      form.status === 'REJECTED' && form.review_notes ? `Rejection reason: ${form.review_notes}` : ''].filter(Boolean).join(' · ');
+    reviewDetails.textContent = [
+      reviewerAction,
+      userDate(form.reviewed_at),
+      form.status === 'REJECTED' && form.review_notes
+        ? `Rejection reason: ${form.review_notes}`
+        : ''
+    ]
+      .filter(Boolean)
+      .join(' · ');
     actions.appendChild(reviewDetails);
   }
   row.appendChild(actions);
@@ -819,16 +1005,18 @@ async function approveWithoutHrSignature(form, button) {
 
 function setHrLeaveBalances(containerId, form) {
   const container = $(containerId);
-  const visible = form.template_key === 'leave-2026' && form.review_stage === 'HR';
+  const visible =
+    form.template_key === 'leave-2026' && form.review_stage === 'HR';
   container.hidden = !visible;
   const data = form.form_data || {};
-  ['vlBalance', 'slBalance', 'silBalance'].forEach(name => {
+  ['vlBalance', 'slBalance', 'silBalance'].forEach((name) => {
     container.querySelector(`[name="${name}"]`).value = data[name] || '';
   });
 }
 
 function getHrLeaveBalances(containerId, form) {
-  if (form.template_key !== 'leave-2026' || form.review_stage !== 'HR') return null;
+  if (form.template_key !== 'leave-2026' || form.review_stage !== 'HR')
+    return null;
   const container = $(containerId);
   return {
     vlBalance: container.querySelector('[name="vlBalance"]').value.trim(),
@@ -843,9 +1031,13 @@ function openHeadSignature(form) {
   formToSign = form;
   $('head-signature-control').textContent = `Serial Number ${form.control_no}`;
   const hrHeadApproval = session.is_hr_head && form.submitter_role === 'HR';
-  $('head-signature-dialog').querySelector('h2').textContent = hrHeadApproval ? 'Sign and approve HR form' : 'Sign and forward form';
-  $('head-signature-pad').previousElementSibling.textContent = session.is_hr_head ? 'Head HR signature' : 'Head signature';
-  $('head-signature-form').querySelector('[type="submit"]').textContent = hrHeadApproval ? 'Sign and approve' : 'Sign and forward to HR/Admin';
+  $('head-signature-dialog').querySelector('h2').textContent = hrHeadApproval
+    ? 'Sign and approve HR form'
+    : 'Sign and forward form';
+  $('head-signature-pad').previousElementSibling.textContent =
+    session.is_hr_head ? 'Head HR signature' : 'Head signature';
+  $('head-signature-form').querySelector('[type="submit"]').textContent =
+    hrHeadApproval ? 'Sign and approve' : 'Sign and forward to HR/Admin';
   $('head-signature-feedback').hidden = true;
   $('head-signature-dialog').showModal();
   headSignaturePad.clear();
@@ -856,9 +1048,10 @@ async function signAndForwardForm(event) {
   if (!formToSign) return;
   const feedback = $('head-signature-feedback');
   if (!headSignaturePad.hasSignature()) {
-    feedback.textContent = session.is_hr_head && formToSign.submitter_role === 'HR'
-      ? 'Draw your signature before approving this HR form.'
-      : 'Draw your signature before forwarding this form.';
+    feedback.textContent =
+      session.is_hr_head && formToSign.submitter_role === 'HR'
+        ? 'Draw your signature before approving this HR form.'
+        : 'Draw your signature before forwarding this form.';
     feedback.hidden = false;
     return;
   }
@@ -866,11 +1059,20 @@ async function signAndForwardForm(event) {
   submit.disabled = true;
   feedback.hidden = true;
   try {
-    const isHrHeadApproval = session.is_hr_head && formToSign.submitter_role === 'HR';
-    await api('reviewUserForm', formToSign.id, 'APPROVED', '', headSignaturePad.toDataURL());
+    const isHrHeadApproval =
+      session.is_hr_head && formToSign.submitter_role === 'HR';
+    await api(
+      'reviewUserForm',
+      formToSign.id,
+      'APPROVED',
+      '',
+      headSignaturePad.toDataURL()
+    );
     $('head-signature-dialog').close();
     formToSign = null;
-    $('uf_review_feedback').textContent = isHrHeadApproval ? 'HR form signed and approved.' : 'Form signed and forwarded to HR/Admin.';
+    $('uf_review_feedback').textContent = isHrHeadApproval
+      ? 'HR form signed and approved.'
+      : 'Form signed and forwarded to HR/Admin.';
     $('uf_review_feedback').hidden = false;
     await loadFormsForReview();
   } catch (error) {
@@ -906,7 +1108,14 @@ async function rejectSelectedForm(event) {
   submit.disabled = true;
   feedback.hidden = true;
   try {
-    await api('reviewUserForm', formToReject.id, 'REJECTED', reason, '', getHrLeaveBalances('form-rejection-leave-balances', formToReject));
+    await api(
+      'reviewUserForm',
+      formToReject.id,
+      'REJECTED',
+      reason,
+      '',
+      getHrLeaveBalances('form-rejection-leave-balances', formToReject)
+    );
     $('form-rejection-dialog').close();
     formToReject = null;
     await loadFormsForReview();
@@ -940,7 +1149,14 @@ async function signAndApproveForm(event) {
   submit.disabled = true;
   feedback.hidden = true;
   try {
-    await api('reviewUserForm', formToApprove.id, 'APPROVED', '', hrSignaturePad.toDataURL(), getHrLeaveBalances('hr-leave-balances', formToApprove));
+    await api(
+      'reviewUserForm',
+      formToApprove.id,
+      'APPROVED',
+      '',
+      hrSignaturePad.toDataURL(),
+      getHrLeaveBalances('hr-leave-balances', formToApprove)
+    );
     $('hr-signature-dialog').close();
     formToApprove = null;
     await loadFormsForReview();
@@ -957,7 +1173,9 @@ async function loadFormsForReview(scope = activeReviewScope) {
   const result = await api('listFormsForReview', activeReviewScope);
   formsForReview = result.forms;
   const prefix = 'uf_review';
-  if ($('uf_review_note')) $('uf_review_note').textContent = 'Review forms assigned to you and forms that have reached HR/Admin. Available actions depend on your review permissions.';
+  if ($('uf_review_note'))
+    $('uf_review_note').textContent =
+      'Review forms assigned to you and forms that have reached HR/Admin. Available actions depend on your review permissions.';
   $(`${prefix}_total`).textContent = String(result.summary.total);
   $(`${prefix}_pending`).textContent = String(result.summary.pending);
   $(`${prefix}_approved`).textContent = String(result.summary.approved);
@@ -973,23 +1191,33 @@ function renderFormsForReview() {
   const type = $(`${prefix}_type`).value;
   const search = $(`${prefix}_search`).value.trim();
   const forms = formsForReview
-    .filter(form => matchesFormFilters(form, status, search, type))
-    .sort((left, right) => new Date(right.submitted_at) - new Date(left.submitted_at) || right.id - left.id);
+    .filter((form) => matchesFormFilters(form, status, search, type))
+    .sort(
+      (left, right) =>
+        new Date(right.submitted_at) - new Date(left.submitted_at) ||
+        right.id - left.id
+    );
   body.replaceChildren();
   if (!formsForReview.length) {
-    userEmptyRow(body, 6, 'No forms are available for your review permissions.');
+    userEmptyRow(
+      body,
+      6,
+      'No forms are available for your review permissions.'
+    );
     return;
   }
   if (!forms.length) {
     userEmptyRow(body, 6, 'No forms match the selected filters.');
     return;
   }
-  forms.forEach(form => body.appendChild(reviewRow(form)));
+  forms.forEach((form) => body.appendChild(reviewRow(form)));
 }
 
 async function submitTemplateForm(event) {
   event.preventDefault();
-  const template = FORM_TEMPLATES.find(item => item.key === $('user-template-form').dataset.templateKey);
+  const template = FORM_TEMPLATES.find(
+    (item) => item.key === $('user-template-form').dataset.templateKey
+  );
   if (!template) return;
   const form = $('user-template-form');
   const submit = form.querySelector('[type="submit"]');
@@ -1004,10 +1232,11 @@ async function submitTemplateForm(event) {
   try {
     const values = new FormData(form);
     const data = {};
-    template.fields.forEach(field => {
-      data[field.name] = field.type === 'checkbox'
-        ? values.get(field.name) === 'on'
-        : values.get(field.name) || '';
+    template.fields.forEach((field) => {
+      data[field.name] =
+        field.type === 'checkbox'
+          ? values.get(field.name) === 'on'
+          : values.get(field.name) || '';
     });
     data.signature = templateSignaturePad.toDataURL();
     const result = formBeingEdited
@@ -1033,7 +1262,9 @@ async function submitTemplateForm(event) {
 
 async function refreshSubmittedFormsBadge(scope = 'HR') {
   const requestedScope = String(scope).toUpperCase();
-  const normalizedScope = ['HEAD', 'ALL'].includes(requestedScope) ? requestedScope : 'HR';
+  const normalizedScope = ['HEAD', 'ALL'].includes(requestedScope)
+    ? requestedScope
+    : 'HR';
   const summary = await api('getFormReviewSummary', normalizedScope);
   setSubmittedFormsCount(summary.pending, normalizedScope);
 }
@@ -1047,7 +1278,7 @@ async function showPendingAnnouncements() {
   if (!pendingAnnouncements.length) return;
   const list = $('staff-announcements-list');
   list.replaceChildren();
-  pendingAnnouncements.forEach(announcement => {
+  pendingAnnouncements.forEach((announcement) => {
     const card = document.createElement('article');
     card.className = 'announcement-card';
     const title = document.createElement('h3');
@@ -1071,7 +1302,10 @@ async function acknowledgePendingAnnouncements() {
   button.disabled = true;
   feedback.hidden = true;
   try {
-    await api('markAnnouncementsSeen', pendingAnnouncements.map(announcement => announcement.id));
+    await api(
+      'markAnnouncementsSeen',
+      pendingAnnouncements.map((announcement) => announcement.id)
+    );
     pendingAnnouncements = [];
     $('staff-announcements-dialog').close();
   } catch (error) {
@@ -1127,4 +1361,6 @@ $('form-rejection-cancel').onclick = () => {
   formToReject = null;
 };
 $('staff-announcements-acknowledge').onclick = acknowledgePendingAnnouncements;
-$('staff-announcements-dialog').addEventListener('cancel', event => event.preventDefault());
+$('staff-announcements-dialog').addEventListener('cancel', (event) =>
+  event.preventDefault()
+);

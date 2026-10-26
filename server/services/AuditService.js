@@ -1,3 +1,4 @@
+const { httpError } = require('../utils/HttpError');
 const { pool } = require('../db/database');
 const { isValidDate } = require('../utils/Validation');
 
@@ -5,31 +6,23 @@ function normalizeAuditDateTime(value, label) {
   if (value === undefined || value === null || value === '') return '';
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/.test(value) ||
       !isValidDate(value.slice(0, 10))) {
-    const error = new Error(`Enter a valid ${label} date and time.`);
-    error.status = 400;
-    throw error;
+    throw httpError(`Enter a valid ${label} date and time.`, 400);
   }
   return value.replace('T', ' ');
 }
 
 function normalizeAuditFilters(filters = {}) {
   if (!filters || typeof filters !== 'object' || Array.isArray(filters)) {
-    const error = new Error('Audit filters must be an object.');
-    error.status = 400;
-    throw error;
+    throw httpError('Audit filters must be an object.', 400);
   }
   const from = normalizeAuditDateTime(filters.from, 'start');
   const to = normalizeAuditDateTime(filters.to, 'end');
   const user = String(filters.user || '').trim().toLowerCase();
   if (user.length > 191 || (user && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user))) {
-    const error = new Error('Enter a valid user email address.');
-    error.status = 400;
-    throw error;
+    throw httpError('Enter a valid user email address.', 400);
   }
   if (from && to && from > to) {
-    const error = new Error('The start date and time must be before the end date and time.');
-    error.status = 400;
-    throw error;
+    throw httpError('The start date and time must be before the end date and time.', 400);
   }
 
   const conditions = [];

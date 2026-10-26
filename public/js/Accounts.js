@@ -1,4 +1,4 @@
-const accountCell = value => {
+const accountCell = (value) => {
   const cell = document.createElement('td');
   cell.textContent = value === null || value === undefined ? '' : String(value);
   return cell;
@@ -16,11 +16,14 @@ function hasAccountChanges() {
 function updateAccountSaveButton() {
   const button = $('am_save_changes');
   button.disabled = accountSaveBusy || !hasAccountChanges();
-  if (!accountSaveBusy && button.dataset.saved !== 'true') button.textContent = 'Save Changes';
+  if (!accountSaveBusy && button.dataset.saved !== 'true')
+    button.textContent = 'Save Changes';
 }
 
 function stagedHrHeadEmail(accounts) {
-  return hrHeadChanged ? pendingHrHeadEmail : (accounts.find(account => account.is_hr_head)?.email || '');
+  return hrHeadChanged
+    ? pendingHrHeadEmail
+    : accounts.find((account) => account.is_hr_head)?.email || '';
 }
 
 async function saveAccountChanges() {
@@ -28,12 +31,16 @@ async function saveAccountChanges() {
   accountSaveBusy = true;
   const button = $('am_save_changes');
   button.dataset.saved = 'false';
-  button.innerHTML = '<span class="refresh-spinner" aria-hidden="true"></span> Saving changes…';
+  button.innerHTML =
+    '<span class="refresh-spinner" aria-hidden="true"></span> Saving changes…';
   button.disabled = true;
   showErr('');
   try {
     await api('saveAccountChanges', {
-      headAssignments: Array.from(pendingHeadAssignments, ([email, headEmail]) => ({ email, headEmail })),
+      headAssignments: Array.from(
+        pendingHeadAssignments,
+        ([email, headEmail]) => ({ email, headEmail })
+      ),
       hrHeadChanged,
       hrHeadEmail: pendingHrHeadEmail || null
     });
@@ -77,23 +84,27 @@ async function loadAccountManagement() {
   if (!result.requests.length) {
     appendEmptyRow(requests, 6, 'No pending account requests.');
   }
-  result.requests.forEach(request => {
+  result.requests.forEach((request) => {
     const row = document.createElement('tr');
     row.append(
       accountCell(request.full_name),
       accountCell(request.email),
       accountCell(request.assigned_role),
-      accountCell(request.assigned_head_name
-        ? `${request.assigned_head_name}${request.assigned_head_email ? ` (${request.assigned_head_email})` : ''}`
-        : request.assigned_head_email || '—'),
-      accountCell(formatAccountDate(request.requested_at)));
+      accountCell(
+        request.assigned_head_name
+          ? `${request.assigned_head_name}${request.assigned_head_email ? ` (${request.assigned_head_email})` : ''}`
+          : request.assigned_head_email || '—'
+      ),
+      accountCell(formatAccountDate(request.requested_at))
+    );
 
     const actions = document.createElement('td');
     const approve = document.createElement('button');
     approve.type = 'button';
     approve.textContent = 'Approve';
     approve.onclick = async () => {
-      if (!confirm(`Approve ${request.email} as ${request.assigned_role}?`)) return;
+      if (!confirm(`Approve ${request.email} as ${request.assigned_role}?`))
+        return;
       approve.disabled = true;
       try {
         await api('approveAccountRequest', request.id);
@@ -109,7 +120,10 @@ async function loadAccountManagement() {
     reject.className = 'ghost';
     reject.textContent = 'Reject';
     reject.onclick = async () => {
-      if (!confirm(`Reject and remove the account request from ${request.email}?`)) return;
+      if (
+        !confirm(`Reject and remove the account request from ${request.email}?`)
+      )
+        return;
       reject.disabled = true;
       try {
         await api('rejectAccountRequest', request.id);
@@ -135,36 +149,59 @@ async function loadAccountManagement() {
     body.replaceChildren();
     const accounts = result.accounts[group];
     if (!accounts.length) {
-      appendEmptyRow(body, canAssignHead === true ? 7 : canAssignHead === 'hr' ? 6 : 5, 'No accounts in this list.');
+      appendEmptyRow(
+        body,
+        canAssignHead === true ? 7 : canAssignHead === 'hr' ? 6 : 5,
+        'No accounts in this list.'
+      );
       return;
     }
-    accounts.forEach(account => {
+    accounts.forEach((account) => {
       const row = document.createElement('tr');
-      row.append(accountCell(account.full_name || ''), accountCell(account.email), accountCell(account.role));
+      row.append(
+        accountCell(account.full_name || ''),
+        accountCell(account.email),
+        accountCell(account.role)
+      );
       if (canAssignHead === true) {
-        row.appendChild(accountCell(account.assigned_head_name || account.assigned_head_email || 'Unassigned'));
+        row.appendChild(
+          accountCell(
+            account.assigned_head_name ||
+              account.assigned_head_email ||
+              'Unassigned'
+          )
+        );
         const assignmentCell = document.createElement('td');
         const head = document.createElement('select');
         head.setAttribute('aria-label', `Assigned Head for ${account.email}`);
         const none = document.createElement('option');
         none.value = '';
-        none.textContent = account.role === 'HEAD' ? 'No assigned Head (optional)' : 'Select a Head';
+        none.textContent =
+          account.role === 'HEAD'
+            ? 'No assigned Head (optional)'
+            : 'Select a Head';
         head.appendChild(none);
-        headOptions.filter(optionAccount => optionAccount.email !== account.email).forEach(optionAccount => {
-          const option = document.createElement('option');
-          option.value = optionAccount.email;
-          option.textContent = `${optionAccount.full_name || optionAccount.email} (${optionAccount.email})`;
-          head.appendChild(option);
-        });
+        headOptions
+          .filter((optionAccount) => optionAccount.email !== account.email)
+          .forEach((optionAccount) => {
+            const option = document.createElement('option');
+            option.value = optionAccount.email;
+            option.textContent = `${optionAccount.full_name || optionAccount.email} (${optionAccount.email})`;
+            head.appendChild(option);
+          });
         head.value = pendingHeadAssignments.has(account.email)
           ? pendingHeadAssignments.get(account.email)
-          : (account.assigned_head_email || '');
+          : account.assigned_head_email || '';
         head.onchange = () => {
-          if (head.value === (account.assigned_head_email || '')) pendingHeadAssignments.delete(account.email);
+          if (head.value === (account.assigned_head_email || ''))
+            pendingHeadAssignments.delete(account.email);
           else pendingHeadAssignments.set(account.email, head.value);
           updateAccountSaveButton();
         };
-        row.append(accountCell(account.active ? 'Active' : 'Inactive'), accountCell(formatAccountDate(account.created_at)));
+        row.append(
+          accountCell(account.active ? 'Active' : 'Inactive'),
+          accountCell(formatAccountDate(account.created_at))
+        );
         assignmentCell.append(head);
         row.appendChild(assignmentCell);
       } else if (canAssignHead === 'hr') {
@@ -173,22 +210,37 @@ async function loadAccountManagement() {
         toggle.type = 'button';
         const selectedHr = stagedHrHeadEmail(result.accounts.hr);
         const selected = selectedHr === account.email;
-        toggle.className = 'ghost hr-head-toggle' + (selected ? ' selected' : '');
+        toggle.className =
+          'ghost hr-head-toggle' + (selected ? ' selected' : '');
         toggle.textContent = selected ? 'On' : 'Off';
         toggle.setAttribute('aria-pressed', String(selected));
-        toggle.setAttribute('aria-label', `${selected ? 'Remove' : 'Designate'} ${account.full_name || account.email} as Head HR`);
+        toggle.setAttribute(
+          'aria-label',
+          `${selected ? 'Remove' : 'Designate'} ${account.full_name || account.email} as Head HR`
+        );
         toggle.disabled = !account.active;
         toggle.onclick = () => {
           pendingHrHeadEmail = selected ? '' : account.email;
-          hrHeadChanged = pendingHrHeadEmail !== (result.accounts.hr.find(item => item.is_hr_head)?.email || '');
+          hrHeadChanged =
+            pendingHrHeadEmail !==
+            (result.accounts.hr.find((item) => item.is_hr_head)?.email || '');
           if (!hrHeadChanged) pendingHrHeadEmail = undefined;
-          loadAccountManagement().catch(error => showErr(error.message || String(error)));
+          loadAccountManagement().catch((error) =>
+            showErr(error.message || String(error))
+          );
           updateAccountSaveButton();
         };
         toggleCell.appendChild(toggle);
-        row.append(toggleCell, accountCell(account.active ? 'Active' : 'Inactive'), accountCell(formatAccountDate(account.created_at)));
+        row.append(
+          toggleCell,
+          accountCell(account.active ? 'Active' : 'Inactive'),
+          accountCell(formatAccountDate(account.created_at))
+        );
       } else {
-        row.append(accountCell(account.active ? 'Active' : 'Inactive'), accountCell(formatAccountDate(account.created_at)));
+        row.append(
+          accountCell(account.active ? 'Active' : 'Inactive'),
+          accountCell(formatAccountDate(account.created_at))
+        );
       }
       body.appendChild(row);
     });
@@ -198,7 +250,11 @@ async function loadAccountManagement() {
 
 VIEWS.accounts = guard(loadAccountManagement);
 $('am_refresh').onclick = async () => {
-  if (hasAccountChanges() && !confirm('Discard unsaved account changes and refresh?')) return;
+  if (
+    hasAccountChanges() &&
+    !confirm('Discard unsaved account changes and refresh?')
+  )
+    return;
   pendingHeadAssignments.clear();
   pendingHrHeadEmail = undefined;
   hrHeadChanged = false;

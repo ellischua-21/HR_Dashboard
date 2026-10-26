@@ -1,4 +1,5 @@
 const { pool } = require('../db/database');
+const { httpError } = require('../utils/HttpError');
 const { ACCOUNT_ROLE_MAP } = require('../config/Config');
 const { requirePerm } = require('../middleware/Auth');
 const { logAudit } = require('./AuditService');
@@ -6,6 +7,29 @@ const { hashPassword, verifyPassword } = require('../utils/Password');
 const { sanitize } = require('../utils/Validation');
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+async function reassignOrRejectPendingHrForms(connection, oldHeadEmail, newHeadEmail, errorMessage) {
+  if (newHeadEmail) {
+    await connection.execute(
+      `UPDATE user_forms f
+       INNER JOIN user_roles submitter ON submitter.email = f.user_email
+       SET f.head_reviewer_email = ?
+       WHERE f.status = 'PENDING' AND f.review_stage = 'HEAD'
+         AND f.head_reviewer_email = ? AND submitter.role = 'HR'`,
+      [newHeadEmail, oldHeadEmail]
+    );
+    return;
+  }
+
+  const [[pending]] = await connection.execute(
+    `SELECT COUNT(*) AS total FROM user_forms f
+     INNER JOIN user_roles submitter ON submitter.email = f.user_email
+     WHERE f.status = 'PENDING' AND f.review_stage = 'HEAD'
+       AND f.head_reviewer_email = ? AND submitter.role = 'HR'`,
+    [oldHeadEmail]
+  );
+  if (Number(pending.total)) throw httpError(errorMessage, 409);
+}
 
 function validateHeadAssignment(accountEmail, accountRole, headEmail, accounts) {
   const ownerEmail = String(accountEmail || '').trim().toLowerCase();
@@ -31,9 +55,7 @@ function validateHeadAssignment(accountEmail, accountRole, headEmail, accounts) 
 async function listAssignableHeads(req) {
   const user = await requirePerm(req, 'emp.write');
   if (!['HR', 'ADMIN'].includes(user.role)) {
-    const error = new Error('Only HR and ADMIN can assign a Head during employee registration.');
-    error.status = 403;
-    throw error;
+    throw httpError('Only HR and ADMIN can assign a Head during employee registration.', 403);
   }
   const [rows] = await pool.query(
     `SELECT email, full_name, 'ACTIVE' AS assignment_status
@@ -49,9 +71,7 @@ async function listAssignableHeads(req) {
 async function createEmployeeAccountRequest(req, employee, accountData, connection) {
   const user = await requirePerm(req, 'emp.write');
   if (!['HR', 'ADMIN'].includes(user.role)) {
-    const error = new Error('Only HR and ADMIN can create account requests.');
-    error.status = 403;
-    throw error;
+    throw httpError('Only HR and ADMIN can create account requests.', 403);
   }
   const role = String(accountData && accountData.role || '').trim().toUpperCase();
   const assignedHeadEmail = sanitize(accountData && accountData.assignedHeadEmail).toLowerCase() || null;
@@ -59,19 +79,19 @@ async function createEmployeeAccountRequest(req, employee, accountData, connecti
   const email = sanitize(employee.personal_email).toLowerCase();
   const name = sanitize(employee.name);
   if (!['STAFF', 'HEAD', 'HR'].includes(role)) {
-    throw Object.assign(new Error('Choose STAFF, HEAD, or HR for the account role.'), { status: 400 });
+    throw httpError('Choose STAFF, HEAD, or HR for the account role.', 400);
   }
   if (!EMAIL_PATTERN.test(email) || email.length > 191) {
-    throw Object.assign(new Error('Enter a valid Personal Email to create an account.'), { status: 400 });
+    throw httpError('Enter a valid Personal Email to create an account.', 400);
   }
   if (typeof password !== 'string' || password.length < 12 || password.length > 128) {
-    throw Object.assign(new Error('Initial password must be between 12 and 128 characters.'), { status: 400 });
+    throw httpError('Initial password must be between 12 and 128 characters.', 400);
   }
   if (role === 'STAFF' && !assignedHeadEmail) {
-    throw Object.assign(new Error('Assign a Head to this STAFF account using Reports To.'), { status: 400 });
+    throw httpError('Assign a Head to this STAFF account using Reports To.', 400);
   }
   if (role !== 'STAFF' && role !== 'HEAD' && assignedHeadEmail) {
-    throw Object.assign(new Error('Only STAFF and HEAD accounts can be assigned to a Head.'), { status: 400 });
+    throw httpError('Only STAFF and HEAD accounts can be assigned to a Head.', 400);
   }
   if (assignedHeadEmail) {
     const [headRows] = await connection.execute(
@@ -80,7 +100,7 @@ async function createEmployeeAccountRequest(req, employee, accountData, connecti
        SELECT email FROM account_requests WHERE email = ? AND assigned_role = 'HEAD'`,
       [assignedHeadEmail, assignedHeadEmail]);
     if (!headRows.length || assignedHeadEmail === email) {
-      throw Object.assign(new Error('Choose another active or pending HEAD account in Reports To.'), { status: 400 });
+      throw httpError('Choose another active or pending HEAD account in Reports To.', 400);
     }
   }
 
@@ -89,7 +109,7 @@ async function createEmployeeAccountRequest(req, employee, accountData, connecti
      UNION SELECT email FROM account_requests WHERE email = ?`,
     [email, email]);
   if (existing.length) {
-    throw Object.assign(new Error('An account or pending request already exists for this Personal Email.'), { status: 409 });
+    throw httpError('An account or pending request already exists for this Personal Email.', 409);
   }
   await connection.execute(
     `INSERT INTO account_requests
@@ -151,9 +171,7 @@ async function assignAccountHead(req, accountEmail, headEmail) {
   const normalizedEmail = sanitize(accountEmail).toLowerCase();
   const normalizedHeadEmail = sanitize(headEmail).toLowerCase();
   if (!EMAIL_PATTERN.test(normalizedEmail)) {
-    const error = new Error('Choose a valid account.');
-    error.status = 400;
-    throw error;
+    throw httpError('Choose a valid account.', 400);
   }
 
   const connection = await pool.getConnection();
@@ -162,10 +180,10 @@ async function assignAccountHead(req, accountEmail, headEmail) {
     const [accounts] = await connection.query(
       'SELECT email, role, active, assigned_head_email FROM user_roles FOR UPDATE');
     const account = accounts.find(item => item.email.toLowerCase() === normalizedEmail);
-    if (!account) throw Object.assign(new Error('This account no longer exists.'), { status: 404 });
+    if (!account) throw httpError('This account no longer exists.', 404);
     const assignment = validateHeadAssignment(
       normalizedEmail, account.role, normalizedHeadEmail, accounts);
-    if (assignment.error) throw Object.assign(new Error(assignment.error), { status: 400 });
+    if (assignment.error) throw httpError(assignment.error, 400);
     await connection.execute(
       'UPDATE user_roles SET assigned_head_email = ? WHERE email = ?',
       [assignment.headEmail, normalizedEmail]);
@@ -189,7 +207,7 @@ async function setHrHeadAccount(req, accountEmail, isHrHead) {
   const admin = await requirePerm(req, 'admin.manage');
   const email = sanitize(accountEmail).toLowerCase();
   if (!EMAIL_PATTERN.test(email) || typeof isHrHead !== 'boolean') {
-    throw Object.assign(new Error('Choose a valid HR account and Head HR setting.'), { status: 400 });
+    throw httpError('Choose a valid HR account and Head HR setting.', 400);
   }
   const connection = await pool.getConnection();
   try {
@@ -197,30 +215,27 @@ async function setHrHeadAccount(req, accountEmail, isHrHead) {
     const [rows] = await connection.execute(
       'SELECT email, role, active FROM user_roles WHERE email = ? FOR UPDATE', [email]);
     if (!rows.length || rows[0].role !== 'HR' || !rows[0].active) {
-      throw Object.assign(new Error('Only an active HR account can be designated as Head HR.'), { status: 400 });
+      throw httpError('Only an active HR account can be designated as Head HR.', 400);
     }
     if (isHrHead) {
       const [currentHeads] = await connection.query("SELECT email FROM user_roles WHERE role = 'HR' AND is_hr_head = 1 FOR UPDATE");
       for (const currentHead of currentHeads) {
         if (currentHead.email === email) continue;
-        await connection.execute(
-          `UPDATE user_forms f
-           INNER JOIN user_roles submitter ON submitter.email = f.user_email
-           SET f.head_reviewer_email = ?
-           WHERE f.status = 'PENDING' AND f.review_stage = 'HEAD'
-             AND f.head_reviewer_email = ? AND submitter.role = 'HR'`,
-          [email, currentHead.email]);
+        await reassignOrRejectPendingHrForms(
+          connection,
+          currentHead.email,
+          email,
+          'Pending HR forms are assigned to this Head HR. Switch on another HR account to reassign them first.'
+        );
       }
       await connection.execute("UPDATE user_roles SET is_hr_head = 0 WHERE role = 'HR'");
     } else {
-      const [[pending]] = await connection.execute(
-        `SELECT COUNT(*) AS total FROM user_forms f
-         INNER JOIN user_roles submitter ON submitter.email = f.user_email
-         WHERE f.status = 'PENDING' AND f.review_stage = 'HEAD'
-           AND f.head_reviewer_email = ? AND submitter.role = 'HR'`, [email]);
-      if (Number(pending.total)) {
-        throw Object.assign(new Error('Pending HR forms are assigned to this Head HR. Switch on another HR account to reassign them first.'), { status: 409 });
-      }
+      await reassignOrRejectPendingHrForms(
+        connection,
+        email,
+        null,
+        'Pending HR forms are assigned to this Head HR. Switch on another HR account to reassign them first.'
+      );
     }
     await connection.execute('UPDATE user_roles SET is_hr_head = ? WHERE email = ?', [isHrHead ? 1 : 0, email]);
     await logAudit(admin.email, 'HR_HEAD_ASSIGNED', '', `${email} Head HR set to ${isHrHead}`, connection);
@@ -240,10 +255,10 @@ async function saveAccountChanges(req, changes) {
   const assignments = Array.isArray(input.headAssignments) ? input.headAssignments : [];
   const hrHeadChanged = input.hrHeadChanged === true;
   if (assignments.length > 500 || (input.headAssignments !== undefined && !Array.isArray(input.headAssignments))) {
-    throw Object.assign(new Error('Invalid account assignments.'), { status: 400 });
+    throw httpError('Invalid account assignments.', 400);
   }
   if (input.hrHeadChanged !== undefined && typeof input.hrHeadChanged !== 'boolean') {
-    throw Object.assign(new Error('Invalid Head HR setting.'), { status: 400 });
+    throw httpError('Invalid Head HR setting.', 400);
   }
 
   const connection = await pool.getConnection();
@@ -256,18 +271,18 @@ async function saveAccountChanges(req, changes) {
     const seen = new Set();
     for (const item of assignments) {
       if (!item || typeof item !== 'object') {
-        throw Object.assign(new Error('Invalid account assignment.'), { status: 400 });
+        throw httpError('Invalid account assignment.', 400);
       }
       const email = sanitize(item.email).toLowerCase();
       const headEmail = sanitize(item.headEmail).toLowerCase();
       if (!EMAIL_PATTERN.test(email) || seen.has(email)) {
-        throw Object.assign(new Error('Choose a valid account for each Head assignment.'), { status: 400 });
+        throw httpError('Choose a valid account for each Head assignment.', 400);
       }
       seen.add(email);
       const owner = byEmail.get(email);
-      if (!owner) throw Object.assign(new Error(`Account ${email} no longer exists.`), { status: 404 });
+      if (!owner) throw httpError(`Account ${email} no longer exists.`, 404);
       const assignment = validateHeadAssignment(email, owner.role, headEmail, accounts);
-      if (assignment.error) throw Object.assign(new Error(assignment.error), { status: 400 });
+      if (assignment.error) throw httpError(assignment.error, 400);
       normalizedAssignments.push({ email, headEmail: assignment.headEmail });
     }
 
@@ -277,7 +292,7 @@ async function saveAccountChanges(req, changes) {
       if (targetHrHead) {
         const target = byEmail.get(targetHrHead);
         if (!EMAIL_PATTERN.test(targetHrHead) || !target || target.role !== 'HR' || !target.active) {
-          throw Object.assign(new Error('Choose an active HR account as Head HR.'), { status: 400 });
+          throw httpError('Choose an active HR account as Head HR.', 400);
         }
       }
     }
@@ -294,24 +309,21 @@ async function saveAccountChanges(req, changes) {
       if (targetHrHead) {
         for (const oldHead of oldHeads) {
           if (oldHead.email.toLowerCase() === targetHrHead) continue;
-          await connection.execute(
-            `UPDATE user_forms f
-             INNER JOIN user_roles submitter ON submitter.email = f.user_email
-             SET f.head_reviewer_email = ?
-             WHERE f.status = 'PENDING' AND f.review_stage = 'HEAD'
-               AND f.head_reviewer_email = ? AND submitter.role = 'HR'`,
-            [targetHrHead, oldHead.email]);
+          await reassignOrRejectPendingHrForms(
+            connection,
+            oldHead.email,
+            targetHrHead,
+            'Pending HR forms are assigned to the current Head HR. Choose another active HR account to reassign them first.'
+          );
         }
       } else {
         for (const oldHead of oldHeads) {
-          const [[pending]] = await connection.execute(
-            `SELECT COUNT(*) AS total FROM user_forms f
-             INNER JOIN user_roles submitter ON submitter.email = f.user_email
-             WHERE f.status = 'PENDING' AND f.review_stage = 'HEAD'
-               AND f.head_reviewer_email = ? AND submitter.role = 'HR'`, [oldHead.email]);
-          if (Number(pending.total)) {
-            throw Object.assign(new Error('Pending HR forms are assigned to the current Head HR. Choose another active HR account to reassign them first.'), { status: 409 });
-          }
+          await reassignOrRejectPendingHrForms(
+            connection,
+            oldHead.email,
+            null,
+            'Pending HR forms are assigned to the current Head HR. Choose another active HR account to reassign them first.'
+          );
         }
       }
       await connection.execute("UPDATE user_roles SET is_hr_head = 0 WHERE role = 'HR'");
@@ -343,9 +355,7 @@ async function approveAccountRequest(req, requestId) {
       [requestId]);
     if (!requests.length) {
       await connection.rollback();
-      const error = new Error('This account request no longer exists.');
-      error.status = 404;
-      throw error;
+      throw httpError('This account request no longer exists.', 404);
     }
 
     const accountRequest = requests[0];
@@ -353,17 +363,17 @@ async function approveAccountRequest(req, requestId) {
       ? ACCOUNT_ROLE_MAP[accountRequest.assigned_role]
       : null;
     if (!['STAFF', 'HEAD', 'HR'].includes(role)) {
-      throw Object.assign(new Error('This request has no valid assigned role; reject it and recreate it from Employee Registration.'), { status: 400 });
+      throw httpError('This request has no valid assigned role; reject it and recreate it from Employee Registration.', 400);
     }
     if (role === 'STAFF' && !accountRequest.assigned_head_email) {
-      throw Object.assign(new Error('This STAFF request has no assigned Head. Reject it and recreate it from Employee Registration.'), { status: 400 });
+      throw httpError('This STAFF request has no assigned Head. Reject it and recreate it from Employee Registration.', 400);
     }
     if (accountRequest.assigned_head_email) {
       const [heads] = await connection.execute(
         `SELECT email FROM user_roles WHERE email = ? AND role = 'HEAD' AND active = 1`,
         [accountRequest.assigned_head_email]);
       if (!heads.length) {
-        throw Object.assign(new Error('Approve the assigned Head account first, then approve this request.'), { status: 409 });
+        throw httpError('Approve the assigned Head account first, then approve this request.', 409);
       }
     }
     await connection.execute(
@@ -395,9 +405,7 @@ async function rejectAccountRequest(req, requestId) {
       'SELECT id, email FROM account_requests WHERE id = ? FOR UPDATE', [requestId]);
     if (!requests.length) {
       await connection.rollback();
-      const error = new Error('This account request no longer exists.');
-      error.status = 404;
-      throw error;
+      throw httpError('This account request no longer exists.', 404);
     }
     await connection.execute('DELETE FROM account_requests WHERE id = ?', [requestId]);
     await logAudit(admin.email, 'ACCOUNT_REJECTED', '', requests[0].email, connection);
@@ -414,14 +422,10 @@ async function rejectAccountRequest(req, requestId) {
 async function changeMyPassword(req, currentPassword, newPassword) {
   const user = await requirePerm(req, 'account.password');
   if (typeof currentPassword !== 'string' || !currentPassword) {
-    const error = new Error('Enter your current password.');
-    error.status = 400;
-    throw error;
+    throw httpError('Enter your current password.', 400);
   }
   if (typeof newPassword !== 'string' || newPassword.length < 12 || newPassword.length > 128) {
-    const error = new Error('New password must be between 12 and 128 characters.');
-    error.status = 400;
-    throw error;
+    throw httpError('New password must be between 12 and 128 characters.', 400);
   }
 
   const connection = await pool.getConnection();
@@ -431,9 +435,7 @@ async function changeMyPassword(req, currentPassword, newPassword) {
       'SELECT password_hash FROM user_roles WHERE email = ? AND active = 1 FOR UPDATE', [user.email]);
     if (!rows.length || !verifyPassword(currentPassword, rows[0].password_hash)) {
       await connection.rollback();
-      const error = new Error('Current password is incorrect.');
-      error.status = 400;
-      throw error;
+      throw httpError('Current password is incorrect.', 400);
     }
 
     await connection.execute(
@@ -450,4 +452,4 @@ async function changeMyPassword(req, currentPassword, newPassword) {
   }
 }
 
-module.exports = { listAssignableHeads, createEmployeeAccountRequest, getAccountManagement, approveAccountRequest, rejectAccountRequest, assignAccountHead, setHrHeadAccount, saveAccountChanges, validateHeadAssignment, changeMyPassword };
+module.exports = { listAssignableHeads, createEmployeeAccountRequest, getAccountManagement, approveAccountRequest, rejectAccountRequest, assignAccountHead, setHrHeadAccount, saveAccountChanges, validateHeadAssignment, changeMyPassword, reassignOrRejectPendingHrForms };

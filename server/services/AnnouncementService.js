@@ -1,18 +1,15 @@
+const { httpError } = require('../utils/HttpError');
 const { pool } = require('../db/database');
 const { requirePerm } = require('../middleware/Auth');
 const { logAudit } = require('./AuditService');
 
 function normalizeAnnouncementText(value, label, maxLength) {
   if (typeof value !== 'string') {
-    const error = new Error(`Enter an announcement ${label}.`);
-    error.status = 400;
-    throw error;
+    throw httpError(`Enter an announcement ${label}.`, 400);
   }
   const text = value.trim().replace(/[<>]/g, '');
   if (!text || text.length > maxLength) {
-    const error = new Error(`Announcement ${label} must be between 1 and ${maxLength} characters.`);
-    error.status = 400;
-    throw error;
+    throw httpError(`Announcement ${label} must be between 1 and ${maxLength} characters.`, 400);
   }
   return text;
 }
@@ -42,9 +39,7 @@ async function listAnnouncementsForManagement(req) {
 async function listUnseenAnnouncements(req) {
   const user = await requirePerm(req, 'announcements.read');
   if (!['STAFF', 'HEAD'].includes(user.role)) {
-    const error = new Error('Only STAFF and HEAD accounts can read announcements.');
-    error.status = 403;
-    throw error;
+    throw httpError('Only STAFF and HEAD accounts can read announcements.', 403);
   }
   const [rows] = await pool.execute(
     `SELECT a.id, a.title, a.message, a.created_by, a.created_at,
@@ -62,15 +57,11 @@ async function listUnseenAnnouncements(req) {
 async function markAnnouncementsSeen(req, announcementIds) {
   const user = await requirePerm(req, 'announcements.read');
   if (!['STAFF', 'HEAD'].includes(user.role)) {
-    const error = new Error('Only STAFF and HEAD accounts can acknowledge announcements.');
-    error.status = 403;
-    throw error;
+    throw httpError('Only STAFF and HEAD accounts can acknowledge announcements.', 403);
   }
   if (!Array.isArray(announcementIds) || announcementIds.length > 500 ||
       announcementIds.some(id => !Number.isSafeInteger(Number(id)) || Number(id) < 1)) {
-    const error = new Error('Choose valid announcements to acknowledge.');
-    error.status = 400;
-    throw error;
+    throw httpError('Choose valid announcements to acknowledge.', 400);
   }
   const ids = [...new Set(announcementIds.map(Number))];
   if (!ids.length) return { ok: true, count: 0 };

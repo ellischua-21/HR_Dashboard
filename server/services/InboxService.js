@@ -1,19 +1,12 @@
 const { pool } = require('../db/database');
 const { requirePerm } = require('../middleware/Auth');
 const FORM_TEMPLATES = require('../../shared/FormTemplates');
-
-const FORM_REVIEW_TARGETS = {
-  HR: 'leave-requests',
-  ADMIN: 'leave-requests'
-};
+const FormStatus = require('../../shared/FormStatus');
+const { buildReviewScope } = require('./FormReviewScope');
 
 function formTitle(templateKey) {
   const template = FORM_TEMPLATES.find(item => item.key === templateKey);
   return template ? template.title : 'Submitted form';
-}
-
-function displayStatus(status) {
-  return String(status || '').toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase());
 }
 
 async function getInbox(req) {
@@ -47,13 +40,14 @@ async function getInbox(req) {
   }
 
   const targets = [];
-  if (FORM_REVIEW_TARGETS[user.role]) targets.push({ target: FORM_REVIEW_TARGETS[user.role], stage: 'HR' });
+  if (['HR', 'ADMIN'].includes(user.role)) {
+    targets.push({ target: 'leave-requests', stage: 'HR' });
+  }
   if (user.role === 'HEAD' || (user.role === 'HR' && user.is_hr_head)) {
     targets.push({ target: 'leave-requests', stage: 'HEAD' });
   }
   for (const { target, stage } of targets) {
-    const isHead = stage === 'HEAD';
-    const excludeOwn = user.role === 'HR' && !isHead;
+    const reviewScope = buildReviewScope(user, stage);
     const [forms] = await pool.execute(
       `SELECT f.id, f.control_no, f.template_key, f.user_email, f.submitted_at,
               f.status, f.review_stage,
@@ -63,10 +57,9 @@ async function getInbox(req) {
        LEFT JOIN user_roles u ON u.email = f.user_email
        LEFT JOIN inbox_views v
          ON v.user_email = ? AND v.item_type = 'FORM' AND v.item_id = f.id
-       WHERE ${isHead ? 'f.head_reviewer_email = ?' : 'f.review_stage = ?'}
-         ${excludeOwn ? 'AND f.user_email <> ?' : ''}
+       WHERE ${reviewScope.whereSql}
        ORDER BY f.submitted_at DESC, f.id DESC LIMIT 500`,
-      [user.email, ...(isHead ? [user.email] : [stage]), ...(excludeOwn ? [user.email] : [])]);
+      [user.email, ...reviewScope.whereValues]);
     forms.forEach(form => {
       items.push({
         id: `form-${form.id}`,
@@ -74,7 +67,7 @@ async function getInbox(req) {
         status: form.status === 'PENDING' ? 'ACTION_REQUIRED' : form.status,
         unseen: Boolean(form.unseen),
         title: `${formTitle(form.template_key)}${form.status === 'PENDING' ? ' requires review' : ' reviewed'}`,
-        message: `${form.applicant_name} submitted Serial Number ${form.control_no}.${form.status === 'PENDING' ? '' : ` Status: ${displayStatus(form.status)}.`}`,
+        message: `${form.applicant_name} submitted Serial Number ${form.control_no}.${form.status === 'PENDING' ? '' : ` Status: ${FormStatus.titleCase(form.status)}.`}`,
         createdAt: form.submitted_at,
         formId: form.id,
         controlNo: form.control_no,

@@ -1,31 +1,57 @@
-const $ = id => document.getElementById(id);
+const $ = (id) => document.getElementById(id);
 const API_BASE = window.HR_API_BASE || 'http://localhost:3001/api';
 const api = async (fn, ...args) => {
   const response = await fetch(API_BASE + '/' + encodeURIComponent(fn), {
-    method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ args })
   });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || 'The request failed.');
   return result;
 };
-const showErr = m => { $('err').textContent = m; $('err').hidden = !m; };
-const busy = b => { $('busy').hidden = !b; };
-const FILTER_KEYS = ['company', 'department', 'location', 'status', 'rank', 'function_type'];
+const showErr = (m) => {
+  $('err').textContent = m;
+  $('err').hidden = !m;
+};
+const busy = (b) => {
+  $('busy').hidden = !b;
+};
+const FILTER_KEYS = [
+  'company',
+  'department',
+  'location',
+  'status',
+  'rank',
+  'function_type'
+];
 
 // [id, title, chart type, data key]
 const CHARTS = [
-  ['company', 'Headcount by company', 'bar', 'company'], ['department', 'Headcount by department', 'bar', 'department'],
-  ['location', 'Headcount by work location', 'bar', 'location'], ['status', 'Employment status', 'doughnut', 'status'],
-  ['gender', 'Gender distribution', 'doughnut', 'gender'], ['age', 'Age groups', 'bar', 'age'],
-  ['education', 'Education level', 'bar', 'education'], ['rank', 'Employee rank', 'bar', 'rank'],
-  ['functionType', 'Function type', 'bar', 'functionType'], ['tenure', 'Tenure distribution', 'bar', 'tenure'],
+  ['company', 'Headcount by company', 'bar', 'company'],
+  ['department', 'Headcount by department', 'bar', 'department'],
+  ['location', 'Headcount by work location', 'bar', 'location'],
+  ['status', 'Employment status', 'doughnut', 'status'],
+  ['gender', 'Gender distribution', 'doughnut', 'gender'],
+  ['age', 'Age groups', 'bar', 'age'],
+  ['education', 'Education level', 'bar', 'education'],
+  ['rank', 'Employee rank', 'bar', 'rank'],
+  ['functionType', 'Function type', 'bar', 'functionType'],
+  ['tenure', 'Tenure distribution', 'bar', 'tenure'],
   ['hiringTrend', 'Monthly hiring trend', 'line', 'hiringTrend']
 ];
 const KPIS = [
-  ['headcount', 'Total headcount', 'hero'], ['fte', 'Full-time equivalent (FTE)', 'hero'], ['active', 'Active employees'],
-  ['inactive', 'Inactive employees'], ['newHires', 'New hires (period)'], ['resigned', 'Resigned employees'],
-  ['avgTenureYears', 'Average tenure (years)'], ['companies', 'Companies'], ['departments', 'Departments'], ['locations', 'Work locations']
+  ['headcount', 'Total headcount', 'hero'],
+  ['fte', 'Full-time equivalent (FTE)', 'hero'],
+  ['active', 'Active employees'],
+  ['inactive', 'Inactive employees'],
+  ['newHires', 'New hires (period)'],
+  ['resigned', 'Resigned employees'],
+  ['avgTenureYears', 'Average tenure (years)'],
+  ['companies', 'Companies'],
+  ['departments', 'Departments'],
+  ['locations', 'Work locations']
 ];
 // Navigation: [id, label, permission, built?]. Visibility only; the server enforces every permission.
 const NAV = [
@@ -51,23 +77,55 @@ const FORM_NAV = [
   ['user-dashboard', 'Submitted Forms', 'forms.self', true],
   ['leave-requests', 'Manage Forms', 'forms.review', true]
 ];
-const PALETTE = ['#6b2638', '#f6a53a', '#a1566a', '#8a8f98', '#c98a1b', '#3d1620', '#d9b3be', '#5b6678'];
-const _OLD = ['#6b2638', '#f6a53a', '#b45309', '#5b6678', '#2563a8', '#7c3a8a', '#8a8f98', '#3f8f5f'];
-let charts = {}, session = null;
+const PALETTE = [
+  '#6b2638',
+  '#f6a53a',
+  '#a1566a',
+  '#8a8f98',
+  '#c98a1b',
+  '#3d1620',
+  '#d9b3be',
+  '#5b6678'
+];
+const _OLD = [
+  '#6b2638',
+  '#f6a53a',
+  '#b45309',
+  '#5b6678',
+  '#2563a8',
+  '#7c3a8a',
+  '#8a8f98',
+  '#3f8f5f'
+];
+let charts = {},
+  session = null;
 
 async function init() {
   try {
     session = await api('getSession');
-    if (session.error) { showLogin(); return; }
+    if (session.error) {
+      showLogin();
+      return;
+    }
     hideLogin();
-    $('uemail').textContent = session.email; $('urole').textContent = session.role.replaceAll('_', ' ').toUpperCase();
+    $('uemail').textContent = session.email;
+    $('urole').textContent = session.role.replaceAll('_', ' ').toUpperCase();
     const isFormSubmitter = ['STAFF', 'HEAD', 'USER'].includes(session.role);
     const isHead = session.role === 'HEAD';
     const navItems = isFormSubmitter
-      ? USER_NAV.filter(item => !['user-dashboard', 'user-forms'].includes(item[0]))
-      : NAV.filter(item => item[0] !== 'account-settings' || !session.perms.includes('admin.manage'));
-    const addNavLink = n => {
-      const a = document.createElement('a'); a.textContent = n[1]; a.tabIndex = 0; a.dataset.id = n[0];
+      ? USER_NAV.filter(
+          (item) => !['user-dashboard', 'user-forms'].includes(item[0])
+        )
+      : NAV.filter(
+          (item) =>
+            item[0] !== 'account-settings' ||
+            !session.perms.includes('admin.manage')
+        );
+    const addNavLink = (n) => {
+      const a = document.createElement('a');
+      a.textContent = n[1];
+      a.tabIndex = 0;
+      a.dataset.id = n[0];
       if (n[0] === 'leave-requests') {
         const count = document.createElement('span');
         count.id = 'hr-review-count';
@@ -83,13 +141,16 @@ async function init() {
         count.setAttribute('aria-label', 'unseen inbox entries');
         a.appendChild(count);
       }
-      a.onclick = () => go(n); a.onkeydown = e => { if (e.key === 'Enter') go(n); };
+      a.onclick = () => go(n);
+      a.onkeydown = (e) => {
+        if (e.key === 'Enter') go(n);
+      };
       $('nav').appendChild(a);
     };
     const canManageForms = session.perms.includes('forms.review');
-    const formItems = FORM_NAV.filter(n => n[0] === 'leave-requests'
-      ? canManageForms
-      : session.perms.includes(n[2]));
+    const formItems = FORM_NAV.filter((n) =>
+      n[0] === 'leave-requests' ? canManageForms : session.perms.includes(n[2])
+    );
     if (formItems.length) {
       if (formItems.length === 1 && formItems[0][0] === 'leave-requests') {
         addNavLink(formItems[0]);
@@ -101,26 +162,37 @@ async function init() {
         group.appendChild(summary);
         const children = document.createElement('div');
         children.className = 'form-nav-children';
-        formItems.forEach(n => {
-        const a = document.createElement('a'); a.textContent = n[1]; a.tabIndex = 0; a.dataset.id = n[0];
-        if (n[0] === 'leave-requests') {
-          const count = document.createElement('span');
-          count.id = 'hr-review-count';
-          count.className = 'nav-count'; count.hidden = true;
-          count.setAttribute('aria-label', 'pending submissions'); a.appendChild(count);
-        }
-        a.onclick = () => go(n); a.onkeydown = e => { if (e.key === 'Enter') go(n); };
-        children.appendChild(a);
+        formItems.forEach((n) => {
+          const a = document.createElement('a');
+          a.textContent = n[1];
+          a.tabIndex = 0;
+          a.dataset.id = n[0];
+          if (n[0] === 'leave-requests') {
+            const count = document.createElement('span');
+            count.id = 'hr-review-count';
+            count.className = 'nav-count';
+            count.hidden = true;
+            count.setAttribute('aria-label', 'pending submissions');
+            a.appendChild(count);
+          }
+          a.onclick = () => go(n);
+          a.onkeydown = (e) => {
+            if (e.key === 'Enter') go(n);
+          };
+          children.appendChild(a);
         });
         group.appendChild(children);
         $('nav').appendChild(group);
       }
     }
-    navItems.filter(n => session.perms.includes(n[2])).forEach(addNavLink);
+    navItems.filter((n) => session.perms.includes(n[2])).forEach(addNavLink);
     $('menuBtn').onclick = () => document.body.classList.toggle('open');
     $('logoutBtn').onclick = async () => {
       try {
-        const response = await fetch(API_BASE + '/logout', { method: 'POST', credentials: 'include' });
+        const response = await fetch(API_BASE + '/logout', {
+          method: 'POST',
+          credentials: 'include'
+        });
         if (!response.ok) throw new Error('Sign out failed.');
         location.reload();
       } catch (error) {
@@ -128,41 +200,73 @@ async function init() {
       }
     };
     if (session.perms.includes('inbox.read')) {
-      window.refreshInboxBadge().catch(error => showErr(error.message || String(error)));
+      window
+        .refreshInboxBadge()
+        .catch((error) => showErr(error.message || String(error)));
       window.setInterval(() => {
-        if (!document.hidden) window.refreshInboxBadge().catch(error => showErr(error.message || String(error)));
+        if (!document.hidden)
+          window
+            .refreshInboxBadge()
+            .catch((error) => showErr(error.message || String(error)));
       }, 60000);
       document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) window.refreshInboxBadge().catch(error => showErr(error.message || String(error)));
+        if (!document.hidden)
+          window
+            .refreshInboxBadge()
+            .catch((error) => showErr(error.message || String(error)));
       });
     }
     if (isFormSubmitter) {
       go(USER_NAV[0]);
       if (session.perms.includes('announcements.read')) {
-        window.showPendingAnnouncements().catch(error => showErr(error.message || String(error)));
+        window
+          .showPendingAnnouncements()
+          .catch((error) => showErr(error.message || String(error)));
       }
       if (isHead) {
-        window.refreshSubmittedFormsBadge('ALL').catch(error => showErr(error.message || String(error)));
+        window
+          .refreshSubmittedFormsBadge('ALL')
+          .catch((error) => showErr(error.message || String(error)));
         window.setInterval(() => {
-          if (!document.hidden) window.refreshSubmittedFormsBadge('ALL').catch(error => showErr(error.message || String(error)));
+          if (!document.hidden)
+            window
+              .refreshSubmittedFormsBadge('ALL')
+              .catch((error) => showErr(error.message || String(error)));
         }, 60000);
       }
       return;
     }
-    $('applyBtn').onclick = loadDashboard; $('resetBtn').onclick = () => { $('filters').reset(); loadDashboard(); };
+    $('applyBtn').onclick = loadDashboard;
+    $('resetBtn').onclick = () => {
+      $('filters').reset();
+      loadDashboard();
+    };
     buildKpiAndChartShells();
-    if (session.perms.includes('dash.view')) { await loadOptions(); go(NAV[0]); }
+    if (session.perms.includes('dash.view')) {
+      await loadOptions();
+      go(NAV[0]);
+    }
     if (session.perms.includes('forms.review')) {
       const reviewBadgeScope = 'ALL';
-      window.refreshSubmittedFormsBadge(reviewBadgeScope).catch(error => showErr(error.message || String(error)));
+      window
+        .refreshSubmittedFormsBadge(reviewBadgeScope)
+        .catch((error) => showErr(error.message || String(error)));
       window.setInterval(() => {
-        if (!document.hidden) window.refreshSubmittedFormsBadge(reviewBadgeScope).catch(error => showErr(error.message || String(error)));
+        if (!document.hidden)
+          window
+            .refreshSubmittedFormsBadge(reviewBadgeScope)
+            .catch((error) => showErr(error.message || String(error)));
       }, 60000);
       document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) window.refreshSubmittedFormsBadge(reviewBadgeScope).catch(error => showErr(error.message || String(error)));
+        if (!document.hidden)
+          window
+            .refreshSubmittedFormsBadge(reviewBadgeScope)
+            .catch((error) => showErr(error.message || String(error)));
       });
     }
-  } catch (e) { showLogin(e.message || String(e), true); }
+  } catch (e) {
+    showLogin(e.message || String(e), true);
+  }
 }
 
 function showLogin(message = '', isError = false) {
@@ -186,10 +290,25 @@ function showLogin(message = '', isError = false) {
     title.textContent = 'HR Management System';
     const note = document.createElement('p');
     note.className = 'note';
-    note.textContent = 'Sign in with your approved dashboard account. Contact HR or ADMIN if you need an account.';
+    note.textContent =
+      'Sign in with your approved dashboard account. Contact HR or ADMIN if you need an account.';
     card.append(title, note);
-    const email = addLoginInput(card, 'Email', 'email', 'email', 'username', true);
-    const password = addLoginInput(card, 'Password', 'password', 'password', 'current-password', true);
+    const email = addLoginInput(
+      card,
+      'Email',
+      'email',
+      'email',
+      'username',
+      true
+    );
+    const password = addLoginInput(
+      card,
+      'Password',
+      'password',
+      'password',
+      'current-password',
+      true
+    );
     const error = document.createElement('p');
     error.className = feedbackIsError ? 'login-error' : 'login-message';
     error.textContent = feedback;
@@ -200,13 +319,15 @@ function showLogin(message = '', isError = false) {
     submit.textContent = 'Sign in';
     card.appendChild(submit);
 
-    card.onsubmit = async event => {
+    card.onsubmit = async (event) => {
       event.preventDefault();
       error.hidden = true;
       submit.disabled = true;
       try {
         const response = await fetch(API_BASE + '/login', {
-          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: email.value, password: password.value })
         });
         const result = await response.json();
@@ -247,15 +368,27 @@ function addLoginInput(form, labelText, name, type, autocomplete, required) {
 }
 
 function go(n) {
-  document.body.classList.remove('open'); showErr('');
-  document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.id === n[0]));
+  document.body.classList.remove('open');
+  showErr('');
+  document
+    .querySelectorAll('#nav a')
+    .forEach((a) => a.classList.toggle('on', a.dataset.id === n[0]));
   const formsLink = document.querySelector(`#nav a[data-id="${n[0]}"]`);
-  if (formsLink && formsLink.closest('.form-nav-group')) formsLink.closest('.form-nav-group').open = true;
+  if (formsLink && formsLink.closest('.form-nav-group'))
+    formsLink.closest('.form-nav-group').open = true;
   $('title').textContent = n[1];
-  document.querySelectorAll('.view').forEach(v => v.hidden = true);
-  if (n[0] === 'dashboard') { $('view-dashboard').hidden = false; loadDashboard(); }
-  else if (window.VIEWS && VIEWS[n[0]]) { $('view-' + n[0]).hidden = false; VIEWS[n[0]](); }
-  else { $('view-soon').hidden = false; $('soonMsg').textContent = n[1] + ' will be available in the next development stage.'; }
+  document.querySelectorAll('.view').forEach((v) => (v.hidden = true));
+  if (n[0] === 'dashboard') {
+    $('view-dashboard').hidden = false;
+    loadDashboard();
+  } else if (window.VIEWS && VIEWS[n[0]]) {
+    $('view-' + n[0]).hidden = false;
+    VIEWS[n[0]]();
+  } else {
+    $('view-soon').hidden = false;
+    $('soonMsg').textContent =
+      n[1] + ' will be available in the next development stage.';
+  }
 }
 
 function setSubmittedFormsCount(count, scope = 'HR') {
@@ -276,7 +409,10 @@ function setInboxCount(count) {
   badge.textContent = unseen > 99 ? '99+' : String(unseen);
   badge.hidden = unseen === 0;
   const link = badge.parentElement;
-  link.setAttribute('aria-label', `Inbox, ${unseen} unseen item${unseen === 1 ? '' : 's'}`);
+  link.setAttribute(
+    'aria-label',
+    `Inbox, ${unseen} unseen item${unseen === 1 ? '' : 's'}`
+  );
   link.title = `${unseen} unseen inbox item${unseen === 1 ? '' : 's'}`;
 }
 
@@ -287,54 +423,148 @@ window.refreshInboxBadge = refreshInboxBadge;
 
 async function loadOptions() {
   const o = await api('getFilterOptions');
-  FILTER_KEYS.forEach(k => {
-    const s = $('f_' + k); s.innerHTML = '';
-    ['All'].concat(o[k]).forEach((v, i) => { const op = document.createElement('option'); op.value = i ? v : ''; op.textContent = v; s.appendChild(op); });
+  FILTER_KEYS.forEach((k) => {
+    const s = $('f_' + k);
+    s.innerHTML = '';
+    ['All'].concat(o[k]).forEach((v, i) => {
+      const op = document.createElement('option');
+      op.value = i ? v : '';
+      op.textContent = v;
+      s.appendChild(op);
+    });
   });
 }
 
 function getFilters() {
-  const f = {}; ['dateFrom', 'dateTo'].concat(FILTER_KEYS).forEach(k => { const v = $('f_' + k).value; if (v) f[k] = v; });
+  const f = {};
+  ['dateFrom', 'dateTo'].concat(FILTER_KEYS).forEach((k) => {
+    const v = $('f_' + k).value;
+    if (v) f[k] = v;
+  });
   return f;
 }
 
 function buildKpiAndChartShells() {
-  $('kpis').innerHTML = ''; $('charts').innerHTML = '';
-  KPIS.forEach(k => { const d = document.createElement('div'); d.className = 'kpi ' + (k[2] || ''); d.innerHTML = '<b id="k_' + k[0] + '">–</b><span>' + k[1] + '</span>'; $('kpis').appendChild(d); });
-  CHARTS.forEach(c => { const p = document.createElement('div'); p.className = 'panel'; p.innerHTML = '<h2>' + c[1] + '</h2><div class="chartbox"><canvas id="c_' + c[0] + '" role="img" aria-label="' + c[1] + '"></canvas></div><p class="note" id="n_' + c[0] + '"></p>'; $('charts').appendChild(p); });
+  $('kpis').innerHTML = '';
+  $('charts').innerHTML = '';
+  KPIS.forEach((k) => {
+    const d = document.createElement('div');
+    d.className = 'kpi ' + (k[2] || '');
+    d.innerHTML = '<b id="k_' + k[0] + '">–</b><span>' + k[1] + '</span>';
+    $('kpis').appendChild(d);
+  });
+  CHARTS.forEach((c) => {
+    const p = document.createElement('div');
+    p.className = 'panel';
+    p.innerHTML =
+      '<h2>' +
+      c[1] +
+      '</h2><div class="chartbox"><canvas id="c_' +
+      c[0] +
+      '" role="img" aria-label="' +
+      c[1] +
+      '"></canvas></div><p class="note" id="n_' +
+      c[0] +
+      '"></p>';
+    $('charts').appendChild(p);
+  });
 }
 
 async function loadDashboard() {
-  busy(true); showErr('');
-  try { render(await api('getDashboard', getFilters())); }
-  catch (e) { showErr(e.message || String(e)); }
-  finally { busy(false); }
+  busy(true);
+  showErr('');
+  try {
+    render(await api('getDashboard', getFilters()));
+  } catch (e) {
+    showErr(e.message || String(e));
+  } finally {
+    busy(false);
+  }
 }
 
 function render(d) {
-  KPIS.forEach(k => { const v = d.kpis[k[0]]; $('k_' + k[0]).textContent = v === null || v === undefined ? 'n/a' : v; });
-  CHARTS.forEach(c => {
-    const data = d.charts[c[3]], box = $('c_' + c[0]);
+  KPIS.forEach((k) => {
+    const v = d.kpis[k[0]];
+    $('k_' + k[0]).textContent = v === null || v === undefined ? 'n/a' : v;
+  });
+  CHARTS.forEach((c) => {
+    const data = d.charts[c[3]],
+      box = $('c_' + c[0]);
     if (charts[c[0]]) charts[c[0]].destroy();
-    $('n_' + c[0]).textContent = data.length ? '' : 'No records match the selected filters.';
+    $('n_' + c[0]).textContent = data.length
+      ? ''
+      : 'No records match the selected filters.';
     if (!data.length) return;
-    const horizontal = c[2] === 'bar' && ['company', 'department', 'location'].includes(c[0]);
+    const horizontal =
+      c[2] === 'bar' && ['company', 'department', 'location'].includes(c[0]);
     charts[c[0]] = new Chart(box, {
       type: c[2],
-      data: { labels: data.map(x => x.label), datasets: [{ data: data.map(x => x.value),
-        backgroundColor: c[2] === 'line' ? '#f6a53a' : c[2] === 'doughnut' ? PALETTE : '#6b2638', borderColor: '#f6a53a', tension: .25 }] },
-      options: { indexAxis: horizontal ? 'y' : 'x', responsive: true, maintainAspectRatio: false, animation: false,
-        plugins: { legend: { display: c[2] === 'doughnut', position: 'bottom' } },
-        scales: c[2] === 'doughnut' ? {} : { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+      data: {
+        labels: data.map((x) => x.label),
+        datasets: [
+          {
+            data: data.map((x) => x.value),
+            backgroundColor:
+              c[2] === 'line'
+                ? '#f6a53a'
+                : c[2] === 'doughnut'
+                  ? PALETTE
+                  : '#6b2638',
+            borderColor: '#f6a53a',
+            tension: 0.25
+          }
+        ]
+      },
+      options: {
+        indexAxis: horizontal ? 'y' : 'x',
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { display: c[2] === 'doughnut', position: 'bottom' }
+        },
+        scales:
+          c[2] === 'doughnut'
+            ? {}
+            : { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
     });
   });
-  $('obs').innerHTML = ''; d.observations.forEach(t => { const li = document.createElement('li'); li.textContent = t; $('obs').appendChild(li); });
-  $('asof').textContent = 'Reporting date ' + d.asOf + ' · new hires counted from ' + d.from;
-  const q = d.quality, box = $('quality'); box.innerHTML = '';
-  if (q.overallPct === null) { box.textContent = 'No records to assess.'; return; }
-  const row = (l, p) => { const w = document.createElement('div'); w.innerHTML = '<div class="q"><span></span><span>' + p + '%</span></div><div class="bar"><i style="width:' + p + '%"></i></div>'; w.querySelector('span').textContent = l; box.appendChild(w); };
-  row('Overall completeness', q.overallPct); q.lowestFields.forEach(x => row(x.label, x.pct));
-  const g = document.createElement('p'); g.className = 'note';
-  g.textContent = q.govInfoComplete + ' employee(s) have complete government information; ' + q.govInfoIncomplete + ' do not.'; box.appendChild(g);
+  $('obs').innerHTML = '';
+  d.observations.forEach((t) => {
+    const li = document.createElement('li');
+    li.textContent = t;
+    $('obs').appendChild(li);
+  });
+  $('asof').textContent =
+    'Reporting date ' + d.asOf + ' · new hires counted from ' + d.from;
+  const q = d.quality,
+    box = $('quality');
+  box.innerHTML = '';
+  if (q.overallPct === null) {
+    box.textContent = 'No records to assess.';
+    return;
+  }
+  const row = (l, p) => {
+    const w = document.createElement('div');
+    w.innerHTML =
+      '<div class="q"><span></span><span>' +
+      p +
+      '%</span></div><div class="bar"><i style="width:' +
+      p +
+      '%"></i></div>';
+    w.querySelector('span').textContent = l;
+    box.appendChild(w);
+  };
+  row('Overall completeness', q.overallPct);
+  q.lowestFields.forEach((x) => row(x.label, x.pct));
+  const g = document.createElement('p');
+  g.className = 'note';
+  g.textContent =
+    q.govInfoComplete +
+    ' employee(s) have complete government information; ' +
+    q.govInfoIncomplete +
+    ' do not.';
+  box.appendChild(g);
 }
 window.initializeDashboard = init;
