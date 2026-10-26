@@ -18,6 +18,22 @@ const showErr = (m) => {
 const busy = (b) => {
   $('busy').hidden = !b;
 };
+function setupBackToTop() {
+  const button = $('back-to-top');
+  if (!button) return;
+  const updateVisibility = () => {
+    button.hidden = window.scrollY < 320;
+  };
+  window.addEventListener('scroll', updateVisibility, { passive: true });
+  button.onclick = () =>
+    window.scrollTo({
+      top: 0,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'auto'
+        : 'smooth'
+    });
+  updateVisibility();
+}
 const FILTER_KEYS = [
   'company',
   'department',
@@ -102,6 +118,7 @@ let charts = {},
   session = null;
 
 async function init() {
+  setupBackToTop();
   try {
     session = await api('getSession');
     if (session.error) {
