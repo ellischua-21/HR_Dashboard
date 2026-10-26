@@ -8,7 +8,6 @@
 <section id="view-inbox" class="view" hidden>
   <section class="panel">
     <div class="account-heading">
-      <h2>Inbox</h2>
       <button id="inbox-refresh" class="ghost" type="button">Refresh</button>
     </div>
     <div class="toolbar form-filters">
@@ -43,7 +42,6 @@
   <div class="panel" style="margin-top:16px"><h2>Notes and upcoming data</h2><ul class="obs" id="ex_notes"></ul></div>
 </section>
 <section id="view-audit" class="view" hidden>
-  <p class="note">Most recent 300 matching events. Field values are never stored in the log.</p>
   <div class="toolbar form-filters">
     <label for="au_from">From
       <input id="au_from" type="datetime-local">
@@ -61,8 +59,6 @@
 </section>
 <section id="view-announcements" class="view" hidden>
   <section class="panel">
-    <h2>Create announcement</h2>
-    <p class="note">New announcements appear once for each STAFF and HEAD account after login, until acknowledged.</p>
     <form id="announcement-create-form">
       <label for="announcement-title">Title</label>
       <input id="announcement-title" type="text" maxlength="160" required>

@@ -1,8 +1,6 @@
 <section id="view-user-dashboard" class="view" hidden>
   <section class="panel">
-    <h2>My submitted forms</h2>
     <p id="uf_assigned_head" class="note"></p>
-    <p class="note">Track the status of forms you have submitted. Only you can view your submissions.</p>
     <p id="uf_global_feedback" class="okmsg" hidden></p>
     <div class="user-form-summary" aria-label="Form submission summary">
       <article class="user-form-stat"><span>Total submitted</span><strong id="uf_total">0</strong></article>
@@ -36,17 +34,14 @@
 </section>
 
 <section id="view-user-forms" class="view" hidden>
-  <p class="note">Choose a form template to complete and submit it for review.</p>
   <div id="uf_form_catalog" class="grid form-catalog"></div>
 </section>
 
 <section id="view-leave-requests" class="view" hidden>
   <section class="panel">
     <div class="account-heading">
-      <h2>Manage Forms</h2>
       <button id="uf_review_refresh" class="ghost" type="button">Refresh</button>
     </div>
-    <p id="uf_review_note" class="note">Review forms assigned to you and forms that have reached HR/Admin. Available actions depend on your review permissions.</p>
     <p id="uf_review_feedback" class="okmsg" hidden></p>
     <div class="user-form-summary" aria-label="Submitted form status summary">
       <article class="user-form-stat"><span>Total Requested</span><strong id="uf_review_total">0</strong></article>
@@ -72,7 +67,7 @@
     </div>
     <div class="tablewrap">
       <table>
-      <thead><tr><th>Serial Number</th><th>Form</th><th>Applicant</th><th>Submitted</th><th>Status</th><th>Review</th></tr></thead>
+      <thead><tr><th>Serial Number</th><th>Form</th><th>Applicant</th><th>Submitted</th><th>Status</th><th>Review reason</th><th>Review</th></tr></thead>
         <tbody id="uf_review"></tbody>
       </table>
     </div>
@@ -82,8 +77,6 @@
 <dialog id="leave-form-dialog">
   <form id="leave-form">
     <h2 id="leave-form-title">Leave Application</h2>
-    <p id="leave-form-edit-note" class="note" hidden>Draw your electronic signature again to save your changes.</p>
-    <p class="note">Your name and filing date are attached automatically.</p>
     <div class="fgrid">
       <label>Name<input name="name" type="text" maxlength="191" required></label>
       <label>Employee number<input name="employeeNo" type="text" maxlength="191"></label>
@@ -136,7 +129,6 @@
 <dialog id="user-template-dialog">
   <form id="user-template-form">
     <h2 id="user-template-title"></h2>
-    <p id="user-template-edit-note" class="note" hidden>Draw your electronic signature again to save your changes.</p>
     <p id="user-template-feedback" class="errs" hidden></p>
     <div id="user-template-fields" class="fgrid"></div>
     <label id="user-template-confirmation" class="form-acknowledgment"><input name="confirmation" type="checkbox" required><span>I confirm that the information in this form is accurate.</span></label>
@@ -214,7 +206,6 @@
 
 <dialog id="staff-announcements-dialog" class="announcement-dialog">
   <h2>HR Announcements</h2>
-  <p class="note">Please review these announcements. They will not appear again after you acknowledge them.</p>
   <div id="staff-announcements-list" class="announcement-list"></div>
   <p id="staff-announcements-feedback" class="errs" hidden></p>
   <div class="actions">

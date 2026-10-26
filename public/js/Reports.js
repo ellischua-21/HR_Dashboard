@@ -408,8 +408,7 @@ $('announcement-create-form').onsubmit = guard(async (event) => {
       $('announcement-message').value
     );
     $('announcement-create-form').reset();
-    feedback.textContent =
-      'Announcement published for STAFF and HEAD accounts.';
+    feedback.textContent = 'Published successfully.';
     feedback.hidden = false;
     await loadAnnouncementsForManagement();
   } finally {

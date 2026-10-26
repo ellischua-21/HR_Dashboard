@@ -62,20 +62,21 @@ const NAV = [
   ['executive', 'Executive Summary', 'exec.view', true],
   ['reports', 'HR Reports', 'report.run', true],
   ['audit', 'Audit Logs', 'audit.read', true],
-  ['announcements', 'Announcements', 'announcements.manage', true],
-  ['accounts', 'Manage Accounts', 'admin.manage', true],
-  ['account-settings', 'Account Management', 'account.password', true]
+  ['announcements', 'Create Announcement', 'announcements.manage', true],
+  ['accounts', 'Accounts', 'admin.manage', true],
+  ['account-requests', 'Account Requests', 'admin.manage', true],
+  ['account-settings', 'Change Password', 'account.password', true]
 ];
 const USER_NAV = [
   ['user-dashboard', 'Submitted Forms', 'forms.self', true],
   ['inbox', 'Inbox', 'inbox.read', true],
   ['user-forms', 'Forms', 'forms.self', true],
-  ['account-settings', 'Account Management', 'account.password', true]
+  ['account-settings', 'Change Password', 'account.password', true]
 ];
 const FORM_NAV = [
-  ['user-forms', 'Submit Forms', 'forms.self', true],
-  ['user-dashboard', 'Submitted Forms', 'forms.self', true],
-  ['leave-requests', 'Manage Forms', 'forms.review', true]
+  ['user-forms', 'Fill Out', 'forms.self', true],
+  ['user-dashboard', 'My Submissions', 'forms.self', true],
+  ['leave-requests', 'Review Requests', 'forms.review', true]
 ];
 const PALETTE = [
   '#6b2638',
@@ -116,12 +117,8 @@ async function init() {
       ? USER_NAV.filter(
           (item) => !['user-dashboard', 'user-forms'].includes(item[0])
         )
-      : NAV.filter(
-          (item) =>
-            item[0] !== 'account-settings' ||
-            !session.perms.includes('admin.manage')
-        );
-    const addNavLink = (n) => {
+      : NAV;
+    const createNavLink = (n) => {
       const a = document.createElement('a');
       a.textContent = n[1];
       a.tabIndex = 0;
@@ -145,47 +142,77 @@ async function init() {
       a.onkeydown = (e) => {
         if (e.key === 'Enter') go(n);
       };
-      $('nav').appendChild(a);
+      return a;
+    };
+    const addNavLink = (n) => $('nav').appendChild(createNavLink(n));
+    const addNavGroup = (label, items, isForms = false) => {
+      if (!items.length) return;
+      if (items.length === 1) {
+        addNavLink(items[0]);
+        return;
+      }
+      const group = document.createElement('details');
+      group.className = isForms ? 'nav-group form-nav-group' : 'nav-group';
+      const summary = document.createElement('summary');
+      summary.textContent = label;
+      group.appendChild(summary);
+      const children = document.createElement('div');
+      children.className = 'nav-group-children';
+      items.forEach((item) => children.appendChild(createNavLink(item)));
+      group.appendChild(children);
+      $('nav').appendChild(group);
     };
     const canManageForms = session.perms.includes('forms.review');
     const formItems = FORM_NAV.filter((n) =>
       n[0] === 'leave-requests' ? canManageForms : session.perms.includes(n[2])
+    ).map((item) =>
+      session.role === 'ADMIN' && item[0] === 'leave-requests'
+        ? [item[0], 'Manage Forms', item[2], item[3]]
+        : item
     );
-    if (formItems.length) {
-      if (formItems.length === 1 && formItems[0][0] === 'leave-requests') {
-        addNavLink(formItems[0]);
-      } else {
-        const group = document.createElement('details');
-        group.className = 'form-nav-group';
-        const summary = document.createElement('summary');
-        summary.textContent = 'Forms';
-        group.appendChild(summary);
-        const children = document.createElement('div');
-        children.className = 'form-nav-children';
-        formItems.forEach((n) => {
-          const a = document.createElement('a');
-          a.textContent = n[1];
-          a.tabIndex = 0;
-          a.dataset.id = n[0];
-          if (n[0] === 'leave-requests') {
-            const count = document.createElement('span');
-            count.id = 'hr-review-count';
-            count.className = 'nav-count';
-            count.hidden = true;
-            count.setAttribute('aria-label', 'pending submissions');
-            a.appendChild(count);
-          }
-          a.onclick = () => go(n);
-          a.onkeydown = (e) => {
-            if (e.key === 'Enter') go(n);
-          };
-          children.appendChild(a);
-        });
-        group.appendChild(children);
-        $('nav').appendChild(group);
+    const visibleNavItems = navItems.filter((n) =>
+      session.perms.includes(n[2])
+    );
+    const isHrAdmin = ['HR', 'ADMIN'].includes(session.role);
+    if (isHrAdmin) {
+      visibleNavItems.filter((n) => n[0] === 'dashboard').forEach(addNavLink);
+      visibleNavItems.filter((n) => n[0] === 'inbox').forEach(addNavLink);
+      addNavGroup('Forms', formItems, true);
+
+      const groupedItems = new Set([
+        'employees',
+        'register',
+        'executive',
+        'reports',
+        'audit',
+        'announcements',
+        ...(session.role === 'ADMIN'
+          ? ['accounts', 'account-requests', 'account-settings']
+          : [])
+      ]);
+      const groupItems = (ids) =>
+        visibleNavItems.filter((n) => ids.includes(n[0]));
+      addNavGroup('Employees', groupItems(['employees', 'register']));
+      addNavGroup(
+        'Reports',
+        groupItems(['executive', 'reports', 'audit', 'announcements'])
+      );
+      if (session.role === 'ADMIN') {
+        addNavGroup(
+          'Manage Accounts',
+          groupItems(['accounts', 'account-requests', 'account-settings'])
+        );
       }
+      visibleNavItems
+        .filter(
+          (n) =>
+            !['dashboard', 'inbox'].includes(n[0]) && !groupedItems.has(n[0])
+        )
+        .forEach(addNavLink);
+    } else {
+      addNavGroup('Forms', formItems, true);
+      visibleNavItems.forEach(addNavLink);
     }
-    navItems.filter((n) => session.perms.includes(n[2])).forEach(addNavLink);
     $('menuBtn').onclick = () => document.body.classList.toggle('open');
     $('logoutBtn').onclick = async () => {
       try {
@@ -288,11 +315,7 @@ function showLogin(message = '', isError = false) {
     card.replaceChildren();
     const title = document.createElement('h1');
     title.textContent = 'HR Management System';
-    const note = document.createElement('p');
-    note.className = 'note';
-    note.textContent =
-      'Sign in with your approved dashboard account. Contact HR or ADMIN if you need an account.';
-    card.append(title, note);
+    card.append(title);
     const email = addLoginInput(
       card,
       'Email',
@@ -373,10 +396,14 @@ function go(n) {
   document
     .querySelectorAll('#nav a')
     .forEach((a) => a.classList.toggle('on', a.dataset.id === n[0]));
-  const formsLink = document.querySelector(`#nav a[data-id="${n[0]}"]`);
-  if (formsLink && formsLink.closest('.form-nav-group'))
-    formsLink.closest('.form-nav-group').open = true;
-  $('title').textContent = n[1];
+  document.querySelectorAll('#nav .nav-group').forEach((group) => {
+    const containsActiveLink = Boolean(
+      group.querySelector(`a[data-id="${n[0]}"]`)
+    );
+    group.classList.toggle('has-active', containsActiveLink);
+    if (containsActiveLink) group.open = true;
+  });
+  $('title').textContent = n[0] === 'accounts' ? 'Manage Accounts' : n[1];
   document.querySelectorAll('.view').forEach((v) => (v.hidden = true));
   if (n[0] === 'dashboard') {
     $('view-dashboard').hidden = false;

@@ -49,7 +49,7 @@ async function saveAccountChanges() {
     hrHeadChanged = false;
     await loadAccountManagement();
     button.dataset.saved = 'true';
-    button.textContent = 'Changes Saved ✓';
+    button.textContent = 'Saved successfully.';
     window.setTimeout(() => {
       button.dataset.saved = 'false';
       updateAccountSaveButton();
@@ -76,15 +76,14 @@ function formatAccountDate(value) {
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
 }
 
-async function loadAccountManagement() {
-  const result = await api('getAccountManagement');
+function renderAccountRequests(requestList) {
   const requests = $('am_requests');
   requests.replaceChildren();
 
-  if (!result.requests.length) {
+  if (!requestList.length) {
     appendEmptyRow(requests, 6, 'No pending account requests.');
   }
-  result.requests.forEach((request) => {
+  requestList.forEach((request) => {
     const row = document.createElement('tr');
     row.append(
       accountCell(request.full_name),
@@ -108,7 +107,7 @@ async function loadAccountManagement() {
       approve.disabled = true;
       try {
         await api('approveAccountRequest', request.id);
-        await loadAccountManagement();
+        await loadAccountRequests();
       } catch (error) {
         showErr(error.message || String(error));
         approve.disabled = false;
@@ -127,7 +126,7 @@ async function loadAccountManagement() {
       reject.disabled = true;
       try {
         await api('rejectAccountRequest', request.id);
-        await loadAccountManagement();
+        await loadAccountRequests();
       } catch (error) {
         showErr(error.message || String(error));
         reject.disabled = false;
@@ -137,6 +136,15 @@ async function loadAccountManagement() {
     row.appendChild(actions);
     requests.appendChild(row);
   });
+}
+
+async function loadAccountRequests() {
+  const result = await api('getAccountManagement');
+  renderAccountRequests(result.requests || []);
+}
+
+async function loadAccountManagement() {
+  const result = await api('getAccountManagement');
 
   const headOptions = result.availableHeads || [];
   [
@@ -249,15 +257,8 @@ async function loadAccountManagement() {
 }
 
 VIEWS.accounts = guard(loadAccountManagement);
+VIEWS['account-requests'] = guard(loadAccountRequests);
 $('am_refresh').onclick = async () => {
-  if (
-    hasAccountChanges() &&
-    !confirm('Discard unsaved account changes and refresh?')
-  )
-    return;
-  pendingHeadAssignments.clear();
-  pendingHrHeadEmail = undefined;
-  hrHeadChanged = false;
-  await guard(loadAccountManagement)();
+  await guard(loadAccountRequests)();
 };
 $('am_save_changes').onclick = saveAccountChanges;

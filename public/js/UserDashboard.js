@@ -582,7 +582,6 @@ function openTemplateForm(template, existingForm = null) {
     ? `Edit ${template.title}`
     : template.title;
   $('user-template-feedback').hidden = true;
-  $('user-template-edit-note').hidden = !existingForm;
   const fields = $('user-template-fields');
   fields.replaceChildren();
   template.fields.forEach((field) => {
@@ -664,7 +663,6 @@ function openLeaveForm(existingForm = null) {
   $('leave-form-title').textContent = existingForm
     ? 'Edit Leave Application'
     : 'Leave Application';
-  $('leave-form-edit-note').hidden = !existingForm;
   $('leave-form-submit').textContent = existingForm
     ? 'Save changes'
     : 'Submit for review';
@@ -723,22 +721,24 @@ async function submitLeaveRequest(event) {
       payType: values.get('payType'),
       signature: leaveSignaturePad.toDataURL()
     };
-    const result = formBeingEdited
-      ? await api(
+    if (formBeingEdited) {
+      await api(
           'updateMyForm',
           formBeingEdited.id,
           formBeingEdited.template_key,
           formData
-        )
-      : await api('submitLeaveForm', formData);
+        );
+    } else {
+      await api('submitLeaveForm', formData);
+    }
     $('leave-form-dialog').close();
     const wasEdited = Boolean(formBeingEdited);
     formBeingEdited = null;
     if (wasEdited) await loadMyForms();
     else go(USER_NAV[0]);
     $('uf_global_feedback').textContent = wasEdited
-      ? `Form ${result.controlNo} changes saved.`
-      : `Form ${result.controlNo} submitted. Status: Pending review.`;
+      ? 'Changes saved successfully.'
+      : 'Submitted successfully.';
     $('uf_global_feedback').hidden = false;
   } catch (error) {
     showErr(error.message || String(error));
@@ -901,12 +901,17 @@ function openPrintDialog() {
 
 function reviewRow(form) {
   const row = document.createElement('tr');
+  const reviewReason = userCell(
+    form.status === 'REJECTED' ? form.review_notes || '-' : '-'
+  );
+  reviewReason.className = 'review-reason-cell';
   row.append(
     userCell(form.control_no),
     userCell(formTemplate(form.template_key).title),
     userCell(`${form.applicant_name || ''} (${form.user_email})`),
     userCell(userDate(form.submitted_at)),
-    userCell(FormStatus.formatFormStatus(form.status, form.review_stage))
+    userCell(FormStatus.formatFormStatus(form.status, form.review_stage)),
+    reviewReason
   );
   const actions = document.createElement('td');
   actions.className = 'form-review-actions';
@@ -977,13 +982,7 @@ function reviewRow(form) {
           ? `Rejected by ${form.reviewed_by_role === 'HEAD' ? 'Head' : form.reviewed_by_role === 'ADMIN' ? 'Admin' : 'HR'}: ${form.reviewed_by_name || 'reviewer'}`
           : form.reviewed_by_name;
     const reviewDetails = document.createElement('span');
-    reviewDetails.textContent = [
-      reviewerAction,
-      userDate(form.reviewed_at),
-      form.status === 'REJECTED' && form.review_notes
-        ? `Rejection reason: ${form.review_notes}`
-        : ''
-    ]
+    reviewDetails.textContent = [reviewerAction, userDate(form.reviewed_at)]
       .filter(Boolean)
       .join(' · ');
     actions.appendChild(reviewDetails);
@@ -997,6 +996,8 @@ async function approveWithoutHrSignature(form, button) {
   try {
     await api('reviewUserForm', form.id, 'APPROVED', '', '');
     await loadFormsForReview();
+    $('uf_review_feedback').textContent = 'Approved successfully.';
+    $('uf_review_feedback').hidden = false;
   } catch (error) {
     showErr(error.message || String(error));
     button.disabled = false;
@@ -1071,8 +1072,8 @@ async function signAndForwardForm(event) {
     $('head-signature-dialog').close();
     formToSign = null;
     $('uf_review_feedback').textContent = isHrHeadApproval
-      ? 'HR form signed and approved.'
-      : 'Form signed and forwarded to HR/Admin.';
+      ? 'Approved successfully.'
+      : 'Forwarded successfully.';
     $('uf_review_feedback').hidden = false;
     await loadFormsForReview();
   } catch (error) {
@@ -1119,6 +1120,8 @@ async function rejectSelectedForm(event) {
     $('form-rejection-dialog').close();
     formToReject = null;
     await loadFormsForReview();
+    $('uf_review_feedback').textContent = 'Rejected successfully.';
+    $('uf_review_feedback').hidden = false;
   } catch (error) {
     feedback.textContent = error.message || String(error);
     feedback.hidden = false;
@@ -1160,6 +1163,8 @@ async function signAndApproveForm(event) {
     $('hr-signature-dialog').close();
     formToApprove = null;
     await loadFormsForReview();
+    $('uf_review_feedback').textContent = 'Approved successfully.';
+    $('uf_review_feedback').hidden = false;
   } catch (error) {
     feedback.textContent = error.message || String(error);
     feedback.hidden = false;
@@ -1173,9 +1178,6 @@ async function loadFormsForReview(scope = activeReviewScope) {
   const result = await api('listFormsForReview', activeReviewScope);
   formsForReview = result.forms;
   const prefix = 'uf_review';
-  if ($('uf_review_note'))
-    $('uf_review_note').textContent =
-      'Review forms assigned to you and forms that have reached HR/Admin. Available actions depend on your review permissions.';
   $(`${prefix}_total`).textContent = String(result.summary.total);
   $(`${prefix}_pending`).textContent = String(result.summary.pending);
   $(`${prefix}_approved`).textContent = String(result.summary.approved);
@@ -1201,13 +1203,13 @@ function renderFormsForReview() {
   if (!formsForReview.length) {
     userEmptyRow(
       body,
-      6,
+      7,
       'No forms are available for your review permissions.'
     );
     return;
   }
   if (!forms.length) {
-    userEmptyRow(body, 6, 'No forms match the selected filters.');
+    userEmptyRow(body, 7, 'No forms match the selected filters.');
     return;
   }
   forms.forEach((form) => body.appendChild(reviewRow(form)));
@@ -1239,9 +1241,11 @@ async function submitTemplateForm(event) {
           : values.get(field.name) || '';
     });
     data.signature = templateSignaturePad.toDataURL();
-    const result = formBeingEdited
-      ? await api('updateMyForm', formBeingEdited.id, template.key, data)
-      : await api('submitUserForm', template.key, data);
+    if (formBeingEdited) {
+      await api('updateMyForm', formBeingEdited.id, template.key, data);
+    } else {
+      await api('submitUserForm', template.key, data);
+    }
     $('user-template-dialog').close();
     form.dataset.templateKey = '';
     const wasEdited = Boolean(formBeingEdited);
@@ -1249,8 +1253,8 @@ async function submitTemplateForm(event) {
     if (wasEdited) await loadMyForms();
     else go(USER_NAV[0]);
     $('uf_global_feedback').textContent = wasEdited
-      ? `Form ${result.controlNo} changes saved.`
-      : `Form ${result.controlNo} submitted. Status: Pending review.`;
+      ? 'Changes saved successfully.'
+      : 'Submitted successfully.';
     $('uf_global_feedback').hidden = false;
   } catch (error) {
     feedback.textContent = error.message || String(error);

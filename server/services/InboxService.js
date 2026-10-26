@@ -5,7 +5,7 @@ const FormStatus = require('../../shared/FormStatus');
 const { buildReviewScope } = require('./FormReviewScope');
 
 function formTitle(templateKey) {
-  const template = FORM_TEMPLATES.find(item => item.key === templateKey);
+  const template = FORM_TEMPLATES.find((item) => item.key === templateKey);
   return template ? template.title : 'Submitted form';
 }
 
@@ -13,7 +13,7 @@ async function getInbox(req) {
   const user = await requirePerm(req, 'inbox.read');
   const items = [];
 
-  if (['STAFF', 'HEAD'].includes(user.role)) {
+  if (['STAFF', 'HEAD', 'HR', 'ADMIN'].includes(user.role)) {
     const [announcements] = await pool.execute(
       `SELECT a.id, a.title, a.message, a.created_at,
               COALESCE(NULLIF(u.full_name, ''), a.created_by) AS created_by_name,
@@ -23,8 +23,9 @@ async function getInbox(req) {
        LEFT JOIN announcement_views v
          ON v.announcement_id = a.id AND v.user_email = ?
        ORDER BY a.created_at DESC, a.id DESC LIMIT 500`,
-      [user.email]);
-    announcements.forEach(announcement => {
+      [user.email]
+    );
+    announcements.forEach((announcement) => {
       items.push({
         id: `announcement-${announcement.id}`,
         type: 'ANNOUNCEMENT',
@@ -59,8 +60,9 @@ async function getInbox(req) {
          ON v.user_email = ? AND v.item_type = 'FORM' AND v.item_id = f.id
        WHERE ${reviewScope.whereSql}
        ORDER BY f.submitted_at DESC, f.id DESC LIMIT 500`,
-      [user.email, ...reviewScope.whereValues]);
-    forms.forEach(form => {
+      [user.email, ...reviewScope.whereValues]
+    );
+    forms.forEach((form) => {
       items.push({
         id: `form-${form.id}`,
         type: 'FORM',
@@ -77,8 +79,10 @@ async function getInbox(req) {
     });
   }
 
-  return items.sort((first, second) =>
-    new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime());
+  return items.sort(
+    (first, second) =>
+      new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()
+  );
 }
 
 async function getInboxNotificationCount(req) {
@@ -89,22 +93,28 @@ async function getInboxNotificationCount(req) {
 async function markInboxSeen(req) {
   const user = await requirePerm(req, 'inbox.read');
   const items = await getInbox(req);
-  const announcementIds = items.filter(item => item.type === 'ANNOUNCEMENT').map(item => Number(item.announcementId));
-  const formIds = items.filter(item => item.type === 'FORM').map(item => Number(item.formId));
+  const announcementIds = items
+    .filter((item) => item.type === 'ANNOUNCEMENT')
+    .map((item) => Number(item.announcementId));
+  const formIds = items
+    .filter((item) => item.type === 'FORM')
+    .map((item) => Number(item.formId));
 
   if (announcementIds.length) {
     const placeholders = announcementIds.map(() => '?').join(', ');
     await pool.execute(
       `INSERT IGNORE INTO announcement_views (announcement_id, user_email)
        SELECT id, ? FROM hr_announcements WHERE id IN (${placeholders})`,
-      [user.email, ...announcementIds]);
+      [user.email, ...announcementIds]
+    );
   }
   if (formIds.length) {
     const values = formIds.map(() => "(?, 'FORM', ?)").join(', ');
-    const params = formIds.flatMap(id => [user.email, id]);
+    const params = formIds.flatMap((id) => [user.email, id]);
     await pool.execute(
       `INSERT IGNORE INTO inbox_views (user_email, item_type, item_id) VALUES ${values}`,
-      params);
+      params
+    );
   }
   return { ok: true, count: announcementIds.length + formIds.length };
 }

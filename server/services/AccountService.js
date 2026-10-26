@@ -443,7 +443,7 @@ async function changeMyPassword(req, currentPassword, newPassword) {
       [hashPassword(newPassword), user.email]);
     await logAudit(user.email, 'ACCOUNT_PASSWORD_CHANGED', '', 'User changed their password', connection);
     await connection.commit();
-    return { ok: true, message: 'Your password has been updated.' };
+    return { ok: true, message: 'Password changed successfully.' };
   } catch (error) {
     await connection.rollback();
     throw error;

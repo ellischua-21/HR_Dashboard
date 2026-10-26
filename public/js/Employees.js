@@ -687,8 +687,7 @@ $('pv_save').onclick = guard(async () => {
   }
   $('preview').close();
   showErr('');
-  $('r_msg').textContent =
-    `Employee ${r.record_id} was saved. The ${r.accountRequestRole || $('r_account_role').value} account request for ${r.accountEmail || $('ff_personal_email').value} is pending ADMIN approval.`;
+  $('r_msg').textContent = 'Saved successfully.';
   $('r_msg').hidden = false;
   $('r_preview').disabled = true;
 });

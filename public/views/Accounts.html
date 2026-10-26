@@ -1,34 +1,19 @@
-<section id="view-accounts" class="view" hidden>
-  <p class="note">Only ADMIN accounts can manage access, assign a Head to STAFF accounts, and assign a reporting Head to HEAD accounts.</p>
-  <section class="panel password-panel">
-    <h2>Change My Password</h2>
-    <p class="note">Enter your current password and choose a new password with 12–128 characters.</p>
-    <form id="admin-password-form" class="password-form">
-      <label>Current password<input name="currentPassword" type="password" autocomplete="current-password" required></label>
-      <label>New password<input name="newPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
-      <label>Confirm new password<input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
-      <div class="actions">
-        <button type="submit">Update Password</button>
-      </div>
-      <p id="admin-password-feedback" class="okmsg" hidden></p>
-    </form>
-  </section>
+<section id="view-account-requests" class="view" hidden>
   <section class="panel account-requests">
     <div class="account-heading">
-      <h2>Account registration requests</h2>
       <button id="am_refresh" class="ghost" type="button">Refresh</button>
     </div>
-    <p class="note">Review the role and assigned Head chosen during Employee Registration. Approve assigned HEAD accounts before approving STAFF or HEAD requests that report to them.</p>
     <div class="tablewrap"><table><thead><tr><th>Name</th><th>Personal Email</th><th>Assigned role</th><th>Assigned Head</th><th>Requested</th><th>Actions</th></tr></thead><tbody id="am_requests"></tbody></table></div>
   </section>
+</section>
+<section id="view-accounts" class="view" hidden>
   <div class="account-heading account-list-heading">
-    <h2>Manage Accounts</h2>
     <button id="am_save_changes" type="button" disabled>Save Changes</button>
   </div>
   <div class="account-lists">
   <section class="panel"><h2>STAFF</h2><div class="tablewrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Assigned Head</th><th>Status</th><th>Created</th><th>Assignment</th></tr></thead><tbody id="am_users"></tbody></table></div></section>
   <section class="panel"><h2>HEAD</h2><div class="tablewrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Assigned Head</th><th>Status</th><th>Created</th><th>Assignment</th></tr></thead><tbody id="am_heads"></tbody></table></div></section>
-  <section class="panel"><h2>HR</h2><p class="note">Switch on one active HR account to designate the Head HR. Forms submitted by other HR accounts go to this account for approval.</p><div class="tablewrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Head HR</th><th>Status</th><th>Created</th></tr></thead><tbody id="am_hr"></tbody></table></div></section>
+  <section class="panel"><h2>HR</h2><div class="tablewrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Head HR</th><th>Status</th><th>Created</th></tr></thead><tbody id="am_hr"></tbody></table></div></section>
   <section class="panel"><h2>Admins</h2><div class="tablewrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th></tr></thead><tbody id="am_admins"></tbody></table></div></section>
   </div>
 </section>

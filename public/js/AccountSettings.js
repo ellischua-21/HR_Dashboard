@@ -25,14 +25,14 @@ function bindPasswordChange(formId, feedbackId) {
 
     submit.disabled = true;
     try {
-      const result = await api(
+      await api(
         'changeMyPassword',
         currentPassword,
         newPassword
       );
       form.reset();
       feedback.className = 'okmsg';
-      feedback.textContent = result.message;
+      feedback.textContent = 'Password changed successfully.';
       feedback.hidden = false;
     } catch (error) {
       feedback.className = 'login-error';
@@ -46,4 +46,3 @@ function bindPasswordChange(formId, feedbackId) {
 
 VIEWS['account-settings'] = () => {};
 bindPasswordChange('account-password-form', 'account-password-feedback');
-bindPasswordChange('admin-password-form', 'admin-password-feedback');

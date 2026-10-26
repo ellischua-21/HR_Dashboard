@@ -7,7 +7,6 @@
   </div>
   <div id="importPanel" class="panel" hidden>
     <h2>Import employees from Excel or CSV</h2>
-    <p class="note">Choose a file, check how its columns map to employee fields, validate, then import. Employee numbers must be unique.</p>
     <div class="toolbar"><input type="file" id="i_file" accept=".csv,.xlsx,.xls"><button class="ghost" id="i_tpl">Download template</button></div>
     <div class="tablewrap" id="i_map" hidden></div>
     <div class="actions" id="i_act" hidden><button class="ghost" id="i_validate">Validate</button><button id="i_commit" disabled>Import valid rows</button></div>
@@ -23,7 +22,6 @@
   <div id="r_form"></div>
   <section id="r_account_access" class="panel">
     <h2>Account access request</h2>
-    <p class="note">This section requests account access for the employee. Personal Email becomes the account login; an ADMIN must approve the request before the account is activated.</p>
     <div class="fgrid">
       <label for="r_account_role">Assigned role
         <select id="r_account_role">
