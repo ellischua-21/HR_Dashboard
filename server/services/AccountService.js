@@ -115,7 +115,7 @@ async function getAccountManagement(req) {
      LEFT JOIN account_requests p ON p.email = r.assigned_head_email
      ORDER BY r.requested_at, r.id`);
   const [accounts] = await pool.query(
-    `SELECT u.email, u.full_name, u.role, u.active, u.created_at, u.assigned_head_email,
+    `SELECT u.email, u.full_name, u.role, u.active, u.created_at, u.assigned_head_email, u.is_hr_head,
             h.full_name AS assigned_head_name
      FROM user_roles u LEFT JOIN user_roles h ON h.email = u.assigned_head_email
      ORDER BY u.role, u.email`);
@@ -177,6 +177,153 @@ async function assignAccountHead(req, accountEmail, headEmail) {
       connection);
     await connection.commit();
     return { ok: true, email: normalizedEmail, headEmail: assignment.headEmail };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function setHrHeadAccount(req, accountEmail, isHrHead) {
+  const admin = await requirePerm(req, 'admin.manage');
+  const email = sanitize(accountEmail).toLowerCase();
+  if (!EMAIL_PATTERN.test(email) || typeof isHrHead !== 'boolean') {
+    throw Object.assign(new Error('Choose a valid HR account and Head HR setting.'), { status: 400 });
+  }
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [rows] = await connection.execute(
+      'SELECT email, role, active FROM user_roles WHERE email = ? FOR UPDATE', [email]);
+    if (!rows.length || rows[0].role !== 'HR' || !rows[0].active) {
+      throw Object.assign(new Error('Only an active HR account can be designated as Head HR.'), { status: 400 });
+    }
+    if (isHrHead) {
+      const [currentHeads] = await connection.query("SELECT email FROM user_roles WHERE role = 'HR' AND is_hr_head = 1 FOR UPDATE");
+      for (const currentHead of currentHeads) {
+        if (currentHead.email === email) continue;
+        await connection.execute(
+          `UPDATE user_forms f
+           INNER JOIN user_roles submitter ON submitter.email = f.user_email
+           SET f.head_reviewer_email = ?
+           WHERE f.status = 'PENDING' AND f.review_stage = 'HEAD'
+             AND f.head_reviewer_email = ? AND submitter.role = 'HR'`,
+          [email, currentHead.email]);
+      }
+      await connection.execute("UPDATE user_roles SET is_hr_head = 0 WHERE role = 'HR'");
+    } else {
+      const [[pending]] = await connection.execute(
+        `SELECT COUNT(*) AS total FROM user_forms f
+         INNER JOIN user_roles submitter ON submitter.email = f.user_email
+         WHERE f.status = 'PENDING' AND f.review_stage = 'HEAD'
+           AND f.head_reviewer_email = ? AND submitter.role = 'HR'`, [email]);
+      if (Number(pending.total)) {
+        throw Object.assign(new Error('Pending HR forms are assigned to this Head HR. Switch on another HR account to reassign them first.'), { status: 409 });
+      }
+    }
+    await connection.execute('UPDATE user_roles SET is_hr_head = ? WHERE email = ?', [isHrHead ? 1 : 0, email]);
+    await logAudit(admin.email, 'HR_HEAD_ASSIGNED', '', `${email} Head HR set to ${isHrHead}`, connection);
+    await connection.commit();
+    return { ok: true, email, isHrHead };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function saveAccountChanges(req, changes) {
+  const admin = await requirePerm(req, 'admin.manage');
+  const input = changes && typeof changes === 'object' ? changes : {};
+  const assignments = Array.isArray(input.headAssignments) ? input.headAssignments : [];
+  const hrHeadChanged = input.hrHeadChanged === true;
+  if (assignments.length > 500 || (input.headAssignments !== undefined && !Array.isArray(input.headAssignments))) {
+    throw Object.assign(new Error('Invalid account assignments.'), { status: 400 });
+  }
+  if (input.hrHeadChanged !== undefined && typeof input.hrHeadChanged !== 'boolean') {
+    throw Object.assign(new Error('Invalid Head HR setting.'), { status: 400 });
+  }
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [accounts] = await connection.query(
+      'SELECT email, role, active, assigned_head_email, is_hr_head FROM user_roles FOR UPDATE');
+    const byEmail = new Map(accounts.map(account => [account.email.toLowerCase(), account]));
+    const normalizedAssignments = [];
+    const seen = new Set();
+    for (const item of assignments) {
+      if (!item || typeof item !== 'object') {
+        throw Object.assign(new Error('Invalid account assignment.'), { status: 400 });
+      }
+      const email = sanitize(item.email).toLowerCase();
+      const headEmail = sanitize(item.headEmail).toLowerCase();
+      if (!EMAIL_PATTERN.test(email) || seen.has(email)) {
+        throw Object.assign(new Error('Choose a valid account for each Head assignment.'), { status: 400 });
+      }
+      seen.add(email);
+      const owner = byEmail.get(email);
+      if (!owner) throw Object.assign(new Error(`Account ${email} no longer exists.`), { status: 404 });
+      const assignment = validateHeadAssignment(email, owner.role, headEmail, accounts);
+      if (assignment.error) throw Object.assign(new Error(assignment.error), { status: 400 });
+      normalizedAssignments.push({ email, headEmail: assignment.headEmail });
+    }
+
+    let targetHrHead = null;
+    if (hrHeadChanged) {
+      targetHrHead = sanitize(input.hrHeadEmail).toLowerCase() || null;
+      if (targetHrHead) {
+        const target = byEmail.get(targetHrHead);
+        if (!EMAIL_PATTERN.test(targetHrHead) || !target || target.role !== 'HR' || !target.active) {
+          throw Object.assign(new Error('Choose an active HR account as Head HR.'), { status: 400 });
+        }
+      }
+    }
+
+    for (const assignment of normalizedAssignments) {
+      await connection.execute('UPDATE user_roles SET assigned_head_email = ? WHERE email = ?',
+        [assignment.headEmail, assignment.email]);
+      await logAudit(admin.email, 'HEAD_ASSIGNED', '',
+        `${assignment.email} assigned to Head ${assignment.headEmail || 'none'}`, connection);
+    }
+
+    if (hrHeadChanged) {
+      const oldHeads = accounts.filter(account => account.role === 'HR' && account.is_hr_head);
+      if (targetHrHead) {
+        for (const oldHead of oldHeads) {
+          if (oldHead.email.toLowerCase() === targetHrHead) continue;
+          await connection.execute(
+            `UPDATE user_forms f
+             INNER JOIN user_roles submitter ON submitter.email = f.user_email
+             SET f.head_reviewer_email = ?
+             WHERE f.status = 'PENDING' AND f.review_stage = 'HEAD'
+               AND f.head_reviewer_email = ? AND submitter.role = 'HR'`,
+            [targetHrHead, oldHead.email]);
+        }
+      } else {
+        for (const oldHead of oldHeads) {
+          const [[pending]] = await connection.execute(
+            `SELECT COUNT(*) AS total FROM user_forms f
+             INNER JOIN user_roles submitter ON submitter.email = f.user_email
+             WHERE f.status = 'PENDING' AND f.review_stage = 'HEAD'
+               AND f.head_reviewer_email = ? AND submitter.role = 'HR'`, [oldHead.email]);
+          if (Number(pending.total)) {
+            throw Object.assign(new Error('Pending HR forms are assigned to the current Head HR. Choose another active HR account to reassign them first.'), { status: 409 });
+          }
+        }
+      }
+      await connection.execute("UPDATE user_roles SET is_hr_head = 0 WHERE role = 'HR'");
+      if (targetHrHead) {
+        await connection.execute('UPDATE user_roles SET is_hr_head = 1 WHERE email = ?', [targetHrHead]);
+      }
+      await logAudit(admin.email, 'HR_HEAD_ASSIGNED', '',
+        `Head HR set to ${targetHrHead || 'none'}`, connection);
+    }
+
+    await connection.commit();
+    return { ok: true, assignments: normalizedAssignments.length, hrHeadEmail: hrHeadChanged ? targetHrHead : undefined };
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -303,4 +450,4 @@ async function changeMyPassword(req, currentPassword, newPassword) {
   }
 }
 
-module.exports = { listAssignableHeads, createEmployeeAccountRequest, getAccountManagement, approveAccountRequest, rejectAccountRequest, assignAccountHead, validateHeadAssignment, changeMyPassword };
+module.exports = { listAssignableHeads, createEmployeeAccountRequest, getAccountManagement, approveAccountRequest, rejectAccountRequest, assignAccountHead, setHrHeadAccount, saveAccountChanges, validateHeadAssignment, changeMyPassword };

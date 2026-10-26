@@ -30,7 +30,6 @@ const KPIS = [
 // Navigation: [id, label, permission, built?]. Visibility only; the server enforces every permission.
 const NAV = [
   ['dashboard', 'Dashboard', 'dash.view', true],
-  ['leave-requests', 'Manage Forms', 'forms.review', true],
   ['inbox', 'Inbox', 'inbox.read', true],
   ['employees', 'Employee Master List', 'emp.read', true],
   ['register', 'Employee Registration', 'emp.write', true],
@@ -47,7 +46,12 @@ const USER_NAV = [
   ['user-forms', 'Forms', 'forms.self', true],
   ['account-settings', 'Account Management', 'account.password', true]
 ];
-const HEAD_NAV = ['head-forms', 'Manage Forms', 'forms.head-review', true];
+const FORM_NAV = [
+  ['user-forms', 'Submit Forms', 'forms.self', true],
+  ['user-dashboard', 'Submitted Forms', 'forms.self', true],
+  ['head-forms', 'Head Review', 'forms.head-review', true],
+  ['leave-requests', 'Manage Forms', 'forms.review', true]
+];
 const PALETTE = ['#6b2638', '#f6a53a', '#a1566a', '#8a8f98', '#c98a1b', '#3d1620', '#d9b3be', '#5b6678'];
 const _OLD = ['#6b2638', '#f6a53a', '#b45309', '#5b6678', '#2563a8', '#7c3a8a', '#8a8f98', '#3f8f5f'];
 let charts = {}, session = null;
@@ -61,15 +65,13 @@ async function init() {
     const isFormSubmitter = ['STAFF', 'HEAD', 'USER'].includes(session.role);
     const isHead = session.role === 'HEAD';
     const navItems = isFormSubmitter
-      ? isHead
-        ? [USER_NAV[0], USER_NAV[1], HEAD_NAV, USER_NAV[2], USER_NAV[3]]
-        : USER_NAV
+      ? USER_NAV.filter(item => !['user-dashboard', 'user-forms'].includes(item[0]))
       : NAV.filter(item => item[0] !== 'account-settings' || !session.perms.includes('admin.manage'));
-    navItems.filter(n => session.perms.includes(n[2])).forEach(n => {
+    const addNavLink = n => {
       const a = document.createElement('a'); a.textContent = n[1]; a.tabIndex = 0; a.dataset.id = n[0];
       if (n[0] === 'leave-requests' || n[0] === 'head-forms') {
         const count = document.createElement('span');
-        count.id = 'submitted-forms-count';
+        count.id = n[0] === 'head-forms' ? 'head-review-count' : 'hr-review-count';
         count.className = 'nav-count';
         count.hidden = true;
         count.setAttribute('aria-label', 'pending submissions');
@@ -84,7 +86,37 @@ async function init() {
       }
       a.onclick = () => go(n); a.onkeydown = e => { if (e.key === 'Enter') go(n); };
       $('nav').appendChild(a);
-    });
+    };
+    const formItems = FORM_NAV.filter(n => session.perms.includes(n[2])
+      && (!(session.role === 'ADMIN' || (session.role === 'HR' && session.is_hr_head)) || n[0] === 'leave-requests'));
+    if (formItems.length) {
+      if ((session.role === 'ADMIN' || (session.role === 'HR' && session.is_hr_head))
+        && formItems.length === 1 && formItems[0][0] === 'leave-requests') {
+        addNavLink(formItems[0]);
+      } else {
+        const group = document.createElement('details');
+        group.className = 'form-nav-group';
+        const summary = document.createElement('summary');
+        summary.textContent = 'Forms';
+        group.appendChild(summary);
+        const children = document.createElement('div');
+        children.className = 'form-nav-children';
+        formItems.forEach(n => {
+        const a = document.createElement('a'); a.textContent = n[1]; a.tabIndex = 0; a.dataset.id = n[0];
+        if (n[0] === 'leave-requests' || n[0] === 'head-forms') {
+          const count = document.createElement('span');
+          count.id = n[0] === 'head-forms' ? 'head-review-count' : 'hr-review-count';
+          count.className = 'nav-count'; count.hidden = true;
+          count.setAttribute('aria-label', 'pending submissions'); a.appendChild(count);
+        }
+        a.onclick = () => go(n); a.onkeydown = e => { if (e.key === 'Enter') go(n); };
+        children.appendChild(a);
+        });
+        group.appendChild(children);
+        $('nav').appendChild(group);
+      }
+    }
+    navItems.filter(n => session.perms.includes(n[2])).forEach(addNavLink);
     $('menuBtn').onclick = () => document.body.classList.toggle('open');
     $('logoutBtn').onclick = async () => {
       try {
@@ -110,9 +142,9 @@ async function init() {
         window.showPendingAnnouncements().catch(error => showErr(error.message || String(error)));
       }
       if (isHead) {
-        window.refreshSubmittedFormsBadge().catch(error => showErr(error.message || String(error)));
+        window.refreshSubmittedFormsBadge('HEAD').catch(error => showErr(error.message || String(error)));
         window.setInterval(() => {
-          if (!document.hidden) window.refreshSubmittedFormsBadge().catch(error => showErr(error.message || String(error)));
+          if (!document.hidden) window.refreshSubmittedFormsBadge('HEAD').catch(error => showErr(error.message || String(error)));
         }, 60000);
       }
       return;
@@ -121,13 +153,17 @@ async function init() {
     buildKpiAndChartShells();
     if (session.perms.includes('dash.view')) { await loadOptions(); go(NAV[0]); }
     if (session.perms.includes('forms.review')) {
-      window.refreshSubmittedFormsBadge().catch(error => showErr(error.message || String(error)));
+      const reviewBadgeScope = session.role === 'HR' && session.is_hr_head ? 'ALL' : 'HR';
+      window.refreshSubmittedFormsBadge(reviewBadgeScope).catch(error => showErr(error.message || String(error)));
       window.setInterval(() => {
-        if (!document.hidden) window.refreshSubmittedFormsBadge().catch(error => showErr(error.message || String(error)));
+        if (!document.hidden) window.refreshSubmittedFormsBadge(reviewBadgeScope).catch(error => showErr(error.message || String(error)));
+        if (!document.hidden && session.perms.includes('forms.head-review') && reviewBadgeScope !== 'ALL') window.refreshSubmittedFormsBadge('HEAD').catch(error => showErr(error.message || String(error)));
       }, 60000);
       document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) window.refreshSubmittedFormsBadge().catch(error => showErr(error.message || String(error)));
+        if (!document.hidden) window.refreshSubmittedFormsBadge(reviewBadgeScope).catch(error => showErr(error.message || String(error)));
+        if (!document.hidden && session.perms.includes('forms.head-review') && reviewBadgeScope !== 'ALL') window.refreshSubmittedFormsBadge('HEAD').catch(error => showErr(error.message || String(error)));
       });
+      if (session.perms.includes('forms.head-review') && reviewBadgeScope !== 'ALL') window.refreshSubmittedFormsBadge('HEAD').catch(error => showErr(error.message || String(error)));
     }
   } catch (e) { showLogin(e.message || String(e), true); }
 }
@@ -216,6 +252,8 @@ function addLoginInput(form, labelText, name, type, autocomplete, required) {
 function go(n) {
   document.body.classList.remove('open'); showErr('');
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.id === n[0]));
+  const formsLink = document.querySelector(`#nav a[data-id="${n[0]}"]`);
+  if (formsLink && formsLink.closest('.form-nav-group')) formsLink.closest('.form-nav-group').open = true;
   $('title').textContent = n[1];
   document.querySelectorAll('.view').forEach(v => v.hidden = true);
   if (n[0] === 'dashboard') { $('view-dashboard').hidden = false; loadDashboard(); }
@@ -223,15 +261,15 @@ function go(n) {
   else { $('view-soon').hidden = false; $('soonMsg').textContent = n[1] + ' will be available in the next development stage.'; }
 }
 
-function setSubmittedFormsCount(count) {
-  const badge = $('submitted-forms-count');
+function setSubmittedFormsCount(count, scope = 'HR') {
+  const badge = $(String(scope).toUpperCase() === 'HEAD' ? 'head-review-count' : 'hr-review-count');
   if (!badge) return;
   const pending = Number(count) || 0;
   badge.textContent = pending > 99 ? '99+' : String(pending);
   badge.hidden = pending === 0;
   const link = badge.parentElement;
-  link.setAttribute('aria-label', `Submitted Forms, ${pending} pending`);
-  link.title = `${pending} pending submission${pending === 1 ? '' : 's'}`;
+  link.setAttribute('aria-label', `${scope === 'ALL' ? 'Manage Forms' : scope === 'HEAD' ? 'Head Review' : 'HR Review'}, ${pending} pending`);
+  link.title = `${pending} pending form${pending === 1 ? '' : 's'}`;
 }
 
 function setInboxCount(count) {

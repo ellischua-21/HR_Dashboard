@@ -75,6 +75,10 @@ async function initializeDatabase() {
   if (!headColumns.length) {
     await pool.query("ALTER TABLE user_roles ADD COLUMN assigned_head_email VARCHAR(191) NULL AFTER role");
   }
+  const [hrHeadColumns] = await pool.query("SHOW COLUMNS FROM user_roles LIKE 'is_hr_head'");
+  if (!hrHeadColumns.length) {
+    await pool.query("ALTER TABLE user_roles ADD COLUMN is_hr_head TINYINT(1) NOT NULL DEFAULT 0 AFTER assigned_head_email");
+  }
   await pool.query("UPDATE user_roles SET role = 'STAFF' WHERE role IN ('USER', 'MANAGER')");
   await pool.query("UPDATE user_roles SET role = 'STAFF' WHERE role = 'EXECUTIVE'");
   await pool.query("UPDATE user_roles SET role = 'HR' WHERE role = 'HR_STAFF'");

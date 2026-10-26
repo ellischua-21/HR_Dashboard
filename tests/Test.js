@@ -165,7 +165,7 @@ test('serial number year follows the Manila calendar year at New Year', () => {
     'ATD-2027-000001');
 });
 
-test('only STAFF and HEAD can edit forms pending with an assigned Head', () => {
+test('STAFF, HEAD, and HR can edit forms pending with an assigned Head', () => {
   const pendingForHead = {
     status: 'PENDING',
     review_stage: 'HEAD',
@@ -173,7 +173,7 @@ test('only STAFF and HEAD can edit forms pending with an assigned Head', () => {
   };
   assert.equal(canEditForm('STAFF', pendingForHead), true);
   assert.equal(canEditForm('HEAD', pendingForHead), true);
-  assert.equal(canEditForm('HR', pendingForHead), false);
+  assert.equal(canEditForm('HR', pendingForHead), true);
   assert.equal(canEditForm('STAFF', { ...pendingForHead, review_stage: 'HR' }), false);
   assert.equal(canEditForm('STAFF', { ...pendingForHead, status: 'REJECTED' }), false);
   assert.equal(canEditForm('STAFF', { ...pendingForHead, status: 'APPROVED' }), false);

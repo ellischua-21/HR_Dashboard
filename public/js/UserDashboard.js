@@ -3,6 +3,7 @@ let formsForReview = [];
 let formToSign = null;
 let formToApprove = null;
 let formBeingEdited = null;
+let activeReviewScope = 'HR';
 
 const userCell = value => {
   const cell = document.createElement('td');
@@ -94,7 +95,7 @@ function updateFormSummary(summary) {
 }
 
 function canEditSubmittedForm(form) {
-  return ['STAFF', 'HEAD'].includes(session.role) &&
+  return ['STAFF', 'HEAD', 'HR'].includes(session.role) &&
     form.status === 'PENDING' &&
     form.review_stage === 'HEAD' &&
     Boolean(form.head_reviewer_email);
@@ -300,6 +301,12 @@ async function loadMyForms() {
   const assignedHeadLabel = $('uf_assigned_head');
   if (result.assignedHead) {
     assignedHeadLabel.textContent = `Your Head: ${result.assignedHead.full_name} (${result.assignedHead.email})${result.assignedHead.active ? '' : ' — inactive'}`;
+    assignedHeadLabel.hidden = false;
+  } else if (session.role === 'HR' && session.is_hr_head) {
+    assignedHeadLabel.textContent = 'Your forms go directly to the HR review queue.';
+    assignedHeadLabel.hidden = false;
+  } else if (session.role === 'HR') {
+    assignedHeadLabel.textContent = 'Your forms are routed to the designated Head HR.';
     assignedHeadLabel.hidden = false;
   } else if (session.role === 'STAFF' || session.role === 'USER') {
     assignedHeadLabel.textContent = 'No assigned Head yet';
@@ -643,15 +650,16 @@ function reviewRow(form) {
   view.textContent = 'View form';
   view.onclick = () => showFormContents(form);
   actions.appendChild(view);
-  const isHead = session.role === 'HEAD';
+  const isHead = activeReviewScope === 'HEAD'
+    || (activeReviewScope === 'ALL' && form.review_stage === 'HEAD');
   const awaitingReviewer = form.status === 'PENDING' &&
-    (isHead ? form.review_stage === 'HEAD' : form.review_stage === 'HR');
+    (activeReviewScope === 'ALL' || (isHead ? form.review_stage === 'HEAD' : form.review_stage === 'HR'));
   if (awaitingReviewer) {
     ['APPROVED', 'REJECTED'].forEach(decision => {
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = decision === 'APPROVED'
-        ? isHead ? 'Sign and forward' : 'Sign and approve'
+        ? isHead && !(session.is_hr_head && form.submitter_role === 'HR') ? 'Sign and forward' : 'Sign and approve'
         : 'Reject';
       if (decision === 'REJECTED') button.className = 'ghost';
       button.onclick = async () => {
@@ -691,6 +699,10 @@ let formToReject = null;
 function openHeadSignature(form) {
   formToSign = form;
   $('head-signature-control').textContent = `Serial Number ${form.control_no}`;
+  const hrHeadApproval = session.is_hr_head && form.submitter_role === 'HR';
+  $('head-signature-dialog').querySelector('h2').textContent = hrHeadApproval ? 'Sign and approve HR form' : 'Sign and forward form';
+  $('head-signature-pad').previousElementSibling.textContent = session.is_hr_head ? 'Head HR signature' : 'Head signature';
+  $('head-signature-form').querySelector('[type="submit"]').textContent = hrHeadApproval ? 'Sign and approve' : 'Sign and forward to HR/Admin';
   $('head-signature-feedback').hidden = true;
   $('head-signature-dialog').showModal();
   headSignaturePad.clear();
@@ -701,7 +713,9 @@ async function signAndForwardForm(event) {
   if (!formToSign) return;
   const feedback = $('head-signature-feedback');
   if (!headSignaturePad.hasSignature()) {
-    feedback.textContent = 'Draw your signature before forwarding this form.';
+    feedback.textContent = session.is_hr_head && formToSign.submitter_role === 'HR'
+      ? 'Draw your signature before approving this HR form.'
+      : 'Draw your signature before forwarding this form.';
     feedback.hidden = false;
     return;
   }
@@ -709,10 +723,11 @@ async function signAndForwardForm(event) {
   submit.disabled = true;
   feedback.hidden = true;
   try {
+    const isHrHeadApproval = session.is_hr_head && formToSign.submitter_role === 'HR';
     await api('reviewUserForm', formToSign.id, 'APPROVED', '', headSignaturePad.toDataURL());
     $('head-signature-dialog').close();
     formToSign = null;
-    $('uf_head_feedback').textContent = 'Form signed and forwarded to HR/Admin.';
+    $('uf_head_feedback').textContent = isHrHeadApproval ? 'HR form signed and approved.' : 'Form signed and forwarded to HR/Admin.';
     $('uf_head_feedback').hidden = false;
     await loadFormsForReview();
   } catch (error) {
@@ -792,21 +807,28 @@ async function signAndApproveForm(event) {
   }
 }
 
-async function loadFormsForReview() {
-  const result = await api('listFormsForReview');
+async function loadFormsForReview(scope = activeReviewScope) {
+  const requestedScope = String(scope).toUpperCase();
+  activeReviewScope = ['HEAD', 'ALL'].includes(requestedScope) ? requestedScope : 'HR';
+  const result = await api('listFormsForReview', activeReviewScope);
   formsForReview = result.forms;
-  const prefix = session.role === 'HEAD' ? 'uf_head' : 'uf_review';
+  const prefix = activeReviewScope === 'HEAD' ? 'uf_head' : 'uf_review';
+  if (activeReviewScope !== 'HEAD' && $('uf_review_note')) {
+    $('uf_review_note').textContent = activeReviewScope === 'ALL'
+      ? 'Review HR submissions assigned to you and forms that have reached HR/Admin. Both queues appear here.'
+      : 'Review forms that reached HR/Admin and open completed forms, including Head rejections, to view their details and signatures.';
+  }
   $(`${prefix}_total`).textContent = String(result.summary.total);
   $(`${prefix}_pending`).textContent = String(result.summary.pending);
   $(`${prefix}_approved`).textContent = String(result.summary.approved);
   $(`${prefix}_rejected`).textContent = String(result.summary.rejected);
-  setSubmittedFormsCount(result.summary.pending);
+  setSubmittedFormsCount(result.summary.pending, activeReviewScope);
   renderFormsForReview();
 }
 
 function renderFormsForReview() {
-  const prefix = session.role === 'HEAD' ? 'uf_head' : 'uf_review';
-  const body = $(session.role === 'HEAD' ? 'uf_head_review' : 'uf_review');
+  const prefix = activeReviewScope === 'HEAD' ? 'uf_head' : 'uf_review';
+  const body = $(activeReviewScope === 'HEAD' ? 'uf_head_review' : 'uf_review');
   const status = $(`${prefix}_status`).value;
   const type = $(`${prefix}_type`).value;
   const search = $(`${prefix}_search`).value.trim();
@@ -865,9 +887,11 @@ async function submitTemplateForm(event) {
   }
 }
 
-async function refreshSubmittedFormsBadge() {
-  const summary = await api('getFormReviewSummary');
-  setSubmittedFormsCount(summary.pending);
+async function refreshSubmittedFormsBadge(scope = 'HR') {
+  const requestedScope = String(scope).toUpperCase();
+  const normalizedScope = ['HEAD', 'ALL'].includes(requestedScope) ? requestedScope : 'HR';
+  const summary = await api('getFormReviewSummary', normalizedScope);
+  setSubmittedFormsCount(summary.pending, normalizedScope);
 }
 
 window.refreshSubmittedFormsBadge = refreshSubmittedFormsBadge;
@@ -918,15 +942,15 @@ window.showPendingAnnouncements = showPendingAnnouncements;
 
 VIEWS['user-dashboard'] = guard(loadMyForms);
 VIEWS['user-forms'] = () => {};
-VIEWS['leave-requests'] = guard(loadFormsForReview);
-VIEWS['head-forms'] = guard(loadFormsForReview);
+VIEWS['leave-requests'] = guard(() => loadFormsForReview(session.role === 'HR' && session.is_hr_head ? 'ALL' : 'HR'));
+VIEWS['head-forms'] = guard(() => loadFormsForReview('HEAD'));
 buildFormCatalog();
 $('uf_history_type').replaceChildren();
 fillFormTypeFilter($('uf_history_type'));
 fillFormTypeFilter($('uf_review_type'));
 fillFormTypeFilter($('uf_head_type'));
-$('uf_review_refresh').onclick = guard(loadFormsForReview);
-$('uf_head_refresh').onclick = guard(loadFormsForReview);
+$('uf_review_refresh').onclick = guard(() => loadFormsForReview('HR'));
+$('uf_head_refresh').onclick = guard(() => loadFormsForReview('HEAD'));
 $('uf_history_status').onchange = renderMyForms;
 $('uf_history_type').onchange = renderMyForms;
 $('uf_history_search').oninput = renderMyForms;

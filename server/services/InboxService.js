@@ -3,7 +3,6 @@ const { requirePerm } = require('../middleware/Auth');
 const FORM_TEMPLATES = require('../../shared/FormTemplates');
 
 const FORM_REVIEW_TARGETS = {
-  HEAD: 'head-forms',
   HR: 'leave-requests',
   ADMIN: 'leave-requests'
 };
@@ -43,9 +42,14 @@ async function getInbox(req) {
     });
   }
 
-  const reviewTarget = FORM_REVIEW_TARGETS[user.role];
-  if (reviewTarget) {
-    const isHead = user.role === 'HEAD';
+  const targets = [];
+  if (FORM_REVIEW_TARGETS[user.role]) targets.push({ target: FORM_REVIEW_TARGETS[user.role], stage: 'HR' });
+  if (user.role === 'HEAD' || (user.role === 'HR' && user.is_hr_head)) {
+    targets.push({ target: user.role === 'HR' ? 'leave-requests' : 'head-forms', stage: 'HEAD' });
+  }
+  for (const { target, stage } of targets) {
+    const isHead = stage === 'HEAD';
+    const excludeOwn = user.role === 'HR' && !isHead;
     const [forms] = await pool.execute(
       `SELECT f.id, f.control_no, f.template_key, f.user_email, f.submitted_at,
               CASE WHEN v.item_id IS NULL THEN 1 ELSE 0 END AS unseen,
@@ -57,8 +61,9 @@ async function getInbox(req) {
        WHERE f.status = 'PENDING'
          AND f.review_stage = ?
          ${isHead ? 'AND f.head_reviewer_email = ?' : ''}
+         ${excludeOwn ? 'AND f.user_email <> ?' : ''}
        ORDER BY f.submitted_at DESC, f.id DESC LIMIT 500`,
-      isHead ? [user.email, 'HEAD', user.email] : [user.email, 'HR']);
+      [user.email, stage, ...(isHead ? [user.email] : []), ...(excludeOwn ? [user.email] : [])]);
     forms.forEach(form => {
       items.push({
         id: `form-${form.id}`,
@@ -70,7 +75,7 @@ async function getInbox(req) {
         createdAt: form.submitted_at,
         formId: form.id,
         controlNo: form.control_no,
-        target: reviewTarget
+        target
       });
     });
   }

@@ -4,6 +4,57 @@ const accountCell = value => {
   return cell;
 };
 
+const pendingHeadAssignments = new Map();
+let pendingHrHeadEmail;
+let hrHeadChanged = false;
+let accountSaveBusy = false;
+
+function hasAccountChanges() {
+  return pendingHeadAssignments.size > 0 || hrHeadChanged;
+}
+
+function updateAccountSaveButton() {
+  const button = $('am_save_changes');
+  button.disabled = accountSaveBusy || !hasAccountChanges();
+  if (!accountSaveBusy && button.dataset.saved !== 'true') button.textContent = 'Save Changes';
+}
+
+function stagedHrHeadEmail(accounts) {
+  return hrHeadChanged ? pendingHrHeadEmail : (accounts.find(account => account.is_hr_head)?.email || '');
+}
+
+async function saveAccountChanges() {
+  if (accountSaveBusy || !hasAccountChanges()) return;
+  accountSaveBusy = true;
+  const button = $('am_save_changes');
+  button.dataset.saved = 'false';
+  button.innerHTML = '<span class="refresh-spinner" aria-hidden="true"></span> Saving changes…';
+  button.disabled = true;
+  showErr('');
+  try {
+    await api('saveAccountChanges', {
+      headAssignments: Array.from(pendingHeadAssignments, ([email, headEmail]) => ({ email, headEmail })),
+      hrHeadChanged,
+      hrHeadEmail: pendingHrHeadEmail || null
+    });
+    pendingHeadAssignments.clear();
+    pendingHrHeadEmail = undefined;
+    hrHeadChanged = false;
+    await loadAccountManagement();
+    button.dataset.saved = 'true';
+    button.textContent = 'Changes Saved ✓';
+    window.setTimeout(() => {
+      button.dataset.saved = 'false';
+      updateAccountSaveButton();
+    }, 1800);
+  } catch (error) {
+    showErr(error.message || String(error));
+  } finally {
+    accountSaveBusy = false;
+    updateAccountSaveButton();
+  }
+}
+
 function appendEmptyRow(body, columns, message) {
   const row = document.createElement('tr');
   const cell = accountCell(message);
@@ -77,20 +128,20 @@ async function loadAccountManagement() {
   [
     ['users', 'am_users', true],
     ['heads', 'am_heads', true],
-    ['hr', 'am_hr', false],
+    ['hr', 'am_hr', 'hr'],
     ['admins', 'am_admins', false]
   ].forEach(([group, id, canAssignHead]) => {
     const body = $(id);
     body.replaceChildren();
     const accounts = result.accounts[group];
     if (!accounts.length) {
-      appendEmptyRow(body, canAssignHead ? 7 : 5, 'No accounts in this list.');
+      appendEmptyRow(body, canAssignHead === true ? 7 : canAssignHead === 'hr' ? 6 : 5, 'No accounts in this list.');
       return;
     }
     accounts.forEach(account => {
       const row = document.createElement('tr');
       row.append(accountCell(account.full_name || ''), accountCell(account.email), accountCell(account.role));
-      if (canAssignHead) {
+      if (canAssignHead === true) {
         row.appendChild(accountCell(account.assigned_head_name || account.assigned_head_email || 'Unassigned'));
         const assignmentCell = document.createElement('td');
         const head = document.createElement('select');
@@ -105,30 +156,52 @@ async function loadAccountManagement() {
           option.textContent = `${optionAccount.full_name || optionAccount.email} (${optionAccount.email})`;
           head.appendChild(option);
         });
-        head.value = account.assigned_head_email || '';
-        const save = document.createElement('button');
-        save.type = 'button';
-        save.textContent = 'Save';
-        save.onclick = async () => {
-          save.disabled = true;
-          try {
-            await api('assignAccountHead', account.email, head.value);
-            await loadAccountManagement();
-          } catch (error) {
-            showErr(error.message || String(error));
-            save.disabled = false;
-          }
+        head.value = pendingHeadAssignments.has(account.email)
+          ? pendingHeadAssignments.get(account.email)
+          : (account.assigned_head_email || '');
+        head.onchange = () => {
+          if (head.value === (account.assigned_head_email || '')) pendingHeadAssignments.delete(account.email);
+          else pendingHeadAssignments.set(account.email, head.value);
+          updateAccountSaveButton();
         };
         row.append(accountCell(account.active ? 'Active' : 'Inactive'), accountCell(formatAccountDate(account.created_at)));
-        assignmentCell.append(head, save);
+        assignmentCell.append(head);
         row.appendChild(assignmentCell);
+      } else if (canAssignHead === 'hr') {
+        const toggleCell = document.createElement('td');
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        const selectedHr = stagedHrHeadEmail(result.accounts.hr);
+        const selected = selectedHr === account.email;
+        toggle.className = 'ghost hr-head-toggle' + (selected ? ' selected' : '');
+        toggle.textContent = selected ? 'On' : 'Off';
+        toggle.setAttribute('aria-pressed', String(selected));
+        toggle.setAttribute('aria-label', `${selected ? 'Remove' : 'Designate'} ${account.full_name || account.email} as Head HR`);
+        toggle.disabled = !account.active;
+        toggle.onclick = () => {
+          pendingHrHeadEmail = selected ? '' : account.email;
+          hrHeadChanged = pendingHrHeadEmail !== (result.accounts.hr.find(item => item.is_hr_head)?.email || '');
+          if (!hrHeadChanged) pendingHrHeadEmail = undefined;
+          loadAccountManagement().catch(error => showErr(error.message || String(error)));
+          updateAccountSaveButton();
+        };
+        toggleCell.appendChild(toggle);
+        row.append(toggleCell, accountCell(account.active ? 'Active' : 'Inactive'), accountCell(formatAccountDate(account.created_at)));
       } else {
         row.append(accountCell(account.active ? 'Active' : 'Inactive'), accountCell(formatAccountDate(account.created_at)));
       }
       body.appendChild(row);
     });
   });
+  updateAccountSaveButton();
 }
 
 VIEWS.accounts = guard(loadAccountManagement);
-$('am_refresh').onclick = guard(loadAccountManagement);
+$('am_refresh').onclick = async () => {
+  if (hasAccountChanges() && !confirm('Discard unsaved account changes and refresh?')) return;
+  pendingHeadAssignments.clear();
+  pendingHrHeadEmail = undefined;
+  hrHeadChanged = false;
+  await guard(loadAccountManagement)();
+};
+$('am_save_changes').onclick = saveAccountChanges;

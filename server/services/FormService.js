@@ -130,7 +130,7 @@ function currentSerialYear(date = new Date()) {
 }
 
 function canEditForm(role, form) {
-  return ['STAFF', 'HEAD'].includes(role) &&
+  return ['STAFF', 'HEAD', 'HR'].includes(role) &&
     form.status === 'PENDING' &&
     form.review_stage === 'HEAD' &&
     Boolean(form.head_reviewer_email);
@@ -164,8 +164,14 @@ async function listMyForms(req) {
      WHERE f.user_email = ? ORDER BY f.submitted_at DESC, f.id DESC LIMIT 500`,
     [user.email]);
   const [[head]] = await pool.execute(
-    `SELECT h.email, COALESCE(NULLIF(h.full_name, ''), h.email) AS full_name, h.active
-     FROM user_roles owner LEFT JOIN user_roles h ON h.email = owner.assigned_head_email
+    `SELECT CASE WHEN owner.role = 'HR' AND owner.is_hr_head = 0 THEN hr_head.email ELSE h.email END AS email,
+            CASE WHEN owner.role = 'HR' AND owner.is_hr_head = 0
+              THEN COALESCE(NULLIF(hr_head.full_name, ''), hr_head.email)
+              ELSE COALESCE(NULLIF(h.full_name, ''), h.email) END AS full_name,
+            CASE WHEN owner.role = 'HR' AND owner.is_hr_head = 0 THEN hr_head.active ELSE h.active END AS active
+     FROM user_roles owner
+     LEFT JOIN user_roles h ON h.email = owner.assigned_head_email
+     LEFT JOIN user_roles hr_head ON hr_head.role = 'HR' AND hr_head.is_hr_head = 1 AND hr_head.active = 1
      WHERE owner.email = ? AND owner.active = 1 LIMIT 1`,
     [user.email]);
   return {
@@ -184,11 +190,18 @@ async function listMyForms(req) {
 
 async function getSubmissionHead(email, role) {
   const [rows] = await pool.execute(
-    `SELECT u.assigned_head_email, h.role AS head_role, h.active AS head_active
+    `SELECT u.assigned_head_email, u.is_hr_head,
+            h.role AS head_role, h.active AS head_active
      FROM user_roles u LEFT JOIN user_roles h ON h.email = u.assigned_head_email
      WHERE u.email = ? AND u.active = 1 LIMIT 1`,
     [email]);
   if (!rows.length) throw httpError('Your account is not active.', 401);
+  if (role === 'HR') {
+    if (rows[0].is_hr_head) return null;
+    const [heads] = await pool.query("SELECT email FROM user_roles WHERE role = 'HR' AND active = 1 AND is_hr_head = 1 LIMIT 1");
+    if (!heads.length) throw httpError('An Admin must designate an active HR account as Head HR before HR forms can be submitted.', 409);
+    return heads[0].email;
+  }
   const assignedHead = rows[0].assigned_head_email;
   if (!assignedHead) {
     if (role === 'STAFF') throw httpError('An Admin must assign a Head to your account before you can submit forms.', 409);
@@ -242,9 +255,6 @@ async function submitUserForm(req, templateKey, data = {}) {
 
 async function updateMyForm(req, formId, templateKey, data = {}) {
   const user = await requirePerm(req, 'forms.self');
-  if (!['STAFF', 'HEAD'].includes(user.role)) {
-    throw httpError('Only STAFF and HEAD accounts can edit submitted forms.', 403);
-  }
 
   const template = FORM_TEMPLATES.find(item => item.key === templateKey);
   if (!template) throw httpError('Choose a valid form template.', 400);
@@ -351,16 +361,41 @@ async function persistUserForm(email, role, headEmail, templateKey, formData, de
   }
 }
 
-async function getFormReviewSummary(reviewer) {
-  const where = reviewer && reviewer.role === 'HEAD'
+async function getFormReviewSummary(reviewer, scope = null) {
+  const combinedQueue = String(scope || '').toUpperCase() === 'ALL';
+  const isHeadReviewer = scope
+    ? String(scope).toUpperCase() === 'HEAD'
+    : reviewer && (reviewer.role === 'HEAD' || reviewer.is_hr_head);
+  if (combinedQueue && reviewer && reviewer.role === 'HR' && reviewer.is_hr_head) {
+    const [[summary]] = await pool.execute(
+      `SELECT COUNT(*) AS total,
+              COALESCE(SUM(status = 'PENDING' AND ((review_stage = 'HEAD' AND head_reviewer_email = ?)
+                OR (review_stage = 'HR' AND user_email <> ?))), 0) AS pending,
+              COALESCE(SUM(status = 'APPROVED'), 0) AS approved,
+              COALESCE(SUM(status = 'REJECTED'), 0) AS rejected
+       FROM user_forms
+       WHERE head_reviewer_email = ?
+          OR ((review_stage = 'HR' OR status IN ('APPROVED', 'REJECTED')) AND user_email <> ?)`,
+      [reviewer.email, reviewer.email, reviewer.email, reviewer.email]);
+    return {
+      total: Number(summary.total),
+      pending: Number(summary.pending),
+      approved: Number(summary.approved),
+      rejected: Number(summary.rejected)
+    };
+  }
+  const where = isHeadReviewer
     ? 'WHERE head_reviewer_email = ?'
-    : "WHERE review_stage = 'HR' OR status IN ('APPROVED', 'REJECTED')";
-  const values = reviewer && reviewer.role === 'HEAD'
+    : reviewer && reviewer.role === 'HR'
+      ? "WHERE (review_stage = 'HR' OR status IN ('APPROVED', 'REJECTED')) AND user_email <> ?"
+      : "WHERE review_stage = 'HR' OR status IN ('APPROVED', 'REJECTED')";
+  const values = isHeadReviewer
     ? [reviewer.email]
-    : [];
+    : reviewer && reviewer.role === 'HR' ? [reviewer.email] : [];
+  const stage = isHeadReviewer ? 'HEAD' : 'HR';
   const [[summary]] = await pool.query(
     `SELECT COUNT(*) AS total,
-            COALESCE(SUM(status = 'PENDING' AND review_stage = '${reviewer && reviewer.role === 'HEAD' ? 'HEAD' : 'HR'}'), 0) AS pending,
+            COALESCE(SUM(status = 'PENDING' AND review_stage = '${stage}'), 0) AS pending,
             COALESCE(SUM(status = 'APPROVED'), 0) AS approved,
             COALESCE(SUM(status = 'REJECTED'), 0) AS rejected
      FROM user_forms ${where}`,
@@ -373,16 +408,26 @@ async function getFormReviewSummary(reviewer) {
   };
 }
 
-async function listFormsForReview(req) {
+async function listFormsForReview(req, scope = 'HR') {
   const current = await getCurrentUser(req);
   if (!current) await requirePerm(req, 'forms.review');
-  const reviewer = current.role === 'HEAD'
+  const normalizedScope = String(scope).toUpperCase();
+  const isCombinedQueue = normalizedScope === 'ALL';
+  const isHead = normalizedScope === 'HEAD';
+  if (isCombinedQueue && !(current && current.role === 'HR' && current.is_hr_head)) {
+    throw httpError('Only the designated Head HR can view the combined Manage Forms queue.', 403);
+  }
+  const reviewer = isHead
     ? await requirePerm(req, 'forms.head-review')
     : await requirePerm(req, 'forms.review');
-  const isHead = reviewer.role === 'HEAD';
-  const summary = await getFormReviewSummary(reviewer);
+  if (isCombinedQueue) await requirePerm(req, 'forms.head-review');
+  if (isHead && reviewer.role !== 'HEAD' && !(reviewer.role === 'HR' && reviewer.is_hr_head)) {
+    throw httpError('Only a designated Head or Head HR can review this queue.', 403);
+  }
+  const summary = await getFormReviewSummary(reviewer,
+    isCombinedQueue ? 'ALL' : isHead ? 'HEAD' : 'HR');
   const [rows] = await pool.execute(
-    `SELECT f.id, f.control_no, f.user_email, u.full_name AS applicant_name,
+       `SELECT f.id, f.control_no, f.user_email, u.role AS submitter_role, u.full_name AS applicant_name,
             f.template_key, f.form_data, f.status, f.review_stage, f.head_reviewer_email,
             f.head_signature, f.head_signed_by, f.head_signed_at, f.hr_signature, f.submitted_at,
             f.reviewed_by, f.reviewed_at, f.review_notes,
@@ -391,57 +436,98 @@ async function listFormsForReview(req) {
      FROM user_forms f
      LEFT JOIN user_roles u ON u.email = f.user_email
      LEFT JOIN user_roles reviewer ON reviewer.email = f.reviewed_by
-     WHERE ${isHead
+     WHERE ${isCombinedQueue
+       ? '(f.head_reviewer_email = ? OR ((f.review_stage = \'HR\' OR f.status IN (\'APPROVED\', \'REJECTED\')) AND f.user_email <> ?))'
+       : isHead
        ? 'f.head_reviewer_email = ?'
-       : "(f.review_stage = 'HR' OR f.status IN ('APPROVED', 'REJECTED'))"}
+       : reviewer.role === 'HR'
+         ? "((f.review_stage = 'HR' OR f.status IN ('APPROVED', 'REJECTED')) AND f.user_email <> ?)"
+         : "(f.review_stage = 'HR' OR f.status IN ('APPROVED', 'REJECTED'))"}
      ORDER BY f.submitted_at DESC, f.id DESC LIMIT 500`,
-    isHead ? [reviewer.email] : []);
+    isCombinedQueue ? [reviewer.email, reviewer.email]
+      : isHead || reviewer.role === 'HR' ? [reviewer.email] : []);
   return {
     forms: rows.map(parseForm),
     summary
   };
 }
 
-async function getFormReviewSummaryForUser(req) {
+async function getFormReviewSummaryForUser(req, scope = 'HR') {
   const current = await getCurrentUser(req);
   if (!current) await requirePerm(req, 'forms.review');
-  if (current.role === 'STAFF' || current.role === 'USER') {
+  const normalizedScope = String(scope).toUpperCase();
+  const isCombinedQueue = normalizedScope === 'ALL';
+  if (isCombinedQueue) {
+    if (!(current && current.role === 'HR' && current.is_hr_head)) {
+      throw httpError('Only the designated Head HR can view the combined Manage Forms summary.', 403);
+    }
+    const reviewer = await requirePerm(req, 'forms.head-review');
+    await requirePerm(req, 'forms.review');
+    return getFormReviewSummary(reviewer, 'ALL');
+  }
+  const isHead = normalizedScope === 'HEAD';
+  if (isHead) {
+    const reviewer = await requirePerm(req, 'forms.head-review');
+    if (reviewer.role !== 'HEAD' && !(reviewer.role === 'HR' && reviewer.is_hr_head)) {
+      throw httpError('Only a designated Head or Head HR can review this queue.', 403);
+    }
+    return getFormReviewSummary(reviewer);
+  }
+  if (!current.perms.includes('forms.review')) {
     return { total: 0, pending: 0, approved: 0, rejected: 0 };
   }
-  const reviewer = current.role === 'HEAD'
-    ? await requirePerm(req, 'forms.head-review')
-    : await requirePerm(req, 'forms.review');
-  return getFormReviewSummary(reviewer);
+  const reviewer = await requirePerm(req, 'forms.review');
+  return getFormReviewSummary(reviewer, 'HR');
 }
 
 async function reviewUserForm(req, formId, decision, reason = '', signature = '') {
   const current = await getCurrentUser(req);
   if (!current) await requirePerm(req, 'forms.review');
-  const isHead = current.role === 'HEAD';
-  const reviewer = isHead
-    ? await requirePerm(req, 'forms.head-review')
-    : await requirePerm(req, 'forms.review');
+  const reviewer = current;
+  const canReviewAsHead = reviewer.role === 'HEAD' || (reviewer.role === 'HR' && reviewer.is_hr_head);
   if (!['APPROVED', 'REJECTED'].includes(decision)) {
     throw httpError('Choose Approved or Rejected.', 400);
   }
   const reviewReason = decision === 'REJECTED' ? sanitize(reason) : '';
   if (decision === 'REJECTED' && !reviewReason) throw httpError('A reason is required to reject a form.', 400);
   if (String(reason || '').length > 500) throw httpError('The review reason must be 500 characters or fewer.', 400);
-  validateApprovalSignature(isHead, decision, signature);
-
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
     const [rows] = await connection.execute(
-      `SELECT id, control_no, status, review_stage, head_reviewer_email
-       FROM user_forms WHERE id = ? FOR UPDATE`, [formId]);
+      `SELECT f.id, f.control_no, f.status, f.review_stage, f.head_reviewer_email,
+              f.user_email, applicant.role AS submitter_role
+       FROM user_forms f LEFT JOIN user_roles applicant ON applicant.email = f.user_email
+       WHERE f.id = ? FOR UPDATE`, [formId]);
     if (!rows.length) throw httpError('This form does not exist.', 404);
     if (rows[0].status !== 'PENDING') throw httpError('This form has already been reviewed.', 409);
+    const isHead = rows[0].review_stage === 'HEAD';
     if (isHead) {
-      if (rows[0].head_reviewer_email !== reviewer.email || rows[0].review_stage !== 'HEAD') {
-        throw httpError('This form is not awaiting your signature.', 403);
+      if (!canReviewAsHead) throw httpError('Access denied: this form requires its assigned Head.', 403);
+      await requirePerm(req, 'forms.head-review');
+      if (rows[0].head_reviewer_email !== reviewer.email) {
+        throw httpError('This form is not assigned to you.', 403);
       }
+    } else {
+      await requirePerm(req, 'forms.review');
+      if (reviewer.role === 'HR' && rows[0].user_email === reviewer.email) {
+        throw httpError('You cannot review your own form.', 403);
+      }
+    }
+    validateApprovalSignature(isHead, decision, signature);
+    if (isHead) {
       if (decision === 'APPROVED') {
+        if (rows[0].submitter_role === 'HR') {
+          await connection.execute(
+            `UPDATE user_forms SET status = 'APPROVED', head_signature = ?, head_signed_by = ?,
+               head_signed_at = CURRENT_TIMESTAMP, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [signature, reviewer.email, reviewer.email, formId]);
+          await logAudit(reviewer.email, 'FORM_REVIEWED', String(formId),
+            `${rows[0].control_no} approved by the assigned Head HR`, connection);
+          await connection.commit();
+          return { ok: true, status: 'APPROVED' };
+        }
         await connection.execute(
           `UPDATE user_forms SET review_stage = 'HR', head_signature = ?, head_signed_by = ?,
              head_signed_at = CURRENT_TIMESTAMP WHERE id = ?`,

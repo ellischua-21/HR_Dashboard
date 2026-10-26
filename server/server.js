@@ -102,6 +102,8 @@ const methods = {
   listAssignableHeads: req => accounts.listAssignableHeads(req),
   getAccountManagement: req => accounts.getAccountManagement(req),
   assignAccountHead: (req, email, headEmail) => accounts.assignAccountHead(req, email, headEmail),
+  setHrHeadAccount: (req, email, isHrHead) => accounts.setHrHeadAccount(req, email, isHrHead),
+  saveAccountChanges: (req, changes) => accounts.saveAccountChanges(req, changes),
   approveAccountRequest: (req, requestId) => accounts.approveAccountRequest(req, requestId),
   rejectAccountRequest: (req, requestId) => accounts.rejectAccountRequest(req, requestId),
   changeMyPassword: (req, currentPassword, newPassword) => accounts.changeMyPassword(req, currentPassword, newPassword),
@@ -109,8 +111,8 @@ const methods = {
   submitLeaveForm: (req, data) => userForms.submitLeaveForm(req, data),
   submitUserForm: (req, templateKey, data) => userForms.submitUserForm(req, templateKey, data),
   updateMyForm: (req, formId, templateKey, data) => userForms.updateMyForm(req, formId, templateKey, data),
-  listFormsForReview: req => userForms.listFormsForReview(req),
-  getFormReviewSummary: req => userForms.getFormReviewSummaryForUser(req),
+  listFormsForReview: (req, scope) => userForms.listFormsForReview(req, scope),
+  getFormReviewSummary: (req, scope) => userForms.getFormReviewSummaryForUser(req, scope),
   reviewUserForm: (req, formId, decision, notes, signature) => userForms.reviewUserForm(req, formId, decision, notes, signature)
 };
 
