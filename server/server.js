@@ -179,6 +179,28 @@ const methods = {
     incidents.listIncidentCodeProvisions(req),
   saveIncidentCodeProvision: (req, data) =>
     incidents.saveIncidentCodeProvision(req, data),
+  saveIncidentCodeRule: (req, data) =>
+    incidents.saveIncidentCodeRule(req, data),
+  saveIncidentCodeRuleAction: (
+    req,
+    ruleId,
+    priorOffenses,
+    action,
+    decisionType,
+    details
+  ) =>
+    incidents.saveIncidentCodeRuleAction(
+      req,
+      ruleId,
+      priorOffenses,
+      action,
+      decisionType,
+      details
+    ),
+  deactivateIncidentCodeRule: (req, ruleId) =>
+    incidents.deactivateIncidentCodeRule(req, ruleId),
+  deleteIncidentCodeRuleAction: (req, actionId) =>
+    incidents.deleteIncidentCodeRuleAction(req, actionId),
   saveIncidentNteDraft: (req, incidentId, data) =>
     incidents.saveIncidentNteDraft(req, incidentId, data),
   issueIncidentNte: (req, incidentId, data) =>
@@ -189,6 +211,14 @@ const methods = {
     incidents.submitIncidentExplanation(req, incidentId, explanation, files),
   startIncidentEvaluation: (req, incidentId) =>
     incidents.startIncidentEvaluation(req, incidentId),
+  getIncidentEvaluationContext: (req, incidentId, ruleId) =>
+    incidents.getIncidentEvaluationContext(req, incidentId, ruleId),
+  saveIncidentEvaluation: (req, incidentId, data) =>
+    incidents.saveIncidentEvaluation(req, incidentId, data),
+  issueIncidentDecision: (req, incidentId, data) =>
+    incidents.issueIncidentDecision(req, incidentId, data),
+  closeIncidentDecision: (req, incidentId, reason) =>
+    incidents.closeIncidentDecision(req, incidentId, reason),
   submitIncidentExplanationAddendum: (req, incidentId, statement, files) =>
     incidents.submitIncidentExplanationAddendum(
       req,

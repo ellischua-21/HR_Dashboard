@@ -1452,6 +1452,33 @@ legend {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.incident-code-provision-form {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 14px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: #fff;
+}
+.incident-code-provision-form label,
+.incident-case-section > label {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+}
+.incident-code-rule-card {
+  margin: 10px 0;
+  padding: 10px;
+  border-left: 3px solid var(--teal);
+  background: var(--surface, #f7f8fa);
+}
+.incident-evaluation-context {
+  margin: 10px 0;
+  padding: 10px;
+  border-radius: 6px;
+  background: var(--surface, #f7f8fa);
+}
 .incident-signature-field {
   margin-top: 14px;
   padding-top: 10px;

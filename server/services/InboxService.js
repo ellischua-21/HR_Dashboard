@@ -120,21 +120,27 @@ async function getInbox(req) {
               ? 'Incident Report under investigation'
               : notification.notificationType === 'NTE_ISSUED'
                 ? 'Notice to Explain issued'
-                : notification.notificationType === 'EXPLANATION_SENT'
-                  ? 'Employee explanation submitted'
-                  : notification.notificationType.startsWith('EXPLANATION_ADD_')
-                    ? 'Employee additional statement submitted'
-                    : notification.notificationType.startsWith('NTE_OVERDUE')
-                      ? 'NTE explanation is overdue'
-                      : notification.notificationType.startsWith('NTE_EXT_')
-                        ? 'NTE explanation deadline updated'
-                        : notification.notificationType.startsWith('INFO_REQ_')
-                          ? 'Additional incident information requested'
+                : notification.notificationType === 'DECISION_ISSUED'
+                  ? 'Incident Report decision issued'
+                  : notification.notificationType === 'EXPLANATION_SENT'
+                    ? 'Employee explanation submitted'
+                    : notification.notificationType.startsWith(
+                          'EXPLANATION_ADD_'
+                        )
+                      ? 'Employee additional statement submitted'
+                      : notification.notificationType.startsWith('NTE_OVERDUE')
+                        ? 'NTE explanation is overdue'
+                        : notification.notificationType.startsWith('NTE_EXT_')
+                          ? 'NTE explanation deadline updated'
                           : notification.notificationType.startsWith(
-                                'INFO_DONE_'
+                                'INFO_REQ_'
                               )
-                            ? 'Additional incident information received'
-                            : 'Incident Report updated',
+                            ? 'Additional incident information requested'
+                            : notification.notificationType.startsWith(
+                                  'INFO_DONE_'
+                                )
+                              ? 'Additional incident information received'
+                              : 'Incident Report updated',
       message:
         notification.notificationType === 'NTE_ISSUED'
           ? `${notification.caseNumber} has advanced. Open HRIS to view information available to your account.`
@@ -151,14 +157,18 @@ async function getInbox(req) {
             ? ['HR', 'ADMIN'].includes(user.role)
               ? 'incident-review'
               : 'incident-history'
-            : needsSignature ||
-                ['INVESTIGATION_STARTED', 'NTE_ISSUED'].includes(
-                  notification.notificationType
-                ) ||
-                notification.notificationType.startsWith('NTE_EXT_') ||
-                notification.notificationType.startsWith('INFO_REQ_')
-              ? 'incident-track'
-              : 'incident-review'
+            : notification.notificationType === 'DECISION_ISSUED'
+              ? ['HR', 'ADMIN'].includes(user.role)
+                ? 'incident-review'
+                : 'incident-track'
+              : needsSignature ||
+                  ['INVESTIGATION_STARTED', 'NTE_ISSUED'].includes(
+                    notification.notificationType
+                  ) ||
+                  notification.notificationType.startsWith('NTE_EXT_') ||
+                  notification.notificationType.startsWith('INFO_REQ_')
+                ? 'incident-track'
+                : 'incident-review'
     });
   });
 

@@ -1207,6 +1207,7 @@ async function showPendingAnnouncements() {
       CASE_CLOSED: 'Incident Report case closed',
       INVESTIGATION_STARTED: 'Incident Report under investigation',
       NTE_ISSUED: 'Notice to Explain issued',
+      DECISION_ISSUED: 'Incident Report decision issued',
       EXPLANATION_SENT: 'Employee explanation submitted',
       NTE_OVERDUE: 'NTE explanation is overdue'
     };

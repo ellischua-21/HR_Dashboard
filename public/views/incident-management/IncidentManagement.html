@@ -216,6 +216,96 @@
         </button>
       </div>
     </form>
+    <form
+      id="incident-code-rule-form"
+      class="incident-code-provision-form"
+      hidden
+    >
+      <input id="incident-code-rule-id" type="hidden" />
+      <label
+        >Code provision<select
+          id="incident-code-rule-provision"
+          required
+        ></select
+      ></label>
+      <label
+        >Violation<input id="incident-code-rule-title" maxlength="191" required
+      /></label>
+      <label
+        >Severity<select id="incident-code-rule-severity" required>
+          <option value="">Select severity</option>
+          <option>Light</option>
+          <option>Moderate</option>
+          <option>Grave</option>
+          <option>Intolerable</option>
+        </select></label
+      >
+      <label
+        >Count previous offenses<select id="incident-code-rule-scope">
+          <option value="SAME_RULE">Same violation</option>
+          <option value="SAME_SEVERITY">Same severity</option>
+          <option value="ALL_VIOLATIONS">All finalized violations</option>
+        </select></label
+      >
+      <label
+        >Counting window in days (blank means all history)<input
+          id="incident-code-rule-window"
+          type="number"
+          min="1"
+          max="36500"
+      /></label>
+      <p id="incident-code-rule-feedback" role="status" hidden></p>
+      <div class="actions">
+        <button type="submit">Save COC rule</button
+        ><button id="incident-code-rule-reset" class="ghost" type="button">
+          Clear
+        </button>
+      </div>
+    </form>
+    <form
+      id="incident-code-action-form"
+      class="incident-code-provision-form"
+      hidden
+    >
+      <label
+        >Violation rule<select id="incident-code-action-rule" required></select
+      ></label>
+      <label
+        >Previous finalized offenses<input
+          id="incident-code-action-count"
+          type="number"
+          min="0"
+          max="1000"
+          value="0"
+          required
+      /></label>
+      <label
+        >Final decision category<select id="incident-code-action-type" required>
+          <option value="">Select category</option>
+          <option value="WRITTEN_WARNING">Written Warning</option>
+          <option value="SUSPENSION">Suspension</option>
+          <option value="TERMINATION">Termination</option>
+          <option value="OTHER_CORRECTIVE_ACTION">
+            Other Corrective Action
+          </option>
+        </select></label
+      >
+      <label
+        >Corrective action<input
+          id="incident-code-action-name"
+          maxlength="191"
+          required
+      /></label>
+      <label
+        >Action details<textarea
+          id="incident-code-action-details"
+          rows="2"
+          maxlength="2000"
+        ></textarea>
+      </label>
+      <p id="incident-code-action-feedback" role="status" hidden></p>
+      <div class="actions"><button type="submit">Save action rule</button></div>
+    </form>
     <p id="incident-code-provision-empty" class="note" hidden>
       No Code of Conduct provisions have been added.
     </p>
@@ -225,7 +315,7 @@
           <tr>
             <th>Code</th>
             <th>Title</th>
-            <th>Description</th>
+            <th>Description and configured rules</th>
             <th></th>
           </tr>
         </thead>

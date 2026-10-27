@@ -483,6 +483,18 @@ async function submitIncidentReport(req, input = {}) {
 function incidentListFields() {
   return `id, case_number AS caseNumber, subject, incident_date AS incidentDate,
           reported_employee_name AS reportedEmployeeName, status,
+          CASE WHEN EXISTS (SELECT 1 FROM incident_decisions d WHERE d.incident_id = incident_reports.id AND d.status = 'ISSUED') THEN 'DECISION ISSUED'
+               WHEN status = 'CLOSED' THEN COALESCE((SELECT CASE action
+                 WHEN 'CLOSED_FOR_DOCUMENTATION' THEN 'CLOSED DURING REVIEW'
+                 WHEN 'INVESTIGATION_CLOSED' THEN 'CLOSED AFTER INVESTIGATION'
+                 WHEN 'DECISION_CASE_CLOSED' THEN 'DECISION ISSUED'
+                 ELSE 'CLOSED' END FROM incident_activity a WHERE a.incident_id = incident_reports.id
+                 AND action IN ('CLOSED_FOR_DOCUMENTATION', 'INVESTIGATION_CLOSED', 'DECISION_CASE_CLOSED')
+                 ORDER BY id DESC LIMIT 1), 'CLOSED') ELSE status END AS trackingMilestone,
+          CASE WHEN EXISTS (SELECT 1 FROM incident_decisions d WHERE d.incident_id = incident_reports.id AND d.status = 'ISSUED') THEN NULL
+            ELSE (SELECT a.details FROM incident_activity a WHERE a.incident_id = incident_reports.id
+             AND action IN ('CLOSED_FOR_DOCUMENTATION', 'INVESTIGATION_CLOSED') ORDER BY id DESC LIMIT 1) END AS closureReason,
+          (SELECT d.issued_at FROM incident_decisions d WHERE d.incident_id = incident_reports.id AND d.status = 'ISSUED' LIMIT 1) AS decisionIssuedAt,
           (SELECT DATE_FORMAT(n.deadline_date, '%Y-%m-%d') FROM incident_ntes n
            WHERE n.incident_id = incident_reports.id AND n.status = 'ISSUED' LIMIT 1) AS explanationDeadline,
           (SELECT n.overdue_at FROM incident_ntes n
@@ -683,11 +695,37 @@ async function transitionIncident(req, incidentId, action, details = '') {
 }
 
 async function listIncidentCodeProvisions(req) {
-  await requirePerm(req, 'inbox.read');
+  const user = await requirePerm(req, 'inbox.read');
   const [rows] = await pool.execute(
     `SELECT id, provision_code AS code, title, description
      FROM incident_code_provisions WHERE active = 1 ORDER BY provision_code, title`
   );
+  const [rules] = await pool.execute(
+    `SELECT r.id, r.provision_id AS provisionId,
+            r.violation_title AS violationTitle, r.severity,
+            r.occurrence_scope AS occurrenceScope,
+            r.occurrence_window_days AS occurrenceWindowDays
+     FROM incident_code_rules r JOIN incident_code_provisions p ON p.id = r.provision_id
+     WHERE r.active = 1 AND p.active = 1 ORDER BY p.provision_code, r.violation_title`
+  );
+  const [actions] = await pool.execute(
+    `SELECT id, rule_id AS ruleId, prior_offenses AS priorOffenses,
+            decision_type AS decisionType, corrective_action AS correctiveAction, details
+     FROM incident_code_rule_actions ORDER BY prior_offenses, id`
+  );
+  const includeActions = REVIEW_ROLES.has(user.role);
+  rows.forEach((provision) => {
+    provision.rules = rules
+      .filter((rule) => Number(rule.provisionId) === Number(provision.id))
+      .map((rule) => ({
+        ...rule,
+        actions: includeActions
+          ? actions.filter(
+              (action) => Number(action.ruleId) === Number(rule.id)
+            )
+          : []
+      }));
+  });
   return rows;
 }
 
@@ -723,6 +761,174 @@ async function saveIncidentCodeProvision(req, input = {}) {
     [code, title, description, user.email]
   );
   return { ok: true, id: result.insertId };
+}
+
+async function saveIncidentCodeRule(req, input = {}) {
+  const user = await requirePerm(req, 'inbox.read');
+  requireIncidentRole(
+    user,
+    REVIEW_ROLES,
+    'Only HR and ADMIN can manage COC rules.'
+  );
+  const provisionId = Number(input.provisionId);
+  const id = Number(input.id || 0);
+  const violationTitle = normalizeText(
+    String(input.violationTitle || ''),
+    'Violation',
+    191
+  );
+  const severity = normalizeText(String(input.severity || ''), 'Severity', 24);
+  const scope = String(input.occurrenceScope || 'SAME_RULE');
+  const windowDays =
+    input.occurrenceWindowDays === '' || input.occurrenceWindowDays == null
+      ? null
+      : Number(input.occurrenceWindowDays);
+  if (!Number.isSafeInteger(provisionId) || provisionId < 1)
+    throw httpError('Choose a Code of Conduct provision.', 400);
+  if (!['Light', 'Moderate', 'Grave', 'Intolerable'].includes(severity))
+    throw httpError('Choose a valid violation severity.', 400);
+  if (!['SAME_RULE', 'SAME_SEVERITY', 'ALL_VIOLATIONS'].includes(scope))
+    throw httpError('Choose a valid occurrence-counting rule.', 400);
+  if (
+    windowDays !== null &&
+    (!Number.isInteger(windowDays) || windowDays < 1 || windowDays > 36500)
+  )
+    throw httpError(
+      'The occurrence window must be 1 to 36,500 days or blank.',
+      400
+    );
+  const [provisions] = await pool.execute(
+    'SELECT id FROM incident_code_provisions WHERE id = ? AND active = 1',
+    [provisionId]
+  );
+  if (!provisions.length)
+    throw httpError('The selected provision is unavailable.', 404);
+  if (id) {
+    const [result] = await pool.execute(
+      `UPDATE incident_code_rules SET provision_id = ?, violation_title = ?, severity = ?,
+       occurrence_scope = ?, occurrence_window_days = ?, active = 1 WHERE id = ?`,
+      [provisionId, violationTitle, severity, scope, windowDays, id]
+    );
+    if (!result.affectedRows) throw httpError('COC rule not found.', 404);
+    return { ok: true, id };
+  }
+  const [result] = await pool.execute(
+    `INSERT INTO incident_code_rules
+       (provision_id, violation_title, severity, occurrence_scope, occurrence_window_days, created_by)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [provisionId, violationTitle, severity, scope, windowDays, user.email]
+  );
+  return { ok: true, id: result.insertId };
+}
+
+async function saveIncidentCodeRuleAction(
+  req,
+  ruleId,
+  priorOffenses,
+  action,
+  decisionType,
+  details = ''
+) {
+  const user = await requirePerm(req, 'inbox.read');
+  requireIncidentRole(
+    user,
+    REVIEW_ROLES,
+    'Only HR and ADMIN can manage COC actions.'
+  );
+  const id = Number(ruleId);
+  const count = Number(priorOffenses);
+  const actionText = normalizeText(
+    String(action || ''),
+    'Corrective action',
+    191
+  );
+  const actionType = String(decisionType || '');
+  const detailText = normalizeText(
+    String(details || ''),
+    'Action details',
+    2000,
+    false
+  );
+  if (
+    !Number.isSafeInteger(id) ||
+    id < 1 ||
+    !Number.isInteger(count) ||
+    count < 0 ||
+    count > 1000
+  )
+    throw httpError('Enter a valid rule and previous-offense count.', 400);
+  if (
+    ![
+      'WRITTEN_WARNING',
+      'SUSPENSION',
+      'TERMINATION',
+      'OTHER_CORRECTIVE_ACTION'
+    ].includes(actionType)
+  )
+    throw httpError(
+      'Choose a valid final-decision category for this corrective action.',
+      400
+    );
+  const [rules] = await pool.execute(
+    'SELECT id FROM incident_code_rules WHERE id = ? AND active = 1',
+    [id]
+  );
+  if (!rules.length) throw httpError('COC rule not found.', 404);
+  const [result] = await pool.execute(
+    `INSERT INTO incident_code_rule_actions
+     (rule_id, prior_offenses, decision_type, corrective_action, details)
+     VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE decision_type = VALUES(decision_type),
+       corrective_action = VALUES(corrective_action), details = VALUES(details)`,
+    [id, count, actionType, actionText, detailText]
+  );
+  return { ok: true, id: result.insertId || null };
+}
+
+async function deactivateIncidentCodeRule(req, ruleId) {
+  const user = await requirePerm(req, 'inbox.read');
+  requireIncidentRole(
+    user,
+    REVIEW_ROLES,
+    'Only HR and ADMIN can manage COC rules.'
+  );
+  const id = Number(ruleId);
+  if (!Number.isSafeInteger(id) || id < 1)
+    throw httpError('Choose a valid COC rule.', 400);
+  const [activeEvaluations] = await pool.execute(
+    `SELECT 1 FROM incident_evaluations e JOIN incident_reports i ON i.id = e.incident_id
+     WHERE e.rule_id = ? AND i.status = 'EVALUATION' LIMIT 1`,
+    [id]
+  );
+  if (activeEvaluations.length)
+    throw httpError(
+      'This rule is being used by an active evaluation and cannot be deactivated yet.',
+      409
+    );
+  const [result] = await pool.execute(
+    'UPDATE incident_code_rules SET active = 0 WHERE id = ?',
+    [id]
+  );
+  if (!result.affectedRows) throw httpError('COC rule not found.', 404);
+  return { ok: true };
+}
+
+async function deleteIncidentCodeRuleAction(req, actionId) {
+  const user = await requirePerm(req, 'inbox.read');
+  requireIncidentRole(
+    user,
+    REVIEW_ROLES,
+    'Only HR and ADMIN can manage COC actions.'
+  );
+  const id = Number(actionId);
+  if (!Number.isSafeInteger(id) || id < 1)
+    throw httpError('Choose a valid corrective-action rule.', 400);
+  const [result] = await pool.execute(
+    'DELETE FROM incident_code_rule_actions WHERE id = ?',
+    [id]
+  );
+  if (!result.affectedRows)
+    throw httpError('Corrective-action rule not found.', 404);
+  return { ok: true };
 }
 
 function normalizeNteInput(input = {}) {
@@ -1140,6 +1346,497 @@ async function startIncidentEvaluation(req, incidentId) {
     );
     await connection.commit();
     return { ok: true, status: 'EVALUATION' };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function getIncidentEvaluationContext(req, incidentId, ruleId) {
+  const user = await requirePerm(req, 'inbox.read');
+  requireIncidentRole(
+    user,
+    REVIEW_ROLES,
+    'Only HR and ADMIN can evaluate cases.'
+  );
+  const id = Number(incidentId);
+  const selectedRuleId = Number(ruleId);
+  if (
+    !Number.isSafeInteger(id) ||
+    id < 1 ||
+    !Number.isSafeInteger(selectedRuleId) ||
+    selectedRuleId < 1
+  )
+    throw httpError('Choose a valid case and Code of Conduct rule.', 400);
+  const [incidents] = await pool.execute(
+    `SELECT reported_employee_email AS employeeEmail, status FROM incident_reports WHERE id = ?`,
+    [id]
+  );
+  const incident = incidents[0];
+  if (!incident) throw httpError('Incident Report not found.', 404);
+  if (incident.status !== 'EVALUATION')
+    throw httpError('This case is not in evaluation.', 409);
+  const [rules] = await pool.execute(
+    `SELECT r.id, r.provision_id AS provisionId, r.violation_title AS violationTitle,
+            r.severity, r.occurrence_scope AS occurrenceScope,
+            r.occurrence_window_days AS occurrenceWindowDays,
+            p.provision_code AS provisionCode, p.title AS provisionTitle
+     FROM incident_code_rules r JOIN incident_code_provisions p ON p.id = r.provision_id
+     WHERE r.id = ? AND r.active = 1 AND p.active = 1 LIMIT 1`,
+    [selectedRuleId]
+  );
+  const rule = rules[0];
+  if (!rule)
+    throw httpError('The selected Code of Conduct rule is unavailable.', 404);
+  const conditions = ['LOWER(employee_email) = LOWER(?)', 'incident_id <> ?'];
+  const params = [incident.employeeEmail, id];
+  if (rule.occurrenceScope === 'SAME_RULE') {
+    conditions.push('rule_id = ?');
+    params.push(rule.id);
+  } else if (rule.occurrenceScope === 'SAME_SEVERITY') {
+    conditions.push('severity = ?');
+    params.push(rule.severity);
+  }
+  if (rule.occurrenceWindowDays) {
+    conditions.push(
+      `finalized_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL ${Number(rule.occurrenceWindowDays)} DAY)`
+    );
+  }
+  const [history] = await pool.execute(
+    `SELECT incident_id AS incidentId, violation_title AS violationTitle,
+            code_reference AS codeReference, severity, corrective_action AS correctiveAction,
+            effective_date AS effectiveDate, finalized_at AS finalizedAt
+     FROM incident_disciplinary_history WHERE ${conditions.join(' AND ')}
+     ORDER BY finalized_at DESC, id DESC`,
+    params
+  );
+  const [actions] = await pool.execute(
+    `SELECT prior_offenses AS priorOffenses, decision_type AS decisionType,
+            corrective_action AS correctiveAction, details
+     FROM incident_code_rule_actions WHERE rule_id = ? ORDER BY prior_offenses`,
+    [rule.id]
+  );
+  const priorOffenses = history.length;
+  const suggestion =
+    actions
+      .filter((action) => Number(action.priorOffenses) <= priorOffenses)
+      .sort((a, b) => Number(b.priorOffenses) - Number(a.priorOffenses))[0] ||
+    null;
+  return {
+    rule,
+    priorOffenses,
+    history,
+    actions,
+    suggestedAction: suggestion?.correctiveAction || '',
+    suggestedActionDetails: suggestion?.details || ''
+  };
+}
+
+async function saveIncidentEvaluation(req, incidentId, input = {}) {
+  const user = await requirePerm(req, 'inbox.read');
+  requireIncidentRole(
+    user,
+    REVIEW_ROLES,
+    'Only HR and ADMIN can save evaluations.'
+  );
+  const id = Number(incidentId);
+  const finding = String(input.finding || '');
+  const findings = normalizeText(
+    String(input.findings || ''),
+    'Evaluation findings',
+    20000
+  );
+  const justification = normalizeText(
+    String(input.recommendationJustification || ''),
+    'Recommendation justification',
+    5000,
+    finding === 'SUBSTANTIATED'
+  );
+  const remarks = normalizeText(
+    String(input.remarks || ''),
+    'Additional remarks',
+    5000,
+    false
+  );
+  if (!Number.isSafeInteger(id) || id < 1)
+    throw httpError('Choose a valid case.', 400);
+  if (!['SUBSTANTIATED', 'NOT_SUBSTANTIATED'].includes(finding))
+    throw httpError('Choose whether the allegation was substantiated.', 400);
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const incident = await getIncidentForAction(connection, id);
+    if (incident.status !== 'EVALUATION')
+      throw httpError('This case is not in evaluation.', 409);
+    const [[decision]] = await connection.execute(
+      'SELECT id FROM incident_decisions WHERE incident_id = ? FOR UPDATE',
+      [id]
+    );
+    if (decision)
+      throw httpError('The final decision has already been issued.', 409);
+    let rule = null;
+    let previousOffenses = 0;
+    let suggestedAction = '';
+    let recommendedAction = '';
+    let reference = '';
+    let allowedActions = [];
+    if (finding === 'SUBSTANTIATED') {
+      const context = await getIncidentEvaluationContextForConnection(
+        connection,
+        id,
+        Number(input.ruleId)
+      );
+      rule = context.rule;
+      previousOffenses = context.priorOffenses;
+      suggestedAction = context.suggestedAction;
+      allowedActions = context.actions;
+      reference = `${rule.provisionCode} — ${rule.provisionTitle}`;
+      recommendedAction = normalizeText(
+        String(input.recommendedAction || ''),
+        'Recommended corrective action',
+        191
+      );
+    } else if (input.recommendedAction) {
+      throw httpError(
+        'A recommendation cannot be added when the allegation is not substantiated.',
+        400
+      );
+    }
+    await connection.execute(
+      `INSERT INTO incident_evaluations
+       (incident_id, finding, findings, rule_id, violation_title, code_reference, severity,
+        previous_offenses, suggested_action, recommended_action, recommendation_justification,
+        remarks, evaluated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE finding = VALUES(finding), findings = VALUES(findings),
+        rule_id = VALUES(rule_id), violation_title = VALUES(violation_title),
+        code_reference = VALUES(code_reference), severity = VALUES(severity),
+        previous_offenses = VALUES(previous_offenses), suggested_action = VALUES(suggested_action),
+        recommended_action = VALUES(recommended_action),
+        recommendation_justification = VALUES(recommendation_justification),
+        remarks = VALUES(remarks), evaluated_by = VALUES(evaluated_by), evaluated_at = CURRENT_TIMESTAMP`,
+      [
+        id,
+        finding,
+        findings,
+        rule?.id || null,
+        rule?.violationTitle || null,
+        reference || null,
+        rule?.severity || null,
+        previousOffenses,
+        suggestedAction || null,
+        recommendedAction || null,
+        justification,
+        remarks,
+        user.email
+      ]
+    );
+    const [[savedEvaluation]] = await connection.execute(
+      'SELECT id FROM incident_evaluations WHERE incident_id = ? FOR UPDATE',
+      [id]
+    );
+    await connection.execute(
+      'DELETE FROM incident_evaluation_allowed_actions WHERE evaluation_id = ?',
+      [savedEvaluation.id]
+    );
+    for (const action of allowedActions)
+      await connection.execute(
+        `INSERT INTO incident_evaluation_allowed_actions
+         (evaluation_id, prior_offenses, decision_type, corrective_action, details)
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          savedEvaluation.id,
+          action.priorOffenses,
+          action.decisionType,
+          action.correctiveAction,
+          action.details
+        ]
+      );
+    await recordIncidentActivity(
+      connection,
+      user,
+      incident,
+      'EVALUATION_SAVED',
+      `${finding === 'SUBSTANTIATED' ? 'Substantiated' : 'Not substantiated'} evaluation saved.`
+    );
+    await connection.commit();
+    return { ok: true, finding, suggestedAction, recommendedAction };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function getIncidentEvaluationContextForConnection(
+  connection,
+  incidentId,
+  ruleId
+) {
+  if (!Number.isSafeInteger(ruleId) || ruleId < 1)
+    throw httpError('Select an applicable Code of Conduct violation.', 400);
+  const [[incident]] = await connection.execute(
+    'SELECT reported_employee_email AS employeeEmail, status FROM incident_reports WHERE id = ? FOR UPDATE',
+    [incidentId]
+  );
+  if (!incident || incident.status !== 'EVALUATION')
+    throw httpError('This case is not in evaluation.', 409);
+  const [[rule]] = await connection.execute(
+    `SELECT r.id, r.provision_id AS provisionId, r.violation_title AS violationTitle,
+            r.severity, r.occurrence_scope AS occurrenceScope,
+            r.occurrence_window_days AS occurrenceWindowDays,
+            p.provision_code AS provisionCode, p.title AS provisionTitle
+     FROM incident_code_rules r JOIN incident_code_provisions p ON p.id = r.provision_id
+     WHERE r.id = ? AND r.active = 1 AND p.active = 1 FOR UPDATE`,
+    [ruleId]
+  );
+  if (!rule)
+    throw httpError('The selected Code of Conduct rule is unavailable.', 404);
+  const conditions = ['LOWER(employee_email) = LOWER(?)', 'incident_id <> ?'];
+  const params = [incident.employeeEmail, incidentId];
+  if (rule.occurrenceScope === 'SAME_RULE') {
+    conditions.push('rule_id = ?');
+    params.push(rule.id);
+  } else if (rule.occurrenceScope === 'SAME_SEVERITY') {
+    conditions.push('severity = ?');
+    params.push(rule.severity);
+  }
+  if (rule.occurrenceWindowDays)
+    conditions.push(
+      `finalized_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL ${Number(rule.occurrenceWindowDays)} DAY)`
+    );
+  const [history] = await connection.execute(
+    `SELECT incident_id AS incidentId, violation_title AS violationTitle,
+            code_reference AS codeReference, severity, corrective_action AS correctiveAction,
+            effective_date AS effectiveDate, finalized_at AS finalizedAt
+     FROM incident_disciplinary_history WHERE ${conditions.join(' AND ')}
+     ORDER BY finalized_at DESC, id DESC`,
+    params
+  );
+  const [actions] = await connection.execute(
+    'SELECT prior_offenses AS priorOffenses, decision_type AS decisionType, corrective_action AS correctiveAction, details FROM incident_code_rule_actions WHERE rule_id = ? ORDER BY prior_offenses',
+    [rule.id]
+  );
+  const action =
+    actions
+      .filter((row) => Number(row.priorOffenses) <= history.length)
+      .sort((a, b) => Number(b.priorOffenses) - Number(a.priorOffenses))[0] ||
+    null;
+  return {
+    rule,
+    priorOffenses: history.length,
+    history,
+    actions,
+    suggestedAction: action?.correctiveAction || ''
+  };
+}
+
+function normalizeDecisionSignature(value) {
+  return normalizeSignature(value);
+}
+
+async function issueIncidentDecision(req, incidentId, input = {}) {
+  const user = await requirePerm(req, 'inbox.read');
+  requireIncidentRole(
+    user,
+    REVIEW_ROLES,
+    'Only HR and ADMIN can approve and issue decisions.'
+  );
+  const id = Number(incidentId);
+  const signature = normalizeDecisionSignature(input.signature);
+  const outcome = String(input.outcome || '');
+  const decisionReason = normalizeText(
+    String(input.decisionReason || ''),
+    'Decision reasons',
+    10000
+  );
+  const effectiveDate = input.effectiveDate
+    ? normalizeDate(input.effectiveDate, 'effective date')
+    : null;
+  if (!Number.isSafeInteger(id) || id < 1)
+    throw httpError('Choose a valid case.', 400);
+  if (
+    ![
+      'NO_VIOLATION',
+      'WRITTEN_WARNING',
+      'SUSPENSION',
+      'TERMINATION',
+      'OTHER_CORRECTIVE_ACTION'
+    ].includes(outcome)
+  )
+    throw httpError('Choose a valid final decision.', 400);
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const incident = await getIncidentForAction(connection, id);
+    if (incident.status !== 'EVALUATION')
+      throw httpError('This case is not ready for a final decision.', 409);
+    const [[evaluation]] = await connection.execute(
+      'SELECT * FROM incident_evaluations WHERE incident_id = ? FOR UPDATE',
+      [id]
+    );
+    if (!evaluation)
+      throw httpError('Save the evaluation before issuing a decision.', 409);
+    const [[existing]] = await connection.execute(
+      'SELECT id FROM incident_decisions WHERE incident_id = ? FOR UPDATE',
+      [id]
+    );
+    if (existing)
+      throw httpError('A final decision has already been issued.', 409);
+    if (
+      evaluation.finding === 'NOT_SUBSTANTIATED' &&
+      outcome !== 'NO_VIOLATION'
+    )
+      throw httpError(
+        'A not-substantiated finding cannot receive a corrective action.',
+        409
+      );
+    if (evaluation.finding === 'SUBSTANTIATED' && outcome === 'NO_VIOLATION')
+      throw httpError(
+        'Change the evaluation finding before issuing a no-violation decision.',
+        409
+      );
+    let finalAction = null;
+    if (outcome !== 'NO_VIOLATION') {
+      finalAction = normalizeText(
+        String(input.finalAction || ''),
+        'Approved corrective action',
+        191
+      );
+      const [allowed] = await connection.execute(
+        'SELECT id FROM incident_evaluation_allowed_actions WHERE evaluation_id = ? AND corrective_action = ? AND decision_type = ? LIMIT 1',
+        [evaluation.id, finalAction, outcome]
+      );
+      if (!allowed.length)
+        throw httpError(
+          'Choose a corrective action configured for this Code of Conduct rule.',
+          400
+        );
+      if (['SUSPENSION', 'TERMINATION'].includes(outcome) && !effectiveDate)
+        throw httpError('Enter the effective date for this decision.', 400);
+    }
+    const [insert] = await connection.execute(
+      `INSERT INTO incident_decisions
+       (incident_id, evaluation_id, outcome, violation_title, code_reference, severity,
+        final_action, effective_date, decision_reason, approver_email, approver_name, approval_signature)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        evaluation.id,
+        outcome,
+        outcome === 'NO_VIOLATION' ? null : evaluation.violation_title,
+        outcome === 'NO_VIOLATION' ? null : evaluation.code_reference,
+        outcome === 'NO_VIOLATION' ? null : evaluation.severity,
+        finalAction,
+        effectiveDate,
+        decisionReason,
+        user.email,
+        user.full_name || user.email,
+        signature
+      ]
+    );
+    await connection.execute(
+      "UPDATE incident_reports SET status = 'DECISION ISSUED' WHERE id = ?",
+      [id]
+    );
+    if (outcome !== 'NO_VIOLATION') {
+      await connection.execute(
+        `INSERT INTO incident_disciplinary_history
+         (incident_id, decision_id, employee_email, rule_id, violation_title, code_reference,
+          severity, corrective_action, effective_date)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          insert.insertId,
+          incident.reported_employee_email,
+          evaluation.rule_id,
+          evaluation.violation_title,
+          evaluation.code_reference,
+          evaluation.severity,
+          finalAction,
+          effectiveDate
+        ]
+      );
+    }
+    await recordIncidentActivity(
+      connection,
+      user,
+      incident,
+      'DECISION_ISSUED',
+      outcome === 'NO_VIOLATION'
+        ? 'Final decision issued: no violation established.'
+        : `Final decision issued: ${finalAction}.`
+    );
+    await notifyIncidentParties(connection, incident, 'DECISION_ISSUED');
+    await connection.commit();
+    return {
+      ok: true,
+      decisionId: insert.insertId,
+      status: 'DECISION ISSUED',
+      deliveredAt: new Date().toISOString()
+    };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function closeIncidentDecision(req, incidentId, reason) {
+  const user = await requirePerm(req, 'inbox.read');
+  requireIncidentRole(
+    user,
+    REVIEW_ROLES,
+    'Only HR and ADMIN can close a decided case.'
+  );
+  const id = Number(incidentId);
+  const closureReason = normalizeText(
+    String(reason || ''),
+    'Administrative completion notes',
+    4000
+  );
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const incident = await getIncidentForAction(connection, id);
+    if (incident.status !== 'DECISION ISSUED')
+      throw httpError(
+        'Only an issued decision can be completed and closed.',
+        409
+      );
+    const [[decision]] = await connection.execute(
+      `SELECT id, delivered_at AS deliveredAt, closed_at AS closedAt FROM incident_decisions WHERE incident_id = ? AND status = 'ISSUED' FOR UPDATE`,
+      [id]
+    );
+    if (!decision || !decision.deliveredAt)
+      throw httpError(
+        'The decision must be delivered before case closure.',
+        409
+      );
+    if (decision.closedAt)
+      throw httpError('This decision has already been closed.', 409);
+    await connection.execute(
+      'UPDATE incident_decisions SET closed_at = CURRENT_TIMESTAMP, closure_reason = ? WHERE id = ?',
+      [closureReason, decision.id]
+    );
+    await connection.execute(
+      "UPDATE incident_reports SET status = 'CLOSED' WHERE id = ?",
+      [id]
+    );
+    await recordIncidentActivity(
+      connection,
+      user,
+      incident,
+      'DECISION_CASE_CLOSED',
+      closureReason
+    );
+    await notifyIncidentParties(connection, incident, 'CASE_CLOSED');
+    await connection.commit();
+    return { ok: true, status: 'CLOSED', trackingMilestone: 'DECISION ISSUED' };
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -1873,6 +2570,9 @@ async function getIncidentCase(req, incidentId) {
     REVIEW_ROLES.has(user.role) ||
     incident.reportedEmployeeEmail.toLowerCase() === user.email.toLowerCase();
   let nte = null;
+  let evaluation = null;
+  let decision = null;
+  let disciplinaryHistory = [];
   let explanationDraft = null;
   let explanations = [];
   let addenda = [];
@@ -1933,6 +2633,50 @@ async function getIncidentCase(req, incidentId) {
       [id]
     );
     addenda = addendumRows;
+    if (REVIEW_ROLES.has(user.role)) {
+      const [[evaluationRow]] = await pool.execute(
+        `SELECT id, finding, findings, rule_id AS ruleId, violation_title AS violationTitle,
+                code_reference AS codeReference, severity, previous_offenses AS previousOffenses,
+                suggested_action AS suggestedAction, recommended_action AS recommendedAction,
+                recommendation_justification AS recommendationJustification, remarks,
+                evaluated_by AS evaluatedBy, evaluated_at AS evaluatedAt
+         FROM incident_evaluations WHERE incident_id = ? LIMIT 1`,
+        [id]
+      );
+      evaluation = evaluationRow || null;
+      if (evaluation) {
+        const [allowedActions] = await pool.execute(
+          `SELECT prior_offenses AS priorOffenses, decision_type AS decisionType,
+                  corrective_action AS correctiveAction, details
+           FROM incident_evaluation_allowed_actions WHERE evaluation_id = ? ORDER BY prior_offenses`,
+          [evaluation.id]
+        );
+        evaluation.allowedActions = allowedActions;
+      }
+      const [historyRows] = await pool.execute(
+        `SELECT incident_id AS incidentId, violation_title AS violationTitle,
+                code_reference AS codeReference, severity, corrective_action AS correctiveAction,
+                effective_date AS effectiveDate, finalized_at AS finalizedAt
+         FROM incident_disciplinary_history WHERE LOWER(employee_email) = LOWER(?) ORDER BY finalized_at DESC, id DESC`,
+        [incident.reportedEmployeeEmail]
+      );
+      disciplinaryHistory = historyRows;
+    }
+  }
+  if (canViewNte) {
+    const [decisionRows] = await pool.execute(
+      `SELECT d.id, d.outcome, d.violation_title AS violationTitle, d.code_reference AS codeReference,
+              d.severity, d.final_action AS finalAction, d.effective_date AS effectiveDate,
+              d.decision_reason AS decisionReason, d.approver_email AS approverEmail,
+              d.approver_name AS approverName, d.approval_signature AS approvalSignature,
+              d.issued_at AS issuedAt, d.delivered_at AS deliveredAt, d.closed_at AS closedAt,
+              d.closure_reason AS closureReason, e.findings AS evaluationFindings
+       FROM incident_decisions d JOIN incident_evaluations e ON e.id = d.evaluation_id
+       WHERE d.incident_id = ? AND d.status = 'ISSUED' LIMIT 1`,
+      [id]
+    );
+    decision = decisionRows[0] || null;
+    if (decision && !REVIEW_ROLES.has(user.role)) decision.closureReason = null;
   }
   if (nte) {
     const [[nteEvidence]] = await pool.execute(
@@ -1994,6 +2738,9 @@ async function getIncidentCase(req, incidentId) {
             request.recipientEmail.toLowerCase() === user.email.toLowerCase()
         ),
     nte,
+    evaluation,
+    decision,
+    disciplinaryHistory,
     explanationDraft,
     explanations,
     explanationAddenda: addenda,
@@ -2206,7 +2953,11 @@ async function listPendingIncidentNotifications(req) {
   await processOverdueIncidentNtes();
   const [rows] = await pool.execute(
     `SELECT n.id, n.notification_type AS type,
-            CASE WHEN n.notification_type = 'CASE_CLOSED' THEN 'incident-history'
+            CASE WHEN i.status = 'CLOSED' AND ? = 1 THEN 'incident-review'
+                 WHEN i.status = 'CLOSED' THEN 'incident-history'
+                 WHEN n.notification_type = 'DECISION_ISSUED' AND ? = 1 THEN 'incident-review'
+                 WHEN n.notification_type = 'DECISION_ISSUED' THEN 'incident-track'
+                 WHEN n.notification_type = 'CASE_CLOSED' THEN 'incident-history'
                  WHEN n.notification_type = 'HR_REVIEW_READY' OR n.notification_type LIKE 'INFO_DONE_%'
                       OR n.notification_type LIKE 'EXPLANATION_SENT'
                       OR n.notification_type LIKE 'EXPLANATION_ADD_%'
@@ -2219,7 +2970,11 @@ async function listPendingIncidentNotifications(req) {
      JOIN incident_reports i ON i.id = n.incident_id
      WHERE n.recipient_email = ? AND n.viewed_at IS NULL
      ORDER BY n.created_at, n.id LIMIT 100`,
-    [user.email]
+    [
+      REVIEW_ROLES.has(user.role) ? 1 : 0,
+      REVIEW_ROLES.has(user.role) ? 1 : 0,
+      user.email
+    ]
   );
   return rows;
 }
@@ -2250,11 +3005,19 @@ module.exports = {
   transitionIncident,
   listIncidentCodeProvisions,
   saveIncidentCodeProvision,
+  saveIncidentCodeRule,
+  saveIncidentCodeRuleAction,
+  deactivateIncidentCodeRule,
+  deleteIncidentCodeRuleAction,
   saveIncidentNteDraft,
   issueIncidentNte,
   saveIncidentExplanationDraft,
   submitIncidentExplanation,
   startIncidentEvaluation,
+  getIncidentEvaluationContext,
+  saveIncidentEvaluation,
+  issueIncidentDecision,
+  closeIncidentDecision,
   submitIncidentExplanationAddendum,
   extendIncidentDeadline,
   recordExternalIncidentExplanation,

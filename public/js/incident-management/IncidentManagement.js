@@ -502,6 +502,473 @@ function openNtePreview(incident, nte) {
   preview.document.close();
 }
 
+function createDecisionDocumentHtml(incident, decision) {
+  const signature = /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(
+    decision.approvalSignature || ''
+  )
+    ? `<img class="signature" src="${decision.approvalSignature}" alt="Authorized approval signature">`
+    : '';
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Final Decision — ${escapeIncidentHtml(incident.caseNumber)}</title>
+    <style>@page{size:letter;margin:22mm}body{font:14px Arial,sans-serif;color:#172033;line-height:1.5;max-width:780px;margin:24px auto}h1{text-align:center;font-size:22px}h2{font-size:16px;border-bottom:1px solid #999;padding-bottom:5px}pre{font:inherit;white-space:pre-wrap}.signature{max-width:240px;max-height:80px}button{padding:8px 14px}@media print{button{display:none}body{margin:0}}</style></head><body>
+    <button onclick="window.print()">Print / Save as PDF</button><h1>FINAL DECISION</h1>
+    <p><strong>Case Number:</strong> ${escapeIncidentHtml(incident.caseNumber)}</p><p><strong>Employee:</strong> ${escapeIncidentHtml(incident.reportedEmployeeName)} (${escapeIncidentHtml(incident.reportedEmployeeId)})</p>
+    <p><strong>Decision issued:</strong> ${escapeIncidentHtml(decision.issuedAt)}</p><h2>Evaluation Findings</h2><p><strong>Finding:</strong> ${decision.outcome === 'NO_VIOLATION' ? 'No Violation Established' : 'Violation Established'}</p><pre>${escapeIncidentHtml(decision.evaluationFindings || '')}</pre>
+    ${decision.outcome !== 'NO_VIOLATION' ? `<p><strong>Violation:</strong> ${escapeIncidentHtml(decision.violationTitle)} · ${escapeIncidentHtml(decision.codeReference)} · ${escapeIncidentHtml(decision.severity)}</p>` : ''}
+    <h2>Approved Decision</h2><p><strong>Outcome:</strong> ${escapeIncidentHtml(decision.outcomeLabel || decision.outcome.replaceAll('_', ' '))}</p>${decision.finalAction ? `<p><strong>Corrective action:</strong> ${escapeIncidentHtml(decision.finalAction)}</p>` : ''}${decision.effectiveDate ? `<p><strong>Effective date:</strong> ${escapeIncidentHtml(decision.effectiveDate)}</p>` : ''}<pre>${escapeIncidentHtml(decision.decisionReason)}</pre>
+    <h2>Authorized Approval</h2><p>${escapeIncidentHtml(decision.approverName)} (${escapeIncidentHtml(decision.approverEmail)})</p>${signature}<p><strong>Delivered:</strong> ${escapeIncidentHtml(decision.deliveredAt)}</p></body></html>`;
+}
+
+function renderIncidentDecision(parent, incident) {
+  if (!incident.decision) return;
+  const section = incidentElement('section', 'incident-case-section');
+  section.appendChild(incidentElement('h3', '', 'Final Decision'));
+  const decision = incident.decision;
+  const labels = {
+    NO_VIOLATION: 'No Violation Established',
+    WRITTEN_WARNING: 'Written Warning',
+    SUSPENSION: 'Suspension',
+    TERMINATION: 'Termination',
+    OTHER_CORRECTIVE_ACTION: 'Other Corrective Action'
+  };
+  decision.outcomeLabel = labels[decision.outcome] || decision.outcome;
+  section.append(
+    incidentElement('p', '', `Outcome: ${decision.outcomeLabel}`),
+    incidentElement(
+      'p',
+      '',
+      `Issued: ${new Date(decision.issuedAt).toLocaleString()}`
+    ),
+    incidentElement(
+      'p',
+      '',
+      `Delivered to employee inbox: ${new Date(decision.deliveredAt).toLocaleString()}`
+    ),
+    incidentElement('h4', '', 'Evaluation findings'),
+    incidentElement(
+      'p',
+      'incident-case-text',
+      decision.evaluationFindings || ''
+    ),
+    incidentElement('p', 'incident-case-text', decision.decisionReason)
+  );
+  if (decision.violationTitle)
+    section.appendChild(
+      incidentElement(
+        'p',
+        '',
+        `Established violation: ${decision.violationTitle} · ${decision.codeReference} · ${decision.severity}`
+      )
+    );
+  if (decision.finalAction)
+    section.appendChild(
+      incidentElement(
+        'p',
+        '',
+        `Approved corrective action: ${decision.finalAction}`
+      )
+    );
+  if (decision.effectiveDate)
+    section.appendChild(
+      incidentElement('p', '', `Effective date: ${decision.effectiveDate}`)
+    );
+  const download = incidentElement('button', 'ghost', 'Download decision');
+  download.type = 'button';
+  download.onclick = () =>
+    downloadIncidentHtml(
+      `${incident.caseNumber}-final-decision.html`,
+      createDecisionDocumentHtml(incident, decision)
+    );
+  const preview = incidentElement('button', 'ghost', 'View / Print decision');
+  preview.type = 'button';
+  preview.onclick = () => {
+    const windowRef = window.open('', '_blank');
+    if (!windowRef) return;
+    windowRef.document.open();
+    windowRef.document.write(createDecisionDocumentHtml(incident, decision));
+    windowRef.document.close();
+  };
+  section.append(download, preview);
+  if (incident.canReview && incident.status === 'DECISION ISSUED') {
+    const reason = incidentElement('textarea');
+    reason.rows = 3;
+    reason.maxLength = 4000;
+    reason.placeholder = 'Administrative completion notes before closing';
+    const close = incidentElement(
+      'button',
+      '',
+      'Complete delivery and close case'
+    );
+    close.type = 'button';
+    close.onclick = async () => {
+      if (
+        !window.confirm('Record administrative completion and close this case?')
+      )
+        return;
+      try {
+        await api('closeIncidentDecision', incident.id, reason.value);
+        await refreshIncidentBadges();
+        await loadIncidentReview();
+        await openIncidentCase(incident.id);
+      } catch (error) {
+        setIncidentFeedback(
+          document.getElementById('ir-case-feedback'),
+          error.message || String(error),
+          true
+        );
+      }
+    };
+    section.append(reason, close);
+  }
+  if (decision.closedAt && incident.canReview)
+    section.appendChild(
+      incidentElement(
+        'p',
+        'note',
+        `Case closed ${new Date(decision.closedAt).toLocaleString()}: ${decision.closureReason || ''}`
+      )
+    );
+  parent.appendChild(section);
+}
+
+function renderIncidentEvaluation(parent, incident, padSetup) {
+  if (
+    !incident.canReview ||
+    (!['EVALUATION', 'DECISION ISSUED'].includes(incident.status) &&
+      !(incident.status === 'CLOSED' && incident.decision))
+  )
+    return;
+  const section = incidentElement('section', 'incident-case-section');
+  section.appendChild(
+    incidentElement('h3', '', 'Evaluation and Final Decision')
+  );
+  if (incident.evaluation) {
+    const evaluation = incident.evaluation;
+    section.append(
+      incidentElement(
+        'p',
+        '',
+        `Finding: ${evaluation.finding.replaceAll('_', ' ')}`
+      ),
+      incidentElement('p', 'incident-case-text', evaluation.findings),
+      incidentElement(
+        'p',
+        '',
+        `Applicable violation: ${evaluation.violationTitle || 'None'}`
+      ),
+      incidentElement(
+        'p',
+        '',
+        `Code reference: ${evaluation.codeReference || 'None'}`
+      ),
+      incidentElement('p', '', `Severity: ${evaluation.severity || 'None'}`),
+      incidentElement(
+        'p',
+        '',
+        `Previous relevant offenses: ${evaluation.previousOffenses}`
+      ),
+      incidentElement(
+        'p',
+        '',
+        `Suggested action: ${evaluation.suggestedAction || 'None configured'}`
+      ),
+      incidentElement(
+        'p',
+        '',
+        `HR recommendation: ${evaluation.recommendedAction || 'None'}`
+      ),
+      incidentElement(
+        'p',
+        'incident-case-text',
+        `Justification: ${evaluation.recommendationJustification}`
+      )
+    );
+    if (evaluation.remarks)
+      section.appendChild(
+        incidentElement(
+          'p',
+          'incident-case-text',
+          `Remarks: ${evaluation.remarks}`
+        )
+      );
+  }
+  if (incident.disciplinaryHistory?.length) {
+    section.appendChild(
+      incidentElement('h4', '', 'Finalized disciplinary history')
+    );
+    const history = incidentElement('ul');
+    incident.disciplinaryHistory.forEach((item) =>
+      history.appendChild(
+        incidentElement(
+          'li',
+          '',
+          `${item.finalizedAt ? new Date(item.finalizedAt).toLocaleDateString() : ''} · ${item.violationTitle} · ${item.severity} · ${item.correctiveAction}`
+        )
+      )
+    );
+    section.appendChild(history);
+  }
+  if (incident.status !== 'EVALUATION') {
+    parent.appendChild(section);
+    return;
+  }
+  const rules = (incidentCodeProvisions || []).flatMap((provision) =>
+    (provision.rules || []).map((rule) => ({ ...rule, provision }))
+  );
+  const finding = incidentElement('select');
+  finding.add(new Option('Select finding', ''));
+  finding.add(new Option('Allegation substantiated', 'SUBSTANTIATED'));
+  finding.add(new Option('Allegation not substantiated', 'NOT_SUBSTANTIATED'));
+  finding.value = incident.evaluation?.finding || '';
+  const ruleSelect = incidentElement('select');
+  ruleSelect.add(new Option('Select applicable violation', ''));
+  rules.forEach((item) =>
+    ruleSelect.add(
+      new Option(
+        `${item.provision.code} — ${item.violationTitle} (${item.severity})`,
+        item.id
+      )
+    )
+  );
+  ruleSelect.value = incident.evaluation?.ruleId || '';
+  const findings = incidentElement('textarea');
+  findings.rows = 5;
+  findings.maxLength = 20000;
+  findings.placeholder = 'Evaluation findings and basis';
+  findings.value = incident.evaluation?.findings || '';
+  const recommendation = incidentElement('input');
+  recommendation.maxLength = 191;
+  recommendation.placeholder = 'Recommended corrective action';
+  recommendation.value = incident.evaluation?.recommendedAction || '';
+  const justification = incidentElement('textarea');
+  justification.rows = 3;
+  justification.maxLength = 5000;
+  justification.placeholder = 'Justification for the recommendation';
+  justification.value = incident.evaluation?.recommendationJustification || '';
+  const remarks = incidentElement('textarea');
+  remarks.rows = 3;
+  remarks.maxLength = 5000;
+  remarks.placeholder = 'Additional remarks';
+  remarks.value = incident.evaluation?.remarks || '';
+  const context = incidentElement('div', 'incident-evaluation-context');
+  const field = (label, input) => {
+    const wrapper = incidentElement('label', '', label);
+    wrapper.appendChild(input);
+    section.appendChild(wrapper);
+  };
+  field('Finding', finding);
+  field('Applicable Code of Conduct violation', ruleSelect);
+  field('Evaluation findings', findings);
+  field('Recommended corrective action', recommendation);
+  field('Recommendation justification', justification);
+  field('Additional remarks', remarks);
+  section.appendChild(context);
+  const loadContext = async () => {
+    context.replaceChildren();
+    if (finding.value !== 'SUBSTANTIATED' || !ruleSelect.value) return;
+    try {
+      const data = await api(
+        'getIncidentEvaluationContext',
+        incident.id,
+        ruleSelect.value
+      );
+      context.appendChild(
+        incidentElement(
+          'p',
+          'note',
+          `Severity: ${data.rule.severity}; ${data.priorOffenses} relevant finalized previous offense(s).`
+        )
+      );
+      context.appendChild(
+        incidentElement(
+          'p',
+          'note',
+          `COC suggestion: ${data.suggestedAction || 'No action configured for this occurrence count.'} This is advisory and must be reviewed by HR.`
+        )
+      );
+      if (!recommendation.value && data.suggestedAction)
+        recommendation.value = data.suggestedAction;
+      if (data.history.length) {
+        const list = incidentElement('ul');
+        data.history.forEach((item) =>
+          list.appendChild(
+            incidentElement(
+              'li',
+              '',
+              `${item.violationTitle} · ${item.severity} · ${item.correctiveAction} · ${new Date(item.finalizedAt).toLocaleDateString()}`
+            )
+          )
+        );
+        context.appendChild(list);
+      }
+    } catch (error) {
+      context.appendChild(
+        incidentElement('p', 'note error', error.message || String(error))
+      );
+    }
+  };
+  finding.addEventListener('change', () => {
+    ruleSelect.disabled = finding.value !== 'SUBSTANTIATED';
+    recommendation.disabled = finding.value !== 'SUBSTANTIATED';
+    if (finding.value === 'NOT_SUBSTANTIATED') recommendation.value = '';
+    loadContext();
+  });
+  ruleSelect.disabled = finding.value !== 'SUBSTANTIATED';
+  recommendation.disabled = finding.value !== 'SUBSTANTIATED';
+  ruleSelect.addEventListener('change', loadContext);
+  const save = incidentElement('button', 'ghost', 'Save evaluation');
+  save.type = 'button';
+  save.onclick = async () => {
+    try {
+      await api('saveIncidentEvaluation', incident.id, {
+        finding: finding.value,
+        ruleId: ruleSelect.value,
+        findings: findings.value,
+        recommendedAction: recommendation.value,
+        recommendationJustification: justification.value,
+        remarks: remarks.value
+      });
+      await openIncidentCase(incident.id);
+      setIncidentFeedback(
+        document.getElementById('ir-case-feedback'),
+        'Evaluation saved.'
+      );
+    } catch (error) {
+      setIncidentFeedback(
+        document.getElementById('ir-case-feedback'),
+        error.message || String(error),
+        true
+      );
+    }
+  };
+  section.appendChild(save);
+  if (incident.evaluation) {
+    const decisionForm = incidentElement('div', 'incident-case-section');
+    decisionForm.appendChild(
+      incidentElement('h4', '', 'Review and issue final decision')
+    );
+    decisionForm.appendChild(
+      incidentElement(
+        'p',
+        'note',
+        'The evaluation recommendation is advisory. The approver must choose and sign the final action separately; only actions configured for the applicable Code of Conduct rule are available.'
+      )
+    );
+    const outcome = incidentElement('select');
+    const noViolation = incident.evaluation.finding === 'NOT_SUBSTANTIATED';
+    if (noViolation)
+      outcome.add(new Option('No Violation Established', 'NO_VIOLATION'));
+    else {
+      outcome.add(new Option('Select final decision', ''));
+      outcome.add(new Option('Written Warning', 'WRITTEN_WARNING'));
+      outcome.add(new Option('Suspension', 'SUSPENSION'));
+      outcome.add(new Option('Termination', 'TERMINATION'));
+      outcome.add(
+        new Option('Other Corrective Action', 'OTHER_CORRECTIVE_ACTION')
+      );
+    }
+    const finalAction = incidentElement('select');
+    const updateDecisionActions = () => {
+      finalAction.replaceChildren(new Option('Select approved COC action', ''));
+      (incident.evaluation.allowedActions || [])
+        .filter((action) => action.decisionType === outcome.value)
+        .forEach((action) =>
+          finalAction.add(
+            new Option(
+              `${action.correctiveAction}${action.details ? ` — ${action.details}` : ''}`,
+              action.correctiveAction
+            )
+          )
+        );
+    };
+    updateDecisionActions();
+    outcome.addEventListener('change', updateDecisionActions);
+    const effectiveDate = incidentElement('input');
+    effectiveDate.type = 'date';
+    const decisionReason = incidentElement('textarea');
+    decisionReason.rows = 3;
+    decisionReason.maxLength = 10000;
+    decisionReason.placeholder = 'Reason for the approved final decision';
+    const authorized = incidentElement(
+      'p',
+      'note',
+      `Authorized decision approver: ${incident.currentUserEmail}`
+    );
+    const signatureCanvas = incidentElement(
+      'canvas',
+      'signature-pad incident-signature-pad'
+    );
+    signatureCanvas.width = 560;
+    signatureCanvas.height = 120;
+    signatureCanvas.setAttribute(
+      'aria-label',
+      'Authorized decision approval signature'
+    );
+    const clear = incidentElement('button', 'ghost', 'Clear signature');
+    clear.type = 'button';
+    let decisionPad;
+    padSetup.push(() => {
+      decisionPad = window.createSignaturePad(signatureCanvas, clear);
+    });
+    const issue = incidentElement('button', '', 'Approve and issue decision');
+    issue.type = 'button';
+    issue.onclick = async () => {
+      if (
+        !window.confirm(
+          'Approve and issue this final decision to the reported employee?'
+        )
+      )
+        return;
+      try {
+        await api('issueIncidentDecision', incident.id, {
+          outcome: outcome.value,
+          finalAction: finalAction.value,
+          effectiveDate: effectiveDate.value,
+          decisionReason: decisionReason.value,
+          signature: decisionPad?.toDataURL()
+        });
+        await window.refreshInboxBadge().catch(() => {});
+        await refreshIncidentBadges();
+        await loadIncidentReview();
+        await openIncidentCase(incident.id);
+      } catch (error) {
+        setIncidentFeedback(
+          document.getElementById('ir-case-feedback'),
+          error.message || String(error),
+          true
+        );
+      }
+    };
+    decisionForm.append(
+      incidentElement('label', '', 'Final decision'),
+      outcome,
+      incidentElement('label', '', 'Approved corrective action'),
+      finalAction,
+      incidentElement('label', '', 'Effective date, when applicable'),
+      effectiveDate,
+      incidentElement('label', '', 'Decision reasons'),
+      decisionReason,
+      authorized,
+      signatureCanvas,
+      clear,
+      issue
+    );
+    if (noViolation) {
+      finalAction.disabled = true;
+      outcome.value = 'NO_VIOLATION';
+    }
+    decisionForm.hidden = false;
+    section.appendChild(decisionForm);
+  }
+  if (incident.evaluation?.ruleId) {
+    const selected = rules.find(
+      (item) => Number(item.id) === Number(incident.evaluation.ruleId)
+    );
+    if (selected) ruleSelect.value = String(selected.id);
+  }
+  loadContext();
+  parent.appendChild(section);
+}
+
 function renderIncidentNte(parent, incident, padSetup) {
   if (
     !incident.nte &&
@@ -1097,7 +1564,22 @@ function renderIncidentNte(parent, incident, padSetup) {
 }
 
 async function openIncidentCase(incidentId) {
-  const incident = await api('getIncidentCase', incidentId);
+  let incident = await api('getIncidentCase', incidentId);
+  if (
+    incident.canReview &&
+    incident.status === 'EXPLANATION SENT' &&
+    incident.explanations.length
+  ) {
+    try {
+      await api('startIncidentEvaluation', incident.id);
+    } catch (error) {
+      const current = await api('getIncidentCase', incident.id);
+      if (current.status !== 'EVALUATION') throw error;
+    }
+    incident = await api('getIncidentCase', incident.id);
+  }
+  if (incident.canReview && incident.status === 'EVALUATION')
+    incidentCodeProvisions = await api('listIncidentCodeProvisions');
   const body = document.getElementById('ir-case-body');
   const padSetup = [];
   body.replaceChildren();
@@ -1431,6 +1913,9 @@ async function openIncidentCase(incidentId) {
     body.appendChild(history);
   }
 
+  renderIncidentEvaluation(body, incident, padSetup);
+  renderIncidentDecision(body, incident);
+
   setIncidentFeedback(document.getElementById('ir-case-feedback'), '');
   const dialog = document.getElementById('ir-case-dialog');
   if (!dialog.open) dialog.showModal();
@@ -1619,15 +2104,117 @@ async function loadIncidentCodeOfConduct() {
   const form = document.getElementById('incident-code-provision-form');
   const canManage = ['HR', 'ADMIN'].includes(session.role);
   form.hidden = !canManage;
+  const ruleForm = document.getElementById('incident-code-rule-form');
+  const actionForm = document.getElementById('incident-code-action-form');
+  ruleForm.hidden = !canManage;
+  actionForm.hidden = !canManage;
+  const provisionSelect = document.getElementById(
+    'incident-code-rule-provision'
+  );
+  const ruleSelect = document.getElementById('incident-code-action-rule');
+  provisionSelect.replaceChildren(new Option('Select a provision', ''));
+  ruleSelect.replaceChildren(new Option('Select a violation rule', ''));
+  incidentCodeProvisions.forEach((provision) => {
+    provisionSelect.add(
+      new Option(`${provision.code} — ${provision.title}`, provision.id)
+    );
+    (provision.rules || []).forEach((rule) => {
+      const label = `${provision.code} — ${rule.violationTitle} (${rule.severity})`;
+      ruleSelect.add(new Option(label, rule.id));
+    });
+  });
   const body = document.getElementById('incident-code-provision-rows');
   body.replaceChildren();
   document.getElementById('incident-code-provision-empty').hidden =
     incidentCodeProvisions.length > 0;
   incidentCodeProvisions.forEach((provision) => {
     const row = incidentElement('tr');
-    [provision.code, provision.title, provision.description].forEach((value) =>
-      row.appendChild(incidentElement('td', '', value))
+    row.append(
+      incidentElement('td', '', provision.code),
+      incidentElement('td', '', provision.title)
     );
+    const details = incidentElement('td');
+    details.appendChild(incidentElement('p', '', provision.description));
+    (provision.rules || []).forEach((rule) => {
+      const ruleCard = incidentElement('div', 'incident-code-rule-card');
+      ruleCard.appendChild(
+        incidentElement(
+          'strong',
+          '',
+          `${rule.violationTitle} · ${rule.severity}`
+        )
+      );
+      ruleCard.appendChild(
+        incidentElement(
+          'p',
+          'note',
+          `Occurrence count: ${rule.occurrenceScope.replaceAll('_', ' ').toLowerCase()}${rule.occurrenceWindowDays ? `, last ${rule.occurrenceWindowDays} days` : ', all history'}`
+        )
+      );
+      (rule.actions || []).forEach((action) => {
+        const actionLine = incidentElement(
+          'p',
+          '',
+          `${action.priorOffenses} prior offense(s): ${action.decisionType.replaceAll('_', ' ')} · ${action.correctiveAction}${action.details ? ` — ${action.details}` : ''}`
+        );
+        if (canManage) {
+          const removeAction = incidentElement('button', 'ghost', 'Remove');
+          removeAction.type = 'button';
+          removeAction.onclick = async () => {
+            if (
+              !window.confirm(
+                'Remove this occurrence action from the active Code of Conduct rule?'
+              )
+            )
+              return;
+            try {
+              await api('deleteIncidentCodeRuleAction', action.id);
+              await loadIncidentCodeOfConduct();
+            } catch (error) {
+              window.alert(error.message || String(error));
+            }
+          };
+          actionLine.append(' ', removeAction);
+        }
+        ruleCard.appendChild(actionLine);
+      });
+      if (canManage) {
+        const editRule = incidentElement('button', 'ghost', 'Edit rule');
+        editRule.type = 'button';
+        editRule.onclick = () => {
+          document.getElementById('incident-code-rule-id').value = rule.id;
+          provisionSelect.value = String(provision.id);
+          document.getElementById('incident-code-rule-title').value =
+            rule.violationTitle;
+          document.getElementById('incident-code-rule-severity').value =
+            rule.severity;
+          document.getElementById('incident-code-rule-scope').value =
+            rule.occurrenceScope;
+          document.getElementById('incident-code-rule-window').value =
+            rule.occurrenceWindowDays || '';
+          ruleForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+        const deactivateRule = incidentElement('button', 'ghost', 'Deactivate');
+        deactivateRule.type = 'button';
+        deactivateRule.onclick = async () => {
+          if (
+            !window.confirm(
+              'Deactivate this COC violation rule? Historical records will be preserved.'
+            )
+          )
+            return;
+          try {
+            await api('deactivateIncidentCodeRule', rule.id);
+            await loadIncidentCodeOfConduct();
+          } catch (error) {
+            window.alert(error.message || String(error));
+          }
+        };
+        ruleCard.append(editRule, deactivateRule);
+      }
+      details.appendChild(ruleCard);
+    });
+    row.appendChild(details);
     const action = incidentElement('td');
     if (canManage) {
       const edit = incidentElement('button', 'ghost', 'Edit');
@@ -1649,6 +2236,63 @@ async function loadIncidentCodeOfConduct() {
     body.appendChild(row);
   });
 }
+
+document
+  .getElementById('incident-code-rule-form')
+  .addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const feedback = document.getElementById('incident-code-rule-feedback');
+    try {
+      await api('saveIncidentCodeRule', {
+        id: document.getElementById('incident-code-rule-id').value,
+        provisionId: document.getElementById('incident-code-rule-provision')
+          .value,
+        violationTitle: document.getElementById('incident-code-rule-title')
+          .value,
+        severity: document.getElementById('incident-code-rule-severity').value,
+        occurrenceScope: document.getElementById('incident-code-rule-scope')
+          .value,
+        occurrenceWindowDays: document.getElementById(
+          'incident-code-rule-window'
+        ).value
+      });
+      event.currentTarget.reset();
+      document.getElementById('incident-code-rule-id').value = '';
+      setIncidentFeedback(feedback, 'COC rule saved.');
+      await loadIncidentCodeOfConduct();
+    } catch (error) {
+      setIncidentFeedback(feedback, error.message || String(error), true);
+    }
+  });
+document.getElementById('incident-code-rule-reset').onclick = () => {
+  document.getElementById('incident-code-rule-form').reset();
+  document.getElementById('incident-code-rule-id').value = '';
+};
+document
+  .getElementById('incident-code-action-form')
+  .addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const feedback = document.getElementById('incident-code-action-feedback');
+    try {
+      await api(
+        'saveIncidentCodeRuleAction',
+        document.getElementById('incident-code-action-rule').value,
+        document.getElementById('incident-code-action-count').value,
+        document.getElementById('incident-code-action-name').value,
+        document.getElementById('incident-code-action-type').value,
+        document.getElementById('incident-code-action-details').value
+      );
+      const selectedRule = document.getElementById(
+        'incident-code-action-rule'
+      ).value;
+      event.currentTarget.reset();
+      await loadIncidentCodeOfConduct();
+      document.getElementById('incident-code-action-rule').value = selectedRule;
+      setIncidentFeedback(feedback, 'Corrective action rule saved.');
+    } catch (error) {
+      setIncidentFeedback(feedback, error.message || String(error), true);
+    }
+  });
 
 document
   .getElementById('incident-code-provision-form')

@@ -340,6 +340,127 @@ async function initializeDatabase() {
     UNIQUE KEY uq_incident_code_provision (provision_code)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_code_rules (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    provision_id BIGINT UNSIGNED NOT NULL,
+    violation_title VARCHAR(191) NOT NULL,
+    severity VARCHAR(24) NOT NULL,
+    occurrence_scope VARCHAR(24) NOT NULL DEFAULT 'SAME_RULE',
+    occurrence_window_days INT UNSIGNED NULL,
+    active TINYINT(1) NOT NULL DEFAULT 1,
+    created_by VARCHAR(191) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_incident_code_rules (provision_id, active, severity)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_code_rule_actions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    rule_id BIGINT UNSIGNED NOT NULL,
+    prior_offenses INT UNSIGNED NOT NULL DEFAULT 0,
+    decision_type VARCHAR(32) NOT NULL DEFAULT 'OTHER_CORRECTIVE_ACTION',
+    corrective_action VARCHAR(191) NOT NULL,
+    details TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_incident_code_rule_action (rule_id, prior_offenses),
+    KEY idx_incident_code_action_rule (rule_id, prior_offenses)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  const [incidentActionDecisionTypeColumn] = await pool.query(
+    "SHOW COLUMNS FROM incident_code_rule_actions LIKE 'decision_type'"
+  );
+  if (!incidentActionDecisionTypeColumn.length) {
+    await pool.query(
+      "ALTER TABLE incident_code_rule_actions ADD COLUMN decision_type VARCHAR(32) NOT NULL DEFAULT 'OTHER_CORRECTIVE_ACTION' AFTER prior_offenses"
+    );
+  }
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_evaluations (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    incident_id BIGINT UNSIGNED NOT NULL,
+    finding VARCHAR(24) NOT NULL,
+    findings MEDIUMTEXT NOT NULL,
+    rule_id BIGINT UNSIGNED NULL,
+    violation_title VARCHAR(191) NULL,
+    code_reference VARCHAR(191) NULL,
+    severity VARCHAR(24) NULL,
+    previous_offenses INT UNSIGNED NOT NULL DEFAULT 0,
+    suggested_action VARCHAR(191) NULL,
+    recommended_action VARCHAR(191) NULL,
+    recommendation_justification TEXT NOT NULL,
+    remarks TEXT NOT NULL,
+    evaluated_by VARCHAR(191) NOT NULL,
+    evaluated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_incident_evaluation_case (incident_id),
+    KEY idx_incident_evaluation_rule (rule_id, severity)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_evaluation_allowed_actions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    evaluation_id BIGINT UNSIGNED NOT NULL,
+    prior_offenses INT UNSIGNED NOT NULL,
+    decision_type VARCHAR(32) NOT NULL,
+    corrective_action VARCHAR(191) NOT NULL,
+    details TEXT NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_incident_eval_allowed_actions (evaluation_id, prior_offenses)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  const [incidentEvaluationActionTypeColumn] = await pool.query(
+    "SHOW COLUMNS FROM incident_evaluation_allowed_actions LIKE 'decision_type'"
+  );
+  if (!incidentEvaluationActionTypeColumn.length) {
+    await pool.query(
+      "ALTER TABLE incident_evaluation_allowed_actions ADD COLUMN decision_type VARCHAR(32) NOT NULL DEFAULT 'OTHER_CORRECTIVE_ACTION' AFTER prior_offenses"
+    );
+  }
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_decisions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    incident_id BIGINT UNSIGNED NOT NULL,
+    evaluation_id BIGINT UNSIGNED NOT NULL,
+    outcome VARCHAR(32) NOT NULL,
+    violation_title VARCHAR(191) NULL,
+    code_reference VARCHAR(191) NULL,
+    severity VARCHAR(24) NULL,
+    final_action VARCHAR(191) NULL,
+    effective_date DATE NULL,
+    decision_reason TEXT NOT NULL,
+    approver_email VARCHAR(191) NOT NULL,
+    approver_name VARCHAR(191) NOT NULL,
+    approval_signature MEDIUMTEXT NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'ISSUED',
+    issued_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    delivered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    closed_at TIMESTAMP NULL,
+    closure_reason TEXT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_incident_decision_case (incident_id),
+    KEY idx_incident_decision_status (status, issued_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_disciplinary_history (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    incident_id BIGINT UNSIGNED NOT NULL,
+    decision_id BIGINT UNSIGNED NOT NULL,
+    employee_email VARCHAR(191) NOT NULL,
+    rule_id BIGINT UNSIGNED NULL,
+    violation_title VARCHAR(191) NOT NULL,
+    code_reference VARCHAR(191) NOT NULL,
+    severity VARCHAR(24) NOT NULL,
+    corrective_action VARCHAR(191) NOT NULL,
+    effective_date DATE NULL,
+    finalized_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_incident_disciplinary_case (incident_id),
+    KEY idx_incident_disciplinary_employee (employee_email, finalized_at),
+    KEY idx_incident_disciplinary_rule (rule_id, finalized_at),
+    KEY idx_incident_disciplinary_severity (severity, finalized_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
   await pool.query(`CREATE TABLE IF NOT EXISTS incident_ntes (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     incident_id BIGINT UNSIGNED NOT NULL,
