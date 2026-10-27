@@ -1786,6 +1786,82 @@ legend {
   border-left: 3px solid var(--teal);
   background: var(--surface, #f7f8fa);
 }
+#view-incident-history [hidden],
+#view-incident-code-of-conduct [hidden] {
+  display: none !important;
+}
+#view-incident-history > .panel {
+  max-width: none;
+}
+.incident-archive-filters,
+.incident-coc-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+  align-items: end;
+}
+.incident-archive-filters label,
+#view-incident-code-of-conduct label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.incident-coc-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 20px;
+}
+.incident-coc-columns > .panel {
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.incident-coc-provision {
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 12px;
+  margin: 12px 0;
+}
+.incident-coc-provision > summary,
+#ir-coc-management > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.incident-policy-description {
+  white-space: pre-wrap;
+}
+#ir-coc-management {
+  max-width: none;
+  margin-top: 20px;
+}
+#ir-coc-matrix-editor textarea {
+  min-width: 220px;
+  width: 100%;
+}
+#ir-coc-matrix-editor input {
+  width: 90px;
+}
+#ir-coc-publish-form > label {
+  margin: 16px 0;
+}
+#view-incident-code-of-conduct .incident-policy-approval {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.incident-policy-approval input {
+  flex: 0 0 auto;
+  width: auto;
+  margin-top: 3px;
+}
+@media (max-width: 1000px) {
+  .incident-coc-columns {
+    grid-template-columns: 1fr;
+  }
+}
 .incident-evaluation-context {
   margin: 10px 0;
   padding: 10px;

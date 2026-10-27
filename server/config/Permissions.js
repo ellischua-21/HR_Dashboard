@@ -1,6 +1,7 @@
 // Role grants and account-request role normalization.
 const ROLE_PERMS = {
   ADMIN: [
+    'incidents.coc.manage',
     'dash.view',
     'exec.view',
     'emp.read',
@@ -17,6 +18,7 @@ const ROLE_PERMS = {
     'account.password'
   ],
   HR: [
+    'incidents.coc.manage',
     'dash.view',
     'exec.view',
     'emp.read',

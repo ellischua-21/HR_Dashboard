@@ -15,6 +15,8 @@ const inbox = require('./services/InboxService');
 const accounts = require('./services/AccountService');
 const userForms = require('./services/FormService');
 const incidents = require('./services/IncidentService');
+const incidentArchive = require('./services/incident-management/Archive');
+const incidentConduct = require('./services/incident-management/Conduct');
 const { verifyPassword } = require('./utils/Password');
 
 const app = express();
@@ -169,7 +171,18 @@ const methods = {
   listIncidentsForTrack: (req) => incidents.listIncidentsForTrack(req),
   getIncidentTrackingVersion: (req, incidentId) =>
     incidents.getIncidentTrackingVersion(req, incidentId),
-  listIncidentsForHistory: (req) => incidents.listIncidentsForHistory(req),
+  listIncidentsForHistory: (req, filters) =>
+    incidents.listIncidentsForHistory(req, filters),
+  listIncidentViolations: (req, filters) =>
+    incidentArchive.listIncidentViolations(req, filters),
+  getIncidentCodeGuide: (req, id) =>
+    incidentConduct.getIncidentCodeGuide(req, id),
+  saveIncidentPolicyDraft: (req, matrix) =>
+    incidentConduct.saveIncidentPolicyDraft(req, matrix),
+  publishIncidentPolicy: (req, input) =>
+    incidentConduct.publishIncidentPolicy(req, input),
+  getIncidentPolicyPdf: (req, id) =>
+    incidentConduct.getIncidentPolicyPdf(req, id),
   listIncidentsForReview: (req) => incidents.listIncidentsForReview(req),
   getIncidentReviewDashboard: (req, filters) =>
     incidents.getIncidentReviewDashboard(req, filters),

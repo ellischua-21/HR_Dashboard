@@ -8,7 +8,14 @@
     'EXPLANATION SENT': 'Explanation Sent',
     EVALUATION: 'Evaluation',
     'DECISION ISSUED': 'Decision Issued',
-    CLOSED: 'Closed'
+    CLOSED: 'Closed',
+    NO_VIOLATION: 'No Violation Established',
+    WRITTEN_WARNING: 'Written Warning',
+    SUSPENSION: 'Suspension',
+    TERMINATION: 'Termination',
+    OTHER_CORRECTIVE_ACTION: 'Other Corrective Action',
+    CLOSED_FOR_DOCUMENTATION: 'Closed for Documentation',
+    INVESTIGATION_CLOSED: 'Closed after Investigation'
   };
   const states = {
     completed: 'Completed',

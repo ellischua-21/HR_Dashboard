@@ -1622,14 +1622,18 @@ function renderIncidentReport(body, incident) {
 }
 
 let incidentOpenRequest = 0;
-async function openIncidentCase(incidentId) {
+async function openIncidentCase(incidentId, options = {}) {
   const ticket = ++incidentOpenRequest;
   const reviewView = !document.getElementById('view-incident-review').hidden;
   const owner = session?.email;
   let incident = await api('getIncidentCase', incidentId);
+  if (options.archived && incident.status !== 'CLOSED')
+    throw new Error('This case has not been closed. Open it in Track.');
   if (
     ticket !== incidentOpenRequest ||
     owner !== session?.email ||
+    (options.archived &&
+      document.getElementById('view-incident-history').hidden) ||
     (reviewView && document.getElementById('view-incident-review').hidden)
   )
     return;
@@ -1651,6 +1655,8 @@ async function openIncidentCase(incidentId) {
   if (
     ticket !== incidentOpenRequest ||
     owner !== session?.email ||
+    (options.archived &&
+      document.getElementById('view-incident-history').hidden) ||
     (reviewView && document.getElementById('view-incident-review').hidden)
   )
     return;
@@ -1667,7 +1673,7 @@ async function openIncidentCase(incidentId) {
   document.getElementById(
     inline ? 'ir-review-case-title' : 'ir-case-title'
   ).textContent = incident.caseNumber;
-  if (inline) {
+  if (inline || incident.status === 'CLOSED') {
     const progress = incidentElement('section', 'incident-review-progress');
     body.appendChild(progress);
     window.IncidentProgress.render(progress, incident);
@@ -1681,6 +1687,27 @@ async function openIncidentCase(incidentId) {
       );
   }
   renderIncidentReport(body, incident);
+  if (incident.policyReferences?.length) {
+    const references = incidentElement('section', 'incident-case-section');
+    references.appendChild(
+      incidentElement('h3', '', 'Recorded policy references')
+    );
+    for (const reference of incident.policyReferences)
+      references.appendChild(
+        incidentElement(
+          'p',
+          '',
+          reference.documentType +
+            ': ' +
+            (reference.version
+              ? reference.version + ' · Effective ' + reference.effectiveDate
+              : 'Captured working configuration (unpublished)') +
+            ' · ' +
+            new Date(reference.capturedAt).toLocaleString()
+        )
+      );
+    body.appendChild(references);
+  }
 
   const signatures = incidentElement('section', 'incident-case-section');
   signatures.appendChild(
@@ -2029,29 +2056,6 @@ async function runIncidentTransition(incident, action, details, ui = {}) {
   }
 }
 
-function renderIncidentRows(rows, targetId, emptyId) {
-  const body = document.getElementById(targetId);
-  body.replaceChildren();
-  document.getElementById(emptyId).hidden = rows.length > 0;
-  rows.forEach((incident) => {
-    const row = incidentElement('tr');
-    [
-      incident.caseNumber,
-      incident.subject,
-      incident.reportedEmployeeName,
-      incident.incidentDate,
-      incident.status
-    ].forEach((value) => row.appendChild(incidentElement('td', '', value)));
-    const action = incidentElement('td');
-    const open = incidentElement('button', 'ghost', 'Open');
-    open.type = 'button';
-    open.addEventListener('click', () => openIncidentCase(incident.id));
-    action.appendChild(open);
-    row.appendChild(action);
-    body.appendChild(row);
-  });
-}
-
 async function loadIncidentTrack() {
   const requested = pendingIncidentCaseId;
   pendingIncidentCaseId = null;
@@ -2059,13 +2063,9 @@ async function loadIncidentTrack() {
 }
 
 async function loadIncidentHistory() {
-  const rows = await api('listIncidentsForHistory');
-  renderIncidentRows(rows, 'ir-history-rows', 'ir-history-empty');
-  if (pendingIncidentCaseId) {
-    const id = pendingIncidentCaseId;
-    pendingIncidentCaseId = null;
-    await openIncidentCase(id);
-  }
+  const requested = pendingIncidentCaseId;
+  pendingIncidentCaseId = null;
+  await window.IncidentHistory.load(requested);
 }
 
 async function loadIncidentReview() {
@@ -2121,232 +2121,8 @@ window.IncidentCaseUI = {
 };
 
 async function loadIncidentCodeOfConduct() {
-  incidentCodeProvisions = await api('listIncidentCodeProvisions');
-  const form = document.getElementById('incident-code-provision-form');
-  const canManage = ['HR', 'ADMIN'].includes(session.role);
-  form.hidden = !canManage;
-  const ruleForm = document.getElementById('incident-code-rule-form');
-  const actionForm = document.getElementById('incident-code-action-form');
-  ruleForm.hidden = !canManage;
-  actionForm.hidden = !canManage;
-  const provisionSelect = document.getElementById(
-    'incident-code-rule-provision'
-  );
-  const ruleSelect = document.getElementById('incident-code-action-rule');
-  provisionSelect.replaceChildren(new Option('Select a provision', ''));
-  ruleSelect.replaceChildren(new Option('Select a violation rule', ''));
-  incidentCodeProvisions.forEach((provision) => {
-    provisionSelect.add(
-      new Option(`${provision.code} — ${provision.title}`, provision.id)
-    );
-    (provision.rules || []).forEach((rule) => {
-      const label = `${provision.code} — ${rule.violationTitle} (${rule.severity})`;
-      ruleSelect.add(new Option(label, rule.id));
-    });
-  });
-  const body = document.getElementById('incident-code-provision-rows');
-  body.replaceChildren();
-  document.getElementById('incident-code-provision-empty').hidden =
-    incidentCodeProvisions.length > 0;
-  incidentCodeProvisions.forEach((provision) => {
-    const row = incidentElement('tr');
-    row.append(
-      incidentElement('td', '', provision.code),
-      incidentElement('td', '', provision.title)
-    );
-    const details = incidentElement('td');
-    details.appendChild(incidentElement('p', '', provision.description));
-    (provision.rules || []).forEach((rule) => {
-      const ruleCard = incidentElement('div', 'incident-code-rule-card');
-      ruleCard.appendChild(
-        incidentElement(
-          'strong',
-          '',
-          `${rule.violationTitle} · ${rule.severity}`
-        )
-      );
-      ruleCard.appendChild(
-        incidentElement(
-          'p',
-          'note',
-          `Occurrence count: ${rule.occurrenceScope.replaceAll('_', ' ').toLowerCase()}${rule.occurrenceWindowDays ? `, last ${rule.occurrenceWindowDays} days` : ', all history'}`
-        )
-      );
-      (rule.actions || []).forEach((action) => {
-        const actionLine = incidentElement(
-          'p',
-          '',
-          `${action.priorOffenses} prior offense(s): ${action.decisionType.replaceAll('_', ' ')} · ${action.correctiveAction}${action.details ? ` — ${action.details}` : ''}`
-        );
-        if (canManage) {
-          const removeAction = incidentElement('button', 'ghost', 'Remove');
-          removeAction.type = 'button';
-          removeAction.onclick = async () => {
-            if (
-              !window.confirm(
-                'Remove this occurrence action from the active Code of Conduct rule?'
-              )
-            )
-              return;
-            try {
-              await api('deleteIncidentCodeRuleAction', action.id);
-              await loadIncidentCodeOfConduct();
-            } catch (error) {
-              window.alert(error.message || String(error));
-            }
-          };
-          actionLine.append(' ', removeAction);
-        }
-        ruleCard.appendChild(actionLine);
-      });
-      if (canManage) {
-        const editRule = incidentElement('button', 'ghost', 'Edit rule');
-        editRule.type = 'button';
-        editRule.onclick = () => {
-          document.getElementById('incident-code-rule-id').value = rule.id;
-          provisionSelect.value = String(provision.id);
-          document.getElementById('incident-code-rule-title').value =
-            rule.violationTitle;
-          document.getElementById('incident-code-rule-severity').value =
-            rule.severity;
-          document.getElementById('incident-code-rule-scope').value =
-            rule.occurrenceScope;
-          document.getElementById('incident-code-rule-window').value =
-            rule.occurrenceWindowDays || '';
-          ruleForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        };
-        const deactivateRule = incidentElement('button', 'ghost', 'Deactivate');
-        deactivateRule.type = 'button';
-        deactivateRule.onclick = async () => {
-          if (
-            !window.confirm(
-              'Deactivate this COC violation rule? Historical records will be preserved.'
-            )
-          )
-            return;
-          try {
-            await api('deactivateIncidentCodeRule', rule.id);
-            await loadIncidentCodeOfConduct();
-          } catch (error) {
-            window.alert(error.message || String(error));
-          }
-        };
-        ruleCard.append(editRule, deactivateRule);
-      }
-      details.appendChild(ruleCard);
-    });
-    row.appendChild(details);
-    const action = incidentElement('td');
-    if (canManage) {
-      const edit = incidentElement('button', 'ghost', 'Edit');
-      edit.type = 'button';
-      edit.onclick = () => {
-        document.getElementById('incident-code-provision-id').value =
-          provision.id;
-        document.getElementById('incident-code-provision-code').value =
-          provision.code;
-        document.getElementById('incident-code-provision-title').value =
-          provision.title;
-        document.getElementById('incident-code-provision-description').value =
-          provision.description;
-        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      };
-      action.appendChild(edit);
-    }
-    row.appendChild(action);
-    body.appendChild(row);
-  });
+  await window.IncidentConduct.load();
 }
-
-document
-  .getElementById('incident-code-rule-form')
-  .addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const feedback = document.getElementById('incident-code-rule-feedback');
-    try {
-      await api('saveIncidentCodeRule', {
-        id: document.getElementById('incident-code-rule-id').value,
-        provisionId: document.getElementById('incident-code-rule-provision')
-          .value,
-        violationTitle: document.getElementById('incident-code-rule-title')
-          .value,
-        severity: document.getElementById('incident-code-rule-severity').value,
-        occurrenceScope: document.getElementById('incident-code-rule-scope')
-          .value,
-        occurrenceWindowDays: document.getElementById(
-          'incident-code-rule-window'
-        ).value
-      });
-      event.currentTarget.reset();
-      document.getElementById('incident-code-rule-id').value = '';
-      setIncidentFeedback(feedback, 'COC rule saved.');
-      await loadIncidentCodeOfConduct();
-    } catch (error) {
-      setIncidentFeedback(feedback, error.message || String(error), true);
-    }
-  });
-document.getElementById('incident-code-rule-reset').onclick = () => {
-  document.getElementById('incident-code-rule-form').reset();
-  document.getElementById('incident-code-rule-id').value = '';
-};
-document
-  .getElementById('incident-code-action-form')
-  .addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const feedback = document.getElementById('incident-code-action-feedback');
-    try {
-      await api(
-        'saveIncidentCodeRuleAction',
-        document.getElementById('incident-code-action-rule').value,
-        document.getElementById('incident-code-action-count').value,
-        document.getElementById('incident-code-action-name').value,
-        document.getElementById('incident-code-action-type').value,
-        document.getElementById('incident-code-action-details').value
-      );
-      const selectedRule = document.getElementById(
-        'incident-code-action-rule'
-      ).value;
-      event.currentTarget.reset();
-      await loadIncidentCodeOfConduct();
-      document.getElementById('incident-code-action-rule').value = selectedRule;
-      setIncidentFeedback(feedback, 'Corrective action rule saved.');
-    } catch (error) {
-      setIncidentFeedback(feedback, error.message || String(error), true);
-    }
-  });
-
-document
-  .getElementById('incident-code-provision-form')
-  .addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const feedback = document.getElementById(
-      'incident-code-provision-feedback'
-    );
-    try {
-      await api('saveIncidentCodeProvision', {
-        id: document.getElementById('incident-code-provision-id').value,
-        code: document.getElementById('incident-code-provision-code').value,
-        title: document.getElementById('incident-code-provision-title').value,
-        description: document.getElementById(
-          'incident-code-provision-description'
-        ).value
-      });
-      event.currentTarget.reset();
-      document.getElementById('incident-code-provision-id').value = '';
-      setIncidentFeedback(feedback, 'Provision saved.');
-      await loadIncidentCodeOfConduct();
-    } catch (error) {
-      setIncidentFeedback(feedback, error.message || String(error), true);
-    }
-  });
-document.getElementById('incident-code-provision-reset').onclick = () => {
-  document.getElementById('incident-code-provision-form').reset();
-  document.getElementById('incident-code-provision-id').value = '';
-  setIncidentFeedback(
-    document.getElementById('incident-code-provision-feedback'),
-    ''
-  );
-};
 
 VIEWS['incident-file'] = guard(loadIncidentFile);
 VIEWS['incident-track'] = guard(loadIncidentTrack);

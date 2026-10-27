@@ -652,6 +652,41 @@ async function initializeDatabase() {
     KEY idx_inbox_view_user (user_email, viewed_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_code_policies (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    version VARCHAR(100) NOT NULL,
+    effective_date DATE NOT NULL,
+    snapshot MEDIUMTEXT NOT NULL,
+    approved_by VARCHAR(191) NOT NULL,
+    approved_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    pdf_name VARCHAR(191) NULL,
+    pdf_data MEDIUMBLOB NULL,
+    UNIQUE KEY uq_incident_policy_version (version),
+    KEY idx_incident_policy_effective (effective_date, id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_code_policy_draft (
+    id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+    matrix MEDIUMTEXT NOT NULL,
+    updated_by VARCHAR(191) NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  await pool.execute(
+    'INSERT IGNORE INTO incident_code_policy_draft (id, matrix) VALUES (1, ?)',
+    [
+      JSON.stringify(
+        require('../services/incident-management/PolicyDefaults').MATRIX
+      )
+    ]
+  );
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_document_policies (
+    incident_id BIGINT UNSIGNED NOT NULL,
+    document_type VARCHAR(16) NOT NULL,
+    policy_id BIGINT UNSIGNED NULL,
+    snapshot MEDIUMTEXT NOT NULL,
+    captured_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (incident_id, document_type)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
   await pool.query(`CREATE TABLE IF NOT EXISTS system_settings (
     setting_key VARCHAR(100) NOT NULL,
     setting_value VARCHAR(255) NOT NULL,

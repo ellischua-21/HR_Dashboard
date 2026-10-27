@@ -137,26 +137,71 @@
 <section id="view-incident-history" class="view" hidden>
   <section class="panel">
     <div class="account-heading">
-      <h2>Closed Incident Reports</h2>
+      <h2>History</h2>
       <button id="ir-history-refresh" class="ghost" type="button">
         Refresh
       </button>
     </div>
-    <p id="ir-history-empty" class="note" hidden>No closed Incident Reports.</p>
+    <form id="ir-history-filters" class="incident-archive-filters">
+      <label
+        >Search<input
+          id="ir-history-search"
+          type="search"
+          maxlength="191"
+          placeholder="Title or IR number"
+      /></label>
+      <label>IR number<input id="ir-history-number" maxlength="100" /></label>
+      <label>Closed from<input id="ir-history-from" type="date" /></label>
+      <label>Closed through<input id="ir-history-to" type="date" /></label>
+      <label
+        >Outcome<select id="ir-history-outcome">
+          <option value="ALL">All outcomes</option>
+          <option value="NO_VIOLATION">No Violation Established</option>
+          <option value="WRITTEN_WARNING">Written Warning</option>
+          <option value="SUSPENSION">Suspension</option>
+          <option value="TERMINATION">Termination</option>
+          <option value="OTHER_CORRECTIVE_ACTION">
+            Other Corrective Action
+          </option>
+          <option value="DECISION ISSUED">Decision Issued</option>
+          <option value="CLOSED_FOR_DOCUMENTATION">
+            Closed for Documentation
+          </option>
+          <option value="INVESTIGATION_CLOSED">
+            Closed after Investigation
+          </option>
+          <option value="CLOSED">Closed</option>
+        </select></label
+      >
+      <div class="actions">
+        <button type="submit">Apply filters</button
+        ><button id="ir-history-clear" type="button" class="ghost">
+          Clear
+        </button>
+      </div>
+    </form>
+    <p id="ir-history-feedback" role="status" hidden></p>
+    <p id="ir-history-empty" class="note" hidden>No matching closed cases.</p>
     <div class="tablewrap">
       <table>
         <thead>
           <tr>
-            <th>Case Number</th>
-            <th>Subject</th>
-            <th>Employee</th>
-            <th>Date</th>
-            <th>Status</th>
+            <th>IR Number</th>
+            <th>Incident Title</th>
+            <th>Date Filed</th>
+            <th>Date Closed</th>
+            <th>Final Status or Outcome</th>
             <th></th>
           </tr>
         </thead>
         <tbody id="ir-history-rows"></tbody>
       </table>
+    </div>
+    <div class="incident-review-pagination">
+      <button id="ir-history-previous" class="ghost" type="button">
+        Previous</button
+      ><span id="ir-history-page" role="status"></span
+      ><button id="ir-history-next" class="ghost" type="button">Next</button>
     </div>
   </section>
 </section>
@@ -280,11 +325,107 @@
 </section>
 
 <section id="view-incident-code-of-conduct" class="view" hidden>
-  <section class="panel">
-    <h2>Code of Conduct</h2>
+  <h2>Code of Conduct</h2>
+  <p id="ir-coc-feedback" role="status" hidden></p>
+  <div class="incident-coc-columns">
+    <section
+      class="panel incident-coc-guide"
+      aria-labelledby="ir-coc-guide-heading"
+    >
+      <h3 id="ir-coc-guide-heading">COC Guide</h3>
+      <p id="ir-coc-policy-meta" role="status"></p>
+      <label>Policy version<select id="ir-coc-version"></select></label>
+      <div class="incident-coc-filters">
+        <label
+          >Search violations<input
+            id="ir-coc-search"
+            type="search"
+            maxlength="191"
+        /></label>
+        <label
+          >Severity<select id="ir-coc-severity">
+            <option value="ALL">All severities</option>
+            <option>Light</option>
+            <option>Moderate</option>
+            <option>Grave</option>
+            <option>Intolerable</option>
+          </select></label
+        >
+      </div>
+      <button id="ir-coc-download" class="ghost" type="button" hidden>
+        Download Approved COC PDF
+      </button>
+      <div id="ir-coc-guide"></div>
+      <h4>Corrective Action Matrix</h4>
+      <p id="ir-coc-matrix-note" class="note"></p>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Severity</th>
+              <th>Occurrence</th>
+              <th>Corrective Action</th>
+            </tr>
+          </thead>
+          <tbody id="ir-coc-matrix"></tbody>
+        </table>
+      </div>
+    </section>
+    <section
+      class="panel incident-coc-history"
+      aria-labelledby="ir-coc-history-heading"
+    >
+      <h3 id="ir-coc-history-heading">Violation History</h3>
+      <form id="ir-violation-employee-form" class="actions" hidden>
+        <label
+          >Employee account email<input
+            id="ir-violation-employee"
+            type="email"
+            maxlength="191"
+            required /></label
+        ><button type="submit">View records</button
+        ><button id="ir-violation-own" type="button" class="ghost">
+          My records
+        </button>
+      </form>
+      <p id="ir-violation-owner"></p>
+      <p id="ir-violation-feedback" role="status" hidden></p>
+      <p id="ir-violation-empty" class="note" hidden>
+        No finalized violations.
+      </p>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Violation Date</th>
+              <th>IR Number</th>
+              <th>Violation</th>
+              <th>Severity</th>
+              <th>Occurrence</th>
+              <th>Corrective Action</th>
+              <th>Decision Date</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="ir-violation-rows"></tbody>
+        </table>
+      </div>
+      <div class="incident-review-pagination">
+        <button id="ir-violation-previous" type="button" class="ghost">
+          Previous</button
+        ><span id="ir-violation-page" role="status"></span
+        ><button id="ir-violation-next" type="button" class="ghost">
+          Next
+        </button>
+      </div>
+    </section>
+  </div>
+  <details id="ir-coc-management" class="panel" hidden>
+    <summary>Manage COC configuration</summary>
     <p class="note">
-      HR and ADMIN can maintain the provisions used when preparing a Notice to
-      Explain.
+      Changes here update working rules. Publish a new approved version to
+      update the employee guide. Saved case documents keep their captured policy
+      references.
     </p>
     <form
       id="incident-code-provision-form"
@@ -426,7 +567,53 @@
         <tbody id="incident-code-provision-rows"></tbody>
       </table>
     </div>
-  </section>
+
+    <h3>Policy version and progressive matrix</h3>
+    <form id="ir-coc-publish-form">
+      <div class="incident-coc-filters">
+        <label
+          >New policy version<input
+            id="ir-coc-new-version"
+            maxlength="100"
+            required /></label
+        ><label
+          >Effective date<input id="ir-coc-effective" type="date" required
+        /></label>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Severity</th>
+              <th>Occurrence</th>
+              <th>Corrective Action</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="ir-coc-matrix-editor"></tbody>
+        </table>
+      </div>
+      <button id="ir-coc-matrix-add" type="button" class="ghost">
+        Add matrix row
+      </button>
+      <label
+        >Approved COC PDF (optional, up to 4 MB)<input
+          id="ir-coc-pdf"
+          type="file"
+          accept="application/pdf,.pdf"
+      /></label>
+      <label class="incident-policy-approval"
+        ><input id="ir-coc-approved" type="checkbox" required />I confirm this
+        policy version and matrix are approved for publication.</label
+      >
+      <div class="actions">
+        <button id="ir-coc-save-draft" type="button" class="ghost">
+          Save matrix draft</button
+        ><button type="submit">Publish approved version</button>
+      </div>
+      <p id="ir-coc-publish-feedback" role="status" hidden></p>
+    </form>
+  </details>
 </section>
 
 <dialog id="ir-case-dialog" class="incident-case-dialog">

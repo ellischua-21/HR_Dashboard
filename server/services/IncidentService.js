@@ -16,6 +16,12 @@ const {
   buildReviewFilter
 } = require('./incident-management/Review');
 
+const {
+  readCodeProvisions,
+  snapshotCasePolicy
+} = require('./incident-management/Conduct');
+const { listIncidentsForHistory } = require('./incident-management/Archive');
+
 const FILING_ROLES = new Set(['HEAD', 'HR', 'ADMIN']);
 const REVIEW_ROLES = new Set(['HR', 'ADMIN']);
 const MAX_EVIDENCE_FILES = 10;
@@ -529,23 +535,6 @@ function addIncidentCountdown(rows) {
   }));
 }
 
-async function listIncidentsForHistory(req) {
-  const user = await requirePerm(req, 'inbox.read');
-  if (!['STAFF', 'HEAD'].includes(user.role)) {
-    throw httpError('History is available to STAFF and HEAD accounts.', 403);
-  }
-  const scope = incidentAccessScope(user);
-  const [rows] = await pool.execute(
-    `SELECT ${incidentListFields()}
-     FROM incident_reports
-     WHERE status = 'CLOSED'
-       AND ${scope.sql}
-     ORDER BY updated_at DESC, id DESC LIMIT 300`,
-    scope.values
-  );
-  return addIncidentCountdown(rows);
-}
-
 async function listIncidentsForTrack(req) {
   const user = await requirePerm(req, 'inbox.read');
   const scope = incidentAccessScope(user);
@@ -783,42 +772,12 @@ async function transitionIncident(req, incidentId, action, details = '') {
 }
 
 async function listIncidentCodeProvisions(req) {
-  const user = await requirePerm(req, 'inbox.read');
-  const [rows] = await pool.execute(
-    `SELECT id, provision_code AS code, title, description
-     FROM incident_code_provisions WHERE active = 1 ORDER BY provision_code, title`
-  );
-  const [rules] = await pool.execute(
-    `SELECT r.id, r.provision_id AS provisionId,
-            r.violation_title AS violationTitle, r.severity,
-            r.occurrence_scope AS occurrenceScope,
-            r.occurrence_window_days AS occurrenceWindowDays
-     FROM incident_code_rules r JOIN incident_code_provisions p ON p.id = r.provision_id
-     WHERE r.active = 1 AND p.active = 1 ORDER BY p.provision_code, r.violation_title`
-  );
-  const [actions] = await pool.execute(
-    `SELECT id, rule_id AS ruleId, prior_offenses AS priorOffenses,
-            decision_type AS decisionType, corrective_action AS correctiveAction, details
-     FROM incident_code_rule_actions ORDER BY prior_offenses, id`
-  );
-  const includeActions = REVIEW_ROLES.has(user.role);
-  rows.forEach((provision) => {
-    provision.rules = rules
-      .filter((rule) => Number(rule.provisionId) === Number(provision.id))
-      .map((rule) => ({
-        ...rule,
-        actions: includeActions
-          ? actions.filter(
-              (action) => Number(action.ruleId) === Number(rule.id)
-            )
-          : []
-      }));
-  });
-  return rows;
+  await requirePerm(req, 'inbox.read');
+  return readCodeProvisions();
 }
 
 async function saveIncidentCodeProvision(req, input = {}) {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requirePerm(req, 'incidents.coc.manage');
   requireIncidentRole(
     user,
     REVIEW_ROLES,
@@ -852,7 +811,7 @@ async function saveIncidentCodeProvision(req, input = {}) {
 }
 
 async function saveIncidentCodeRule(req, input = {}) {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requirePerm(req, 'incidents.coc.manage');
   requireIncidentRole(
     user,
     REVIEW_ROLES,
@@ -917,7 +876,7 @@ async function saveIncidentCodeRuleAction(
   decisionType,
   details = ''
 ) {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requirePerm(req, 'incidents.coc.manage');
   requireIncidentRole(
     user,
     REVIEW_ROLES,
@@ -973,7 +932,7 @@ async function saveIncidentCodeRuleAction(
 }
 
 async function deactivateIncidentCodeRule(req, ruleId) {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requirePerm(req, 'incidents.coc.manage');
   requireIncidentRole(
     user,
     REVIEW_ROLES,
@@ -1001,7 +960,7 @@ async function deactivateIncidentCodeRule(req, ruleId) {
 }
 
 async function deleteIncidentCodeRuleAction(req, actionId) {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requirePerm(req, 'incidents.coc.manage');
   requireIncidentRole(
     user,
     REVIEW_ROLES,
@@ -1147,6 +1106,7 @@ async function upsertIncidentNte(connection, user, incident, input) {
       ]
     );
   }
+  await snapshotCasePolicy(connection, incident.id, 'NTE', fields.provisionId);
   return { nteId, ...fields, provision };
 }
 
@@ -1621,6 +1581,7 @@ async function saveIncidentEvaluation(req, incidentId, input = {}) {
         user.email
       ]
     );
+    await snapshotCasePolicy(connection, id, 'EVALUATION', rule?.provisionId);
     const [[savedEvaluation]] = await connection.execute(
       'SELECT id FROM incident_evaluations WHERE incident_id = ? FOR UPDATE',
       [id]
@@ -2809,8 +2770,34 @@ async function getIncidentCase(req, incidentId) {
       );
     });
   }
+  const policyReferences = [];
+  if (canViewNte) {
+    const [references] = await pool.execute(
+      'SELECT document_type AS documentType, snapshot, captured_at AS capturedAt FROM incident_document_policies WHERE incident_id = ?',
+      [id]
+    );
+    for (const reference of references) {
+      if (
+        reference.documentType === 'EVALUATION' &&
+        !REVIEW_ROLES.has(user.role) &&
+        !decision
+      )
+        continue;
+      const snapshot =
+        typeof reference.snapshot === 'string'
+          ? JSON.parse(reference.snapshot)
+          : reference.snapshot;
+      policyReferences.push({
+        documentType: reference.documentType,
+        version: snapshot.version,
+        effectiveDate: snapshot.effectiveDate,
+        capturedAt: reference.capturedAt
+      });
+    }
+  }
   return {
     ...incident,
+    policyReferences,
     tracking: buildIncidentTracking(
       incident,
       signatures,
