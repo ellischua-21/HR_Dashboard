@@ -6,14 +6,6 @@
   const options = byId('ir-track-options');
   const content = byId('ir-track-content');
   const feedback = byId('ir-track-action-feedback');
-  const stateLabels = {
-    completed: 'Completed',
-    current: 'Current stage',
-    upcoming: 'Upcoming',
-    skipped: 'Not required / skipped',
-    closed: 'Closed here',
-    discontinued: 'Path discontinued'
-  };
   let cases = [];
   let selectedId = null;
   let actor = '';
@@ -123,64 +115,7 @@
   });
 
   function renderProgress(incident) {
-    const tracking = incident.tracking;
-    const stages = byId('ir-track-progress');
-    stages.replaceChildren();
-    byId('ir-track-case-heading').textContent =
-      `${incident.caseNumber} · ${incident.subject}`;
-    const current = tracking.stages.find(
-      (stage) => stage.key === tracking.currentStage
-    );
-    byId('ir-track-status').textContent = tracking.closed
-      ? `Closed · ${tracking.completedProcess ? 'Decision issued' : `Closed during ${current.label.toLowerCase()}`}`
-      : `Current stage: ${current.label}`;
-    tracking.stages.forEach((stage, index) => {
-      const step = el('li', `incident-track-step is-${stage.state}`);
-      if (stage.state === 'current') step.setAttribute('aria-current', 'step');
-      const marker = el(
-        'span',
-        'incident-track-marker',
-        stage.state === 'completed'
-          ? '✓'
-          : stage.state === 'closed'
-            ? '×'
-            : stage.state === 'skipped'
-              ? '–'
-              : String(index + 1)
-      );
-      marker.setAttribute('aria-hidden', 'true');
-      step.append(
-        marker,
-        el('strong', '', stage.label),
-        el('span', 'incident-track-state', stateLabels[stage.state])
-      );
-      const date = el(
-        'time',
-        '',
-        stage.reachedAt ? dateTime(stage.reachedAt) : '—'
-      );
-      if (stage.reachedAt)
-        date.dateTime = new Date(stage.reachedAt).toISOString();
-      step.appendChild(date);
-      stages.appendChild(step);
-    });
-    const closure = byId('ir-track-closure');
-    closure.hidden = !tracking.closed;
-    closure.textContent = tracking.closed
-      ? `${tracking.closureReason}${tracking.closedAt ? ` Closed ${dateTime(tracking.closedAt)}.` : ''}`
-      : '';
-    byId('ir-track-progress-panel').hidden = false;
-    const step =
-      stages.querySelector('[aria-current="step"], .is-closed') ||
-      stages.lastElementChild;
-    const scroller = stages.parentElement;
-    scroller.scrollLeft = Math.max(
-      0,
-      step.offsetLeft -
-        stages.offsetLeft -
-        scroller.clientWidth / 2 +
-        step.clientWidth / 2
-    );
+    window.IncidentProgress.render(byId('ir-track-progress-panel'), incident);
   }
 
   function renderInformationRequests(incident) {

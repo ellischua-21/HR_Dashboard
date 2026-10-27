@@ -1,3 +1,6 @@
+const {
+  incidentNotificationTarget
+} = require('./incident-management/Tracking');
 const { pool } = require('../db/database');
 const { requirePerm } = require('../middleware/Auth');
 const FORM_TEMPLATES = require('../../shared/FormTemplates');
@@ -112,35 +115,43 @@ async function getInbox(req) {
         ? notification.notificationType === 'HEAD_SIGNATURE'
           ? 'Incident Report requires your review and signature'
           : 'Incident Report requires your acknowledgment'
-        : notification.notificationType === 'HR_REVIEW_READY'
-          ? 'Incident Report sent to HR for review'
-          : notification.notificationType === 'CASE_CLOSED'
-            ? 'Incident Report case closed'
-            : notification.notificationType === 'INVESTIGATION_STARTED'
-              ? 'Incident Report under investigation'
-              : notification.notificationType === 'NTE_ISSUED'
-                ? 'Notice to Explain issued'
-                : notification.notificationType === 'DECISION_ISSUED'
-                  ? 'Incident Report decision issued'
-                  : notification.notificationType === 'EXPLANATION_SENT'
-                    ? 'Employee explanation submitted'
-                    : notification.notificationType.startsWith(
-                          'EXPLANATION_ADD_'
-                        )
-                      ? 'Employee additional statement submitted'
-                      : notification.notificationType.startsWith('NTE_OVERDUE')
-                        ? 'NTE explanation is overdue'
-                        : notification.notificationType.startsWith('NTE_EXT_')
-                          ? 'NTE explanation deadline updated'
+        : notification.notificationType === 'IR_SUBMITTED'
+          ? 'Incident Report submitted'
+          : notification.notificationType === 'DECISION_PENDING'
+            ? 'Incident evaluation ready for final decision'
+            : notification.notificationType === 'HR_REVIEW_READY'
+              ? 'Incident Report sent to HR for review'
+              : notification.notificationType === 'CASE_CLOSED'
+                ? 'Incident Report case closed'
+                : notification.notificationType === 'INVESTIGATION_STARTED'
+                  ? 'Incident Report under investigation'
+                  : notification.notificationType === 'NTE_ISSUED'
+                    ? 'Notice to Explain issued'
+                    : notification.notificationType === 'DECISION_ISSUED'
+                      ? 'Incident Report decision issued'
+                      : notification.notificationType === 'EXPLANATION_SENT'
+                        ? 'Employee explanation submitted'
+                        : notification.notificationType.startsWith(
+                              'EXPLANATION_ADD_'
+                            )
+                          ? 'Employee additional statement submitted'
                           : notification.notificationType.startsWith(
-                                'INFO_REQ_'
+                                'NTE_OVERDUE'
                               )
-                            ? 'Additional incident information requested'
+                            ? 'NTE explanation is overdue'
                             : notification.notificationType.startsWith(
-                                  'INFO_DONE_'
+                                  'NTE_EXT_'
                                 )
-                              ? 'Additional incident information received'
-                              : 'Incident Report updated',
+                              ? 'NTE explanation deadline updated'
+                              : notification.notificationType.startsWith(
+                                    'INFO_REQ_'
+                                  )
+                                ? 'Additional incident information requested'
+                                : notification.notificationType.startsWith(
+                                      'INFO_DONE_'
+                                    )
+                                  ? 'Additional incident information received'
+                                  : 'Incident Report updated',
       message:
         notification.notificationType === 'NTE_ISSUED'
           ? `${notification.caseNumber} has advanced. Open HRIS to view information available to your account.`
@@ -148,27 +159,7 @@ async function getInbox(req) {
       createdAt: notification.createdAt,
       notificationId: notification.notificationId,
       incidentId: notification.incidentId,
-      target:
-        ['EXPLANATION_SENT'].includes(notification.notificationType) ||
-        notification.notificationType.startsWith('EXPLANATION_ADD_') ||
-        notification.notificationType.startsWith('NTE_OVERDUE')
-          ? 'incident-review'
-          : notification.notificationType === 'CASE_CLOSED'
-            ? ['HR', 'ADMIN'].includes(user.role)
-              ? 'incident-review'
-              : 'incident-history'
-            : notification.notificationType === 'DECISION_ISSUED'
-              ? ['HR', 'ADMIN'].includes(user.role)
-                ? 'incident-review'
-                : 'incident-track'
-              : needsSignature ||
-                  ['INVESTIGATION_STARTED', 'NTE_ISSUED'].includes(
-                    notification.notificationType
-                  ) ||
-                  notification.notificationType.startsWith('NTE_EXT_') ||
-                  notification.notificationType.startsWith('INFO_REQ_')
-                ? 'incident-track'
-                : 'incident-review'
+      target: incidentNotificationTarget(user.role, notification.status)
     });
   });
 

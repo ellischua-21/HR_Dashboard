@@ -410,8 +410,6 @@ function renderIncidentSignature(
             .catch((error) => console.error(error));
           await refreshIncidentBadges().catch((error) => console.error(error));
           await (ui.reload || openIncidentCase)(incident.id);
-          if (!document.getElementById('view-incident-review').hidden)
-            await loadIncidentReview();
         } catch (error) {
           setIncidentFeedback(
             ui.feedback || document.getElementById('ir-case-feedback'),
@@ -526,7 +524,7 @@ function createDecisionDocumentHtml(incident, decision) {
     <h2>Authorized Approval</h2><p>${escapeIncidentHtml(decision.approverName)} (${escapeIncidentHtml(decision.approverEmail)})</p>${signature}<p><strong>Delivered:</strong> ${escapeIncidentHtml(decision.deliveredAt)}</p></body></html>`;
 }
 
-function renderIncidentDecision(parent, incident) {
+function renderIncidentDecision(parent, incident, ui = {}) {
   if (!incident.decision) return;
   const section = incidentElement('section', 'incident-case-section');
   section.appendChild(incidentElement('h3', '', 'Final Decision'));
@@ -615,11 +613,10 @@ function renderIncidentDecision(parent, incident) {
       try {
         await api('closeIncidentDecision', incident.id, reason.value);
         await refreshIncidentBadges();
-        await loadIncidentReview();
-        await openIncidentCase(incident.id);
+        await (ui.reload || openIncidentCase)(incident.id);
       } catch (error) {
         setIncidentFeedback(
-          document.getElementById('ir-case-feedback'),
+          ui.feedback || document.getElementById('ir-case-feedback'),
           error.message || String(error),
           true
         );
@@ -638,7 +635,7 @@ function renderIncidentDecision(parent, incident) {
   parent.appendChild(section);
 }
 
-function renderIncidentEvaluation(parent, incident, padSetup) {
+function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
   if (
     !incident.canReview ||
     (!['EVALUATION', 'DECISION ISSUED'].includes(incident.status) &&
@@ -835,14 +832,14 @@ function renderIncidentEvaluation(parent, incident, padSetup) {
         recommendationJustification: justification.value,
         remarks: remarks.value
       });
-      await openIncidentCase(incident.id);
+      await (ui.reload || openIncidentCase)(incident.id);
       setIncidentFeedback(
-        document.getElementById('ir-case-feedback'),
+        ui.feedback || document.getElementById('ir-case-feedback'),
         'Evaluation saved.'
       );
     } catch (error) {
       setIncidentFeedback(
-        document.getElementById('ir-case-feedback'),
+        ui.feedback || document.getElementById('ir-case-feedback'),
         error.message || String(error),
         true
       );
@@ -936,11 +933,10 @@ function renderIncidentEvaluation(parent, incident, padSetup) {
         });
         await window.refreshInboxBadge().catch(() => {});
         await refreshIncidentBadges();
-        await loadIncidentReview();
-        await openIncidentCase(incident.id);
+        await (ui.reload || openIncidentCase)(incident.id);
       } catch (error) {
         setIncidentFeedback(
-          document.getElementById('ir-case-feedback'),
+          ui.feedback || document.getElementById('ir-case-feedback'),
           error.message || String(error),
           true
         );
@@ -1556,7 +1552,6 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
     start.onclick = async () => {
       try {
         await api('startIncidentEvaluation', incident.id);
-        await loadIncidentReview();
         await (ui.reload || openIncidentCase)(incident.id);
       } catch (error) {
         setIncidentFeedback(
@@ -1581,6 +1576,8 @@ function renderIncidentReport(body, incident) {
     ['Date of Report', incident.dateReported],
     ['Employee Being Reported', incident.reportedEmployeeName],
     ['Employee ID', incident.reportedEmployeeId],
+    ['Employee Department', incident.reportedEmployeeDepartment],
+    ['Employee Position', incident.reportedEmployeePosition],
     ['Assigned Head', incident.assignedHeadEmail || 'None assigned'],
     ['Subject', incident.subject],
     ['Date of Incident', incident.incidentDate],
@@ -1624,8 +1621,18 @@ function renderIncidentReport(body, incident) {
   body.appendChild(evidenceSection);
 }
 
+let incidentOpenRequest = 0;
 async function openIncidentCase(incidentId) {
+  const ticket = ++incidentOpenRequest;
+  const reviewView = !document.getElementById('view-incident-review').hidden;
+  const owner = session?.email;
   let incident = await api('getIncidentCase', incidentId);
+  if (
+    ticket !== incidentOpenRequest ||
+    owner !== session?.email ||
+    (reviewView && document.getElementById('view-incident-review').hidden)
+  )
+    return;
   if (
     incident.canReview &&
     incident.status === 'EXPLANATION SENT' &&
@@ -1641,10 +1648,38 @@ async function openIncidentCase(incidentId) {
   }
   if (incident.canReview && incident.status === 'EVALUATION')
     incidentCodeProvisions = await api('listIncidentCodeProvisions');
-  const body = document.getElementById('ir-case-body');
+  if (
+    ticket !== incidentOpenRequest ||
+    owner !== session?.email ||
+    (reviewView && document.getElementById('view-incident-review').hidden)
+  )
+    return;
+  const inline = reviewView && incident.canReview;
+  const body = document.getElementById(
+    inline ? 'ir-review-case-body' : 'ir-case-body'
+  );
+  const feedback = document.getElementById(
+    inline ? 'ir-review-case-feedback' : 'ir-case-feedback'
+  );
+  const ui = { feedback, reload: openIncidentCase };
   const padSetup = [];
   body.replaceChildren();
-  document.getElementById('ir-case-title').textContent = incident.caseNumber;
+  document.getElementById(
+    inline ? 'ir-review-case-title' : 'ir-case-title'
+  ).textContent = incident.caseNumber;
+  if (inline) {
+    const progress = incidentElement('section', 'incident-review-progress');
+    body.appendChild(progress);
+    window.IncidentProgress.render(progress, incident);
+    if (incident.status === 'CLOSED')
+      body.appendChild(
+        incidentElement(
+          'p',
+          'note',
+          'Archived case. This workspace is read-only.'
+        )
+      );
+  }
   renderIncidentReport(body, incident);
 
   const signatures = incidentElement('section', 'incident-case-section');
@@ -1663,7 +1698,8 @@ async function openIncidentCase(incidentId) {
     incident,
     'EMPLOYEE',
     'Employee Signature',
-    padSetup
+    padSetup,
+    ui
   );
   if (incident.assignedHeadEmail)
     renderIncidentSignature(
@@ -1671,17 +1707,19 @@ async function openIncidentCase(incidentId) {
       incident,
       'HEAD',
       'Head Supervisor Signature',
-      padSetup
+      padSetup,
+      ui
     );
   renderIncidentSignature(
     signatures,
     incident,
     'HR',
     'HRD Signature',
-    padSetup
+    padSetup,
+    ui
   );
   body.appendChild(signatures);
-  renderIncidentNte(body, incident, padSetup);
+  renderIncidentNte(body, incident, padSetup, ui);
 
   if (
     incident.canReview &&
@@ -1713,9 +1751,19 @@ async function openIncidentCase(incidentId) {
       );
       close.type = investigate.type = 'button';
       close.onclick = () =>
-        runIncidentTransition(incident, 'CLOSE_DOCUMENTATION', reason.value);
+        runIncidentTransition(
+          incident,
+          'CLOSE_DOCUMENTATION',
+          reason.value,
+          ui
+        );
       investigate.onclick = () =>
-        runIncidentTransition(incident, 'START_INVESTIGATION', reason.value);
+        runIncidentTransition(
+          incident,
+          'START_INVESTIGATION',
+          reason.value,
+          ui
+        );
       actions.append(close, investigate);
       workflow.append(
         incidentElement(
@@ -1724,12 +1772,7 @@ async function openIncidentCase(incidentId) {
           'Closing for documentation requires a reason. It does not record a disciplinary violation.'
         ),
         reason,
-        actions,
-        incidentElement(
-          'p',
-          'note',
-          'NTE preparation and issuance will be added with the next specification part. An NTE is never issued automatically.'
-        )
+        actions
       );
     } else {
       const note = incidentElement('textarea');
@@ -1754,11 +1797,7 @@ async function openIncidentCase(incidentId) {
           );
           await openIncidentCase(incident.id);
         } catch (error) {
-          setIncidentFeedback(
-            document.getElementById('ir-case-feedback'),
-            error.message || String(error),
-            true
-          );
+          setIncidentFeedback(feedback, error.message || String(error), true);
         } finally {
           saveNote.disabled = false;
         }
@@ -1774,7 +1813,8 @@ async function openIncidentCase(incidentId) {
         runIncidentTransition(
           incident,
           'CLOSE_INVESTIGATION',
-          closeReason.value
+          closeReason.value,
+          ui
         );
       workflow.append(
         incidentElement('h4', '', 'Record findings and evidence'),
@@ -1810,11 +1850,7 @@ async function openIncidentCase(incidentId) {
           );
           await openIncidentCase(incident.id);
         } catch (error) {
-          setIncidentFeedback(
-            document.getElementById('ir-case-feedback'),
-            error.message || String(error),
-            true
-          );
+          setIncidentFeedback(feedback, error.message || String(error), true);
         } finally {
           sendRequest.disabled = false;
         }
@@ -1873,11 +1909,7 @@ async function openIncidentCase(incidentId) {
             );
             await openIncidentCase(incident.id);
           } catch (error) {
-            setIncidentFeedback(
-              document.getElementById('ir-case-feedback'),
-              error.message || String(error),
-              true
-            );
+            setIncidentFeedback(feedback, error.message || String(error), true);
           } finally {
             submit.disabled = false;
           }
@@ -1924,12 +1956,16 @@ async function openIncidentCase(incidentId) {
     body.appendChild(history);
   }
 
-  renderIncidentEvaluation(body, incident, padSetup);
-  renderIncidentDecision(body, incident);
+  renderIncidentEvaluation(body, incident, padSetup, ui);
+  renderIncidentDecision(body, incident, ui);
 
-  setIncidentFeedback(document.getElementById('ir-case-feedback'), '');
+  setIncidentFeedback(feedback, '');
   const dialog = document.getElementById('ir-case-dialog');
-  if (!dialog.open) dialog.showModal();
+  if (inline) {
+    if (dialog.open) dialog.close();
+    document.getElementById('ir-review-workspace').hidden = false;
+    await window.IncidentReview.caseOpened(incident);
+  } else if (!dialog.open) dialog.showModal();
   window.requestAnimationFrame(() => padSetup.forEach((setup) => setup()));
 }
 
@@ -1952,7 +1988,7 @@ async function readIncidentEvidenceFiles(fileList) {
   );
 }
 
-async function runIncidentTransition(incident, action, details) {
+async function runIncidentTransition(incident, action, details, ui = {}) {
   if (
     action.startsWith('CLOSE_') &&
     !window.confirm(
@@ -1979,19 +2015,14 @@ async function runIncidentTransition(incident, action, details) {
       !document.getElementById('view-incident-history').hidden
     )
       await loadIncidentHistory();
-    if (
-      document.getElementById('view-incident-review') &&
-      !document.getElementById('view-incident-review').hidden
-    )
-      await loadIncidentReview();
-    await openIncidentCase(incident.id);
+    await (ui.reload || openIncidentCase)(incident.id);
     setIncidentFeedback(
-      document.getElementById('ir-case-feedback'),
+      ui.feedback || document.getElementById('ir-case-feedback'),
       `Case updated: ${result.status}.`
     );
   } catch (error) {
     setIncidentFeedback(
-      document.getElementById('ir-case-feedback'),
+      ui.feedback || document.getElementById('ir-case-feedback'),
       error.message || String(error),
       true
     );
@@ -2038,24 +2069,9 @@ async function loadIncidentHistory() {
 }
 
 async function loadIncidentReview() {
-  const rows = await api('listIncidentsForReview');
-  const filter = document.getElementById('ir-review-status-filter').value;
-  renderIncidentRows(
-    rows.filter(
-      (row) =>
-        filter === 'ALL' ||
-        (filter === 'CLOSED'
-          ? row.status === 'CLOSED'
-          : row.status !== 'CLOSED')
-    ),
-    'ir-review-rows',
-    'ir-review-empty'
-  );
-  if (pendingIncidentCaseId) {
-    const id = pendingIncidentCaseId;
-    pendingIncidentCaseId = null;
-    await openIncidentCase(id);
-  }
+  const requested = pendingIncidentCaseId;
+  pendingIncidentCaseId = null;
+  await window.IncidentReview.load(requested);
 }
 
 async function refreshIncidentBadges() {
@@ -2092,6 +2108,9 @@ window.openIncidentRoute = openIncidentRoute;
 window.refreshIncidentBadges = refreshIncidentBadges;
 window.selectIncidentCase = (incidentId) => openIncidentCase(incidentId);
 window.IncidentCaseUI = {
+  cancelOpen: () => {
+    ++incidentOpenRequest;
+  },
   renderReport: renderIncidentReport,
   renderSignature: renderIncidentSignature,
   renderNte: renderIncidentNte,
@@ -2340,7 +2359,5 @@ document.getElementById('ir-review-refresh').onclick =
   guard(loadIncidentReview);
 document.getElementById('ir-history-refresh').onclick =
   guard(loadIncidentHistory);
-document.getElementById('ir-review-status-filter').onchange =
-  guard(loadIncidentReview);
 document.getElementById('ir-case-close').onclick = () =>
   document.getElementById('ir-case-dialog').close();

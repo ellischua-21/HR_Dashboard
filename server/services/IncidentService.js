@@ -5,9 +5,16 @@ const { logAudit } = require('./AuditService');
 const { isValidDate } = require('../utils/Validation');
 const {
   canViewIncident,
+  incidentNotificationTarget,
   incidentAccessScope,
   buildIncidentTracking
 } = require('./incident-management/Tracking');
+const {
+  ACTIVE_CASE_SQL,
+  HR_SIGNED_SQL,
+  NTE_CASE_SQL,
+  buildReviewFilter
+} = require('./incident-management/Review');
 
 const FILING_ROLES = new Set(['HEAD', 'HR', 'ADMIN']);
 const REVIEW_ROLES = new Set(['HR', 'ADMIN']);
@@ -462,6 +469,11 @@ async function submitIncidentReport(req, input = {}) {
         [incidentId, assignedHeadEmail]
       );
     }
+    await connection.execute(
+      `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type)
+       SELECT ?, email, 'IR_SUBMITTED' FROM user_roles WHERE active = 1 AND role IN ('HR', 'ADMIN')`,
+      [incidentId]
+    );
     await logAudit(
       user.email,
       'INCIDENT_CREATED',
@@ -579,6 +591,68 @@ async function listIncidentsForReview(req) {
      ORDER BY created_at DESC, id DESC LIMIT 500`
   );
   return addIncidentCountdown(rows);
+}
+
+async function getIncidentReviewDashboard(req, input = {}) {
+  const user = await requirePerm(req, 'inbox.read');
+  requireIncidentRole(
+    user,
+    REVIEW_ROLES,
+    'Only HR and ADMIN can manage Incident Reports.'
+  );
+  const filter = buildReviewFilter(input);
+  const scope = incidentAccessScope(user);
+  await processOverdueIncidentNtes();
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [[counts]] = await connection.execute(
+      `SELECT COUNT(*) AS totalCases,
+         COALESCE(SUM(incident_reports.status = 'UNDER_REVIEW'), 0) AS underReview,
+         COALESCE(SUM(${NTE_CASE_SQL}), 0) AS nte,
+         COALESCE(SUM(incident_reports.status = 'CLOSED'), 0) AS closed,
+         COALESCE(SUM(${filter.sql}), 0) AS filteredCount
+       FROM incident_reports WHERE ${scope.sql}`,
+      [...filter.values, ...scope.values]
+    );
+    const total = Number(counts.filteredCount);
+    const pages = Math.max(1, Math.ceil(total / filter.filters.pageSize));
+    const page = Math.min(filter.filters.page, pages);
+    const offset = (page - 1) * filter.filters.pageSize;
+    const [cases] = await connection.execute(
+      `SELECT incident_reports.id, case_number AS caseNumber, subject,
+          reported_employee_name AS reportedEmployeeName, reporter_name AS reporterName,
+          date_reported AS dateFiled, status, created_at AS createdAt,
+          GREATEST(updated_at,
+            COALESCE((SELECT MAX(a.created_at) FROM incident_activity a WHERE a.incident_id = incident_reports.id), updated_at),
+            COALESCE((SELECT MAX(s.signed_at) FROM incident_signatures s WHERE s.incident_id = incident_reports.id), updated_at)) AS updatedAt,
+          ${HR_SIGNED_SQL} AS hrSigned,
+          EXISTS (SELECT 1 FROM incident_evaluations e WHERE e.incident_id = incident_reports.id) AS hasEvaluation
+       FROM incident_reports WHERE ${scope.sql} AND ${filter.sql}
+       ORDER BY updatedAt DESC, incident_reports.id DESC
+       LIMIT ${filter.filters.pageSize} OFFSET ${offset}`,
+      [...scope.values, ...filter.values]
+    );
+    await connection.commit();
+    return {
+      summary: {
+        totalCases: Number(counts.totalCases),
+        underReview: Number(counts.underReview),
+        nte: Number(counts.nte),
+        closed: Number(counts.closed)
+      },
+      cases,
+      total,
+      page,
+      pages,
+      pageSize: filter.filters.pageSize
+    };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 async function getIncidentForAction(connection, incidentId) {
@@ -1575,6 +1649,11 @@ async function saveIncidentEvaluation(req, incidentId, input = {}) {
       'EVALUATION_SAVED',
       `${finding === 'SUBSTANTIATED' ? 'Substantiated' : 'Not substantiated'} evaluation saved.`
     );
+    await connection.execute(
+      `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type)
+       SELECT ?, email, 'DECISION_PENDING' FROM user_roles WHERE active = 1 AND role IN ('HR', 'ADMIN')`,
+      [id]
+    );
     await connection.commit();
     return { ok: true, finding, suggestedAction, recommendedAction };
   } catch (error) {
@@ -2516,7 +2595,7 @@ async function getIncidentCase(req, incidentId) {
             assigned_head_email AS assignedHeadEmail,
             date_reported AS dateReported, subject, incident_date AS incidentDate,
             location, incident_time AS incidentTime, description, comments, status,
-            created_at AS createdAt
+            created_at AS createdAt, updated_at AS updatedAt
      FROM incident_reports WHERE id = ? LIMIT 1`,
     [id]
   );
@@ -2954,7 +3033,7 @@ async function getIncidentBadgeCounts(req) {
   let review = 0;
   if (REVIEW_ROLES.has(user.role)) {
     const [[row]] = await pool.execute(
-      "SELECT COUNT(*) AS count FROM incident_reports WHERE status IN ('SIGNED', 'UNDER_REVIEW', 'UNDER INVESTIGATION', 'NTE ISSUED', 'EXPLANATION SENT', 'EVALUATION', 'DECISION ISSUED')"
+      `SELECT COUNT(*) AS count FROM incident_reports WHERE ${ACTIVE_CASE_SQL}`
     );
     review = Number(row.count);
   }
@@ -2966,16 +3045,6 @@ async function listPendingIncidentNotifications(req) {
   await processOverdueIncidentNtes();
   const [rows] = await pool.execute(
     `SELECT n.id, n.notification_type AS type,
-            CASE WHEN i.status = 'CLOSED' AND ? = 1 THEN 'incident-review'
-                 WHEN i.status = 'CLOSED' THEN 'incident-history'
-                 WHEN n.notification_type = 'DECISION_ISSUED' AND ? = 1 THEN 'incident-review'
-                 WHEN n.notification_type = 'DECISION_ISSUED' THEN 'incident-track'
-                 WHEN n.notification_type = 'CASE_CLOSED' THEN 'incident-history'
-                 WHEN n.notification_type = 'HR_REVIEW_READY' OR n.notification_type LIKE 'INFO_DONE_%'
-                      OR n.notification_type LIKE 'EXPLANATION_SENT'
-                      OR n.notification_type LIKE 'EXPLANATION_ADD_%'
-                      OR n.notification_type LIKE 'NTE_OVERDUE%'
-                 THEN 'incident-review' ELSE 'incident-track' END AS target,
             n.created_at AS createdAt,
             i.id AS incidentId, i.case_number AS caseNumber, i.subject,
             i.status, i.reported_employee_name AS reportedEmployeeName
@@ -2983,13 +3052,12 @@ async function listPendingIncidentNotifications(req) {
      JOIN incident_reports i ON i.id = n.incident_id
      WHERE n.recipient_email = ? AND n.viewed_at IS NULL
      ORDER BY n.created_at, n.id LIMIT 100`,
-    [
-      REVIEW_ROLES.has(user.role) ? 1 : 0,
-      REVIEW_ROLES.has(user.role) ? 1 : 0,
-      user.email
-    ]
+    [user.email]
   );
-  return rows;
+  return rows.map((notification) => ({
+    ...notification,
+    target: incidentNotificationTarget(user.role, notification.status)
+  }));
 }
 
 async function markIncidentNotificationSeen(req, notificationId) {
@@ -3013,6 +3081,7 @@ module.exports = {
   getIncidentTrackingVersion,
   listIncidentsForHistory,
   listIncidentsForReview,
+  getIncidentReviewDashboard,
   getIncidentCase,
   getIncidentEvidence,
   signIncidentCase,

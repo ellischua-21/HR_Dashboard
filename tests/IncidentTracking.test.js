@@ -191,8 +191,11 @@ test('badge counts use unresolved involvement, persist independently of reading,
         sql,
         /viewed_at|incident_notifications|signatory_role/
       );
-      assert.match(sql, /incident_participants/);
-      return [[{ count: 2 }]];
+      if (['STAFF', 'HEAD'].includes(role)) {
+        assert.match(sql, /incident_participants/);
+        return [[{ count: 2 }]];
+      }
+      return [[{ count: 4 }]];
     }
     if (sql.includes('SELECT COUNT(*) AS count FROM incident_reports'))
       return [[{ count: 4 }]];

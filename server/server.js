@@ -171,6 +171,8 @@ const methods = {
     incidents.getIncidentTrackingVersion(req, incidentId),
   listIncidentsForHistory: (req) => incidents.listIncidentsForHistory(req),
   listIncidentsForReview: (req) => incidents.listIncidentsForReview(req),
+  getIncidentReviewDashboard: (req, filters) =>
+    incidents.getIncidentReviewDashboard(req, filters),
   getIncidentCase: (req, incidentId) =>
     incidents.getIncidentCase(req, incidentId),
   signIncidentCase: (req, incidentId, role, signature) =>

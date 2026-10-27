@@ -117,22 +117,7 @@
     id="ir-track-progress-panel"
     class="panel incident-track-progress-panel"
     hidden
-  >
-    <h3 id="ir-track-case-heading"></h3>
-    <p id="ir-track-status" role="status" aria-live="polite"></p>
-    <div
-      class="incident-track-scroll"
-      tabindex="0"
-      aria-label="Case progress. Scroll horizontally to view all stages."
-    >
-      <ol
-        id="ir-track-progress"
-        class="incident-track-progress"
-        aria-label="Incident stages"
-      ></ol>
-    </div>
-    <p id="ir-track-closure" class="incident-track-closure" hidden></p>
-  </section>
+  ></section>
   <section
     id="ir-track-content-panel"
     class="panel incident-track-content-panel"
@@ -179,37 +164,118 @@
 <section id="view-incident-review" class="view" hidden>
   <section class="panel">
     <div class="account-heading">
-      <h2>Incident Reports</h2>
-      <label
-        >Cases
-        <select id="ir-review-status-filter">
-          <option value="ACTIVE">Active</option>
-          <option value="CLOSED">Closed</option>
-          <option value="ALL">All</option>
-        </select>
-      </label>
+      <h2>REVIEW</h2>
       <button id="ir-review-refresh" class="ghost" type="button">
         Refresh
       </button>
     </div>
-    <p id="ir-review-empty" class="note" hidden>
-      No Incident Reports to review.
-    </p>
-    <div class="tablewrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Case Number</th>
-            <th>Subject</th>
-            <th>Employee</th>
-            <th>Date</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="ir-review-rows"></tbody>
-      </table>
+    <div class="incident-review-counters" aria-label="Case summary">
+      <article>
+        <span>Total Cases</span><strong id="ir-review-total">0</strong>
+      </article>
+      <article>
+        <span>Under Review</span><strong id="ir-review-under-review">0</strong>
+      </article>
+      <article title="NTE Issued, Explanation Sent, and Evaluation">
+        <span>NTE</span><strong id="ir-review-nte">0</strong>
+      </article>
+      <article>
+        <span>Closed</span><strong id="ir-review-closed">0</strong>
+      </article>
     </div>
+    <div class="incident-review-filters">
+      <details id="ir-review-filter-control" open>
+        <summary>FILTER</summary>
+        <div class="fgrid">
+          <label
+            >Search cases<input
+              id="ir-review-search"
+              type="search"
+              maxlength="191"
+              placeholder="IR number, employee, title, or reporter"
+          /></label>
+          <label
+            >Workflow stage<select id="ir-review-stage">
+              <option value="ALL">All stages</option>
+              <option value="PENDING SIGNATURE">Pending Signature</option>
+              <option value="SIGNED">Signed</option>
+              <option value="UNDER_REVIEW">Under Review</option>
+              <option value="UNDER INVESTIGATION">Under Investigation</option>
+              <option value="NTE ISSUED">NTE Issued</option>
+              <option value="EXPLANATION SENT">Explanation Sent</option>
+              <option value="EVALUATION">Evaluation</option>
+              <option value="DECISION ISSUED">Decision Issued</option>
+              <option value="CLOSED">Closed</option>
+            </select></label
+          >
+        </div>
+      </details>
+      <div
+        class="incident-review-categories"
+        role="group"
+        aria-label="Case grouping"
+      >
+        <button
+          type="button"
+          data-review-category="ONGOING"
+          aria-pressed="true"
+        >
+          Ongoing
+        </button>
+        <button
+          type="button"
+          data-review-category="WAITING"
+          aria-pressed="false"
+        >
+          Waiting
+        </button>
+        <button
+          type="button"
+          data-review-category="CLOSED"
+          aria-pressed="false"
+        >
+          Closed
+        </button>
+      </div>
+    </div>
+    <p id="ir-review-results" class="note" role="status" aria-live="polite"></p>
+    <p id="ir-review-feedback" role="status" hidden></p>
+    <p id="ir-review-empty" class="note" hidden>
+      No matching Incident Reports.
+    </p>
+    <div
+      id="ir-review-list"
+      class="incident-review-list"
+      role="list"
+      aria-label="Incident Reports"
+    ></div>
+    <div class="incident-review-pagination">
+      <button id="ir-review-previous" class="ghost" type="button">
+        Previous
+      </button>
+      <span id="ir-review-page" class="note"></span>
+      <button id="ir-review-next" class="ghost" type="button">Next</button>
+    </div>
+  </section>
+  <section
+    id="ir-review-workspace"
+    class="panel incident-review-workspace"
+    hidden
+    aria-labelledby="ir-review-case-title"
+  >
+    <div class="account-heading">
+      <h2 id="ir-review-case-title">Case management</h2>
+      <div class="actions">
+        <button id="ir-review-case-refresh" class="ghost" type="button">
+          Refresh case</button
+        ><button id="ir-review-case-close" class="ghost" type="button">
+          Close case view
+        </button>
+      </div>
+    </div>
+    <p id="ir-review-case-status" class="note" role="status"></p>
+    <div id="ir-review-case-body"></div>
+    <p id="ir-review-case-feedback" role="status" aria-live="polite" hidden></p>
   </section>
 </section>
 

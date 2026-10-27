@@ -39,6 +39,11 @@ function incidentAccessScope(user) {
   };
 }
 
+function incidentNotificationTarget(role, status) {
+  if (['HR', 'ADMIN'].includes(role)) return 'incident-review';
+  return status === 'CLOSED' ? 'incident-history' : 'incident-track';
+}
+
 function buildIncidentTracking(
   incident,
   signatures,
@@ -134,6 +139,7 @@ function buildIncidentTracking(
 
 module.exports = {
   canViewIncident,
+  incidentNotificationTarget,
   incidentAccessScope,
   buildIncidentTracking
 };

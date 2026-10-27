@@ -1204,6 +1204,8 @@ async function showPendingAnnouncements() {
       EMPLOYEE_SIGNATURE: 'Incident Report requires your acknowledgment',
       HEAD_SIGNATURE: 'Incident Report requires your review and signature',
       HR_REVIEW_READY: 'Incident Report ready for HR review',
+      IR_SUBMITTED: 'Incident Report submitted',
+      DECISION_PENDING: 'Incident evaluation ready for final decision',
       CASE_CLOSED: 'Incident Report case closed',
       INVESTIGATION_STARTED: 'Incident Report under investigation',
       NTE_ISSUED: 'Notice to Explain issued',
