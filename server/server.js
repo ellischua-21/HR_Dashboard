@@ -167,11 +167,22 @@ const methods = {
   submitIncidentReport: (req, input) =>
     incidents.submitIncidentReport(req, input),
   listIncidentsForTrack: (req) => incidents.listIncidentsForTrack(req),
+  listIncidentsForHistory: (req) => incidents.listIncidentsForHistory(req),
   listIncidentsForReview: (req) => incidents.listIncidentsForReview(req),
   getIncidentCase: (req, incidentId) =>
     incidents.getIncidentCase(req, incidentId),
   signIncidentCase: (req, incidentId, role, signature) =>
     incidents.signIncidentCase(req, incidentId, role, signature),
+  transitionIncident: (req, incidentId, action, details) =>
+    incidents.transitionIncident(req, incidentId, action, details),
+  listIncidentRequestRecipients: (req, incidentId) =>
+    incidents.listIncidentRequestRecipients(req, incidentId),
+  requestIncidentInformation: (req, incidentId, recipient, text) =>
+    incidents.requestIncidentInformation(req, incidentId, recipient, text),
+  addIncidentInvestigationNote: (req, incidentId, text, files) =>
+    incidents.addIncidentInvestigationNote(req, incidentId, text, files),
+  respondToIncidentInformation: (req, incidentId, requestId, text, files) =>
+    incidents.respondToIncidentInformation(req, incidentId, requestId, text, files),
   getIncidentBadgeCounts: (req) => incidents.getIncidentBadgeCounts(req),
   listPendingIncidentNotifications: (req) =>
     incidents.listPendingIncidentNotifications(req),

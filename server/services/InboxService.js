@@ -109,15 +109,29 @@ async function getInbox(req) {
       status: needsSignature ? 'ACTION_REQUIRED' : notification.status,
       unseen: !notification.viewedAt,
       title: needsSignature
-        ? 'Incident Report requires your acknowledgment'
+        ? notification.notificationType === 'HEAD_SIGNATURE'
+          ? 'Incident Report requires your review and signature'
+          : 'Incident Report requires your acknowledgment'
         : notification.notificationType === 'HR_REVIEW_READY'
           ? 'Incident Report sent to HR for review'
-          : 'Incident Report signature recorded',
+          : notification.notificationType === 'CASE_CLOSED'
+            ? 'Incident Report case closed'
+            : notification.notificationType === 'INVESTIGATION_STARTED'
+              ? 'Incident Report under investigation'
+              : notification.notificationType.startsWith('INFO_REQ_')
+                ? 'Additional incident information requested'
+                : notification.notificationType.startsWith('INFO_DONE_')
+                  ? 'Additional incident information received'
+                  : 'Incident Report updated',
       message: `${notification.caseNumber}: ${notification.subject} — ${notification.reportedEmployeeName}`,
       createdAt: notification.createdAt,
       notificationId: notification.notificationId,
       incidentId: notification.incidentId,
-      target: needsSignature ? 'incident-track' : 'incident-review'
+      target: notification.notificationType === 'CASE_CLOSED'
+        ? (['HR', 'ADMIN'].includes(user.role) ? 'incident-review' : 'incident-history')
+        : needsSignature || notification.notificationType === 'INVESTIGATION_STARTED' || notification.notificationType.startsWith('INFO_REQ_')
+          ? 'incident-track'
+          : 'incident-review'
     });
   });
 

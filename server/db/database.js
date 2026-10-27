@@ -289,6 +289,44 @@ async function initializeDatabase() {
     KEY idx_incident_notification_inbox (recipient_email, created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_activity (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    incident_id BIGINT UNSIGNED NOT NULL,
+    actor_email VARCHAR(191) NOT NULL,
+    action VARCHAR(40) NOT NULL,
+    details TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_incident_activity_case (incident_id, created_at, id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_information_requests (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    incident_id BIGINT UNSIGNED NOT NULL,
+    requested_by VARCHAR(191) NOT NULL,
+    recipient_email VARCHAR(191) NOT NULL,
+    request_text TEXT NOT NULL,
+    response_text TEXT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    responded_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_incident_info_request_case (incident_id, created_at),
+    KEY idx_incident_info_request_recipient (recipient_email, status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  const [incidentEvidenceRequestColumn] = await pool.query(
+    "SHOW COLUMNS FROM incident_evidence LIKE 'request_id'"
+  );
+  if (!incidentEvidenceRequestColumn.length) {
+    await pool.query(
+      'ALTER TABLE incident_evidence ADD COLUMN request_id BIGINT UNSIGNED NULL AFTER incident_id'
+    );
+    await pool.query(
+      'ALTER TABLE incident_evidence ADD KEY idx_incident_evidence_request (request_id, id)'
+    );
+  }
+
   await pool.query(`CREATE TABLE IF NOT EXISTS form_serial_sequences (
     template_key VARCHAR(64) NOT NULL,
     serial_year SMALLINT UNSIGNED NOT NULL,

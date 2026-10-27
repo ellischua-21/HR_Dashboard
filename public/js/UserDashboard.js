@@ -1194,9 +1194,19 @@ async function showPendingAnnouncements() {
     const card = document.createElement('article');
     card.className = 'announcement-card';
     const title = document.createElement('h3');
-    title.textContent = notification.type.endsWith('_SIGNATURE')
-      ? 'Incident Report requires your acknowledgment'
-      : 'Incident Report ready for HR review';
+    const titles = {
+      EMPLOYEE_SIGNATURE: 'Incident Report requires your acknowledgment',
+      HEAD_SIGNATURE: 'Incident Report requires your review and signature',
+      HR_REVIEW_READY: 'Incident Report ready for HR review',
+      CASE_CLOSED: 'Incident Report case closed',
+      INVESTIGATION_STARTED: 'Incident Report under investigation'
+    };
+    title.textContent = titles[notification.type] ||
+      (notification.type.startsWith('INFO_REQ_')
+        ? 'Additional incident information requested'
+        : notification.type.startsWith('INFO_DONE_')
+          ? 'Additional incident information received'
+          : 'Incident Report updated');
     const message = document.createElement('p');
     message.className = 'announcement-message';
     message.textContent = `${notification.caseNumber}: ${notification.subject} — ${notification.reportedEmployeeName}`;
@@ -1209,9 +1219,9 @@ async function showPendingAnnouncements() {
         $('staff-announcements-dialog').close();
         await window.openIncidentRoute(
           notification.incidentId,
-          notification.type === 'HR_REVIEW_READY'
+          notification.type === 'CASE_CLOSED' && ['HR', 'ADMIN'].includes(session.role)
             ? 'incident-review'
-            : 'incident-track',
+            : notification.target,
           notification.id
         );
       } catch (error) {

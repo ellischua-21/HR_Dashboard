@@ -461,12 +461,29 @@ function incidentListFields() {
           created_at AS createdAt`;
 }
 
+async function listIncidentsForHistory(req) {
+  const user = await requirePerm(req, 'inbox.read');
+  if (!['STAFF', 'HEAD'].includes(user.role)) {
+    throw httpError('History is available to STAFF and HEAD accounts.', 403);
+  }
+  const [rows] = await pool.execute(
+    `SELECT ${incidentListFields()}
+     FROM incident_reports
+     WHERE status = 'CLOSED'
+       AND (reporter_email = ? OR reported_employee_email = ? OR assigned_head_email = ?)
+     ORDER BY updated_at DESC, id DESC LIMIT 300`,
+    [user.email, user.email, user.email]
+  );
+  return rows;
+}
+
 async function listIncidentsForTrack(req) {
   const user = await requirePerm(req, 'inbox.read');
   const [rows] = await pool.execute(
     `SELECT ${incidentListFields()}
      FROM incident_reports
-     WHERE reporter_email = ? OR reported_employee_email = ? OR assigned_head_email = ?
+     WHERE status <> 'CLOSED'
+       AND (reporter_email = ? OR reported_employee_email = ? OR assigned_head_email = ?)
      ORDER BY created_at DESC, id DESC LIMIT 300`,
     [user.email, user.email, user.email]
   );
@@ -486,6 +503,200 @@ async function listIncidentsForReview(req) {
      ORDER BY created_at DESC, id DESC LIMIT 500`
   );
   return rows;
+}
+
+async function getIncidentForAction(connection, incidentId) {
+  const [rows] = await connection.execute(
+    `SELECT id, case_number, status, reporter_email, reported_employee_email,
+            assigned_head_email
+     FROM incident_reports WHERE id = ? FOR UPDATE`,
+    [incidentId]
+  );
+  if (!rows[0]) throw httpError('Incident Report not found.', 404);
+  return rows[0];
+}
+
+async function recordIncidentActivity(connection, user, incident, action, details) {
+  await connection.execute(
+    `INSERT INTO incident_activity (incident_id, actor_email, action, details)
+     VALUES (?, ?, ?, ?)`,
+    [incident.id, user.email, action, details]
+  );
+  await logAudit(user.email, `INCIDENT_${action}`, incident.case_number, details, connection);
+}
+
+async function notifyIncidentParties(connection, incident, type) {
+  const recipients = new Set([
+    incident.reporter_email,
+    incident.reported_employee_email,
+    incident.assigned_head_email
+  ].filter(Boolean));
+  const [participantAccounts] = await connection.execute(
+    `SELECT DISTINCT u.email FROM incident_participants p
+     JOIN employees e ON e.record_id = p.employee_record_id
+     JOIN user_roles u ON LOWER(u.email) = LOWER(e.personal_email) AND u.active = 1
+     WHERE p.incident_id = ?`,
+    [incident.id]
+  );
+  participantAccounts.forEach((account) => recipients.add(account.email));
+  for (const email of recipients) {
+    await connection.execute(
+      `INSERT IGNORE INTO incident_notifications
+       (incident_id, recipient_email, notification_type) VALUES (?, ?, ?)`,
+      [incident.id, email, type]
+    );
+  }
+}
+
+async function transitionIncident(req, incidentId, action, details = '') {
+  const user = await requirePerm(req, 'inbox.read');
+  requireIncidentRole(user, REVIEW_ROLES, 'Only HR and ADMIN can manage Incident Reports.');
+  const id = Number(incidentId);
+  if (!Number.isSafeInteger(id) || id < 1) throw httpError('Choose a valid Incident Report.', 400);
+  const cleanDetails = normalizeText(String(details || ''), 'Reason or findings', 4000, action !== 'INVESTIGATION_STARTED');
+  const transitions = {
+    CLOSE_DOCUMENTATION: { from: 'UNDER_REVIEW', to: 'CLOSED', activity: 'CLOSED_FOR_DOCUMENTATION', notification: 'CASE_CLOSED' },
+    START_INVESTIGATION: { from: 'UNDER_REVIEW', to: 'UNDER INVESTIGATION', activity: 'INVESTIGATION_STARTED', notification: 'INVESTIGATION_STARTED' },
+    CLOSE_INVESTIGATION: { from: 'UNDER INVESTIGATION', to: 'CLOSED', activity: 'INVESTIGATION_CLOSED', notification: 'CASE_CLOSED' }
+  };
+  const transition = transitions[action];
+  if (!transition) throw httpError('Choose a valid case action.', 400);
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const incident = await getIncidentForAction(connection, id);
+    if (incident.status !== transition.from) throw httpError('This case has already changed status.', 409);
+    await connection.execute('UPDATE incident_reports SET status = ? WHERE id = ?', [transition.to, id]);
+    await recordIncidentActivity(connection, user, incident, transition.activity, cleanDetails);
+    await notifyIncidentParties(connection, incident, transition.notification);
+    await connection.commit();
+    return { ok: true, caseNumber: incident.case_number, status: transition.to };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function listIncidentRequestRecipients(req, incidentId) {
+  const user = await requirePerm(req, 'inbox.read');
+  requireIncidentRole(user, REVIEW_ROLES, 'Only HR and ADMIN can manage Incident Reports.');
+  const [cases] = await pool.execute(
+    "SELECT id, status FROM incident_reports WHERE id = ? LIMIT 1", [Number(incidentId)]
+  );
+  if (!cases[0]) throw httpError('Incident Report not found.', 404);
+  if (cases[0].status !== 'UNDER INVESTIGATION') throw httpError('Information can only be requested during investigation.', 409);
+  const [rows] = await pool.execute(
+    `SELECT DISTINCT u.email, COALESCE(NULLIF(e.name, ''), u.full_name, u.email) AS name
+     FROM incident_reports i JOIN user_roles u ON u.active = 1
+     LEFT JOIN employees e ON LOWER(e.personal_email) = LOWER(u.email) AND e.record_status <> 'Archived'
+     WHERE i.id = ? AND (LOWER(u.email) IN (LOWER(i.reporter_email), LOWER(i.reported_employee_email), LOWER(COALESCE(i.assigned_head_email, '')))
+       OR e.record_id IN (SELECT employee_record_id FROM incident_participants WHERE incident_id = i.id AND employee_record_id IS NOT NULL))
+     ORDER BY name`, [Number(incidentId)]
+  );
+  return rows;
+}
+
+async function requestIncidentInformation(req, incidentId, recipientEmail, requestText) {
+  const user = await requirePerm(req, 'inbox.read');
+  requireIncidentRole(user, REVIEW_ROLES, 'Only HR and ADMIN can manage Incident Reports.');
+  const id = Number(incidentId);
+  const recipient = normalizeText(String(recipientEmail || ''), 'Recipient', 191);
+  const text = normalizeText(String(requestText || ''), 'Information requested', 4000);
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const incident = await getIncidentForAction(connection, id);
+    if (incident.status !== 'UNDER INVESTIGATION') throw httpError('Information can only be requested during investigation.', 409);
+    const [allowed] = await connection.execute(
+      `SELECT 1 FROM user_roles u LEFT JOIN employees e ON LOWER(e.personal_email) = LOWER(u.email) AND e.record_status <> 'Archived'
+       WHERE LOWER(u.email) = LOWER(?) AND u.active = 1 AND (
+         LOWER(u.email) IN (LOWER(?), LOWER(?), LOWER(COALESCE(?, '')))
+         OR e.record_id IN (SELECT employee_record_id FROM incident_participants WHERE incident_id = ? AND employee_record_id IS NOT NULL)
+       ) LIMIT 1`,
+      [recipient, incident.reporter_email, incident.reported_employee_email, incident.assigned_head_email, id]
+    );
+    if (!allowed.length) throw httpError('Choose an authorized case participant.', 400);
+    const [result] = await connection.execute(
+      `INSERT INTO incident_information_requests (incident_id, requested_by, recipient_email, request_text)
+       VALUES (?, ?, ?, ?)`, [id, user.email, recipient, text]
+    );
+    await recordIncidentActivity(connection, user, incident, 'INFORMATION_REQUESTED', `${recipient}: ${text}`);
+    const notificationType = `INFO_REQ_${result.insertId}`.slice(0, 32);
+    await connection.execute(
+      `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type) VALUES (?, ?, ?)`,
+      [id, recipient, notificationType]
+    );
+    await connection.commit();
+    return { ok: true, requestId: result.insertId };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally { connection.release(); }
+}
+
+async function addIncidentInvestigationNote(req, incidentId, details, files = []) {
+  const user = await requirePerm(req, 'inbox.read');
+  requireIncidentRole(user, REVIEW_ROLES, 'Only HR and ADMIN can investigate Incident Reports.');
+  const id = Number(incidentId);
+  const text = normalizeText(String(details || ''), 'Investigation note', 4000);
+  const evidence = normalizeEvidence(files);
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const incident = await getIncidentForAction(connection, id);
+    if (incident.status !== 'UNDER INVESTIGATION') throw httpError('Investigation notes can only be added while the case is under investigation.', 409);
+    await recordIncidentActivity(connection, user, incident, 'INVESTIGATION_NOTE', text);
+    for (const file of evidence) await connection.execute(
+      `INSERT INTO incident_evidence (incident_id, file_name, mime_type, byte_size, file_data, uploaded_by)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, file.fileName, file.mimeType, file.fileData.length, file.fileData, user.email]
+    );
+    await connection.commit();
+    return { ok: true };
+  } catch (error) { await connection.rollback(); throw error; }
+  finally { connection.release(); }
+}
+
+async function respondToIncidentInformation(req, incidentId, requestId, responseText, files = []) {
+  const user = await requirePerm(req, 'inbox.read');
+  const id = Number(incidentId), request = Number(requestId);
+  if (!Number.isSafeInteger(id) || !Number.isSafeInteger(request) || id < 1 || request < 1) throw httpError('Choose a valid information request.', 400);
+  const text = normalizeText(String(responseText || ''), 'Response', 4000, false);
+  const evidence = normalizeEvidence(files);
+  if (!text && !evidence.length) throw httpError('Enter a response or attach evidence.', 400);
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const incident = await getIncidentForAction(connection, id);
+    if (incident.status !== 'UNDER INVESTIGATION') throw httpError('This case is no longer under investigation.', 409);
+    const [requests] = await connection.execute(
+      `SELECT id, requested_by FROM incident_information_requests
+       WHERE id = ? AND incident_id = ? AND recipient_email = ? AND status = 'PENDING' FOR UPDATE`,
+      [request, id, user.email]
+    );
+    if (!requests[0]) throw httpError('This information request is unavailable.', 403);
+    await connection.execute(
+      `UPDATE incident_information_requests SET response_text = ?, status = 'RESPONDED', responded_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [text, request]
+    );
+    for (const file of evidence) await connection.execute(
+      `INSERT INTO incident_evidence (incident_id, request_id, file_name, mime_type, byte_size, file_data, uploaded_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, request, file.fileName, file.mimeType, file.fileData.length, file.fileData, user.email]
+    );
+    await recordIncidentActivity(connection, user, incident, 'INFORMATION_PROVIDED', `Response submitted for request ${request}.`);
+    await connection.execute(
+      `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type) VALUES (?, ?, ?)`,
+      [id, requests[0].requested_by, `INFO_DONE_${request}`.slice(0, 32)]
+    );
+    await connection.commit();
+    return { ok: true };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally { connection.release(); }
 }
 
 function canViewIncident(user, incident) {
@@ -517,10 +728,21 @@ async function getIncidentCase(req, incidentId) {
   );
   const incident = rows[0];
   if (!incident) throw httpError('Incident Report not found.', 404);
-  if (!canViewIncident(user, incident))
+  let isParticipant = false;
+  if (!canViewIncident(user, incident)) {
+    const [participants] = await pool.execute(
+      `SELECT 1 FROM incident_participants p
+       JOIN employees e ON e.record_id = p.employee_record_id
+       JOIN user_roles u ON LOWER(u.email) = LOWER(e.personal_email) AND u.active = 1
+       WHERE p.incident_id = ? AND LOWER(u.email) = LOWER(?) LIMIT 1`,
+      [id, user.email]
+    );
+    isParticipant = participants.length > 0;
+  }
+  if (!canViewIncident(user, incident) && !isParticipant)
     throw httpError('You do not have access to this Incident Report.', 403);
 
-  const [[participants], [signatures], [evidence]] = await Promise.all([
+  const [[participants], [signatures], [evidence], [activity], [requests]] = await Promise.all([
     pool.execute(
       `SELECT participant_type AS participantType,
               employee_record_id AS employeeId, full_name AS name, sort_order AS sortOrder
@@ -536,10 +758,20 @@ async function getIncidentCase(req, incidentId) {
     ),
     pool.execute(
       `SELECT id, file_name AS fileName, mime_type AS mimeType,
-              byte_size AS byteSize, uploaded_by AS uploadedBy,
+              byte_size AS byteSize, uploaded_by AS uploadedBy, request_id AS requestId,
               created_at AS createdAt
        FROM incident_evidence WHERE incident_id = ? ORDER BY id`,
       [id]
+    ),
+    pool.execute(
+      `SELECT action, details, actor_email AS actorEmail, created_at AS createdAt
+       FROM incident_activity WHERE incident_id = ? ORDER BY created_at, id`, [id]
+    ),
+    pool.execute(
+      `SELECT id, requested_by AS requestedBy, recipient_email AS recipientEmail,
+              request_text AS requestText, response_text AS responseText, status,
+              created_at AS createdAt, responded_at AS respondedAt
+       FROM incident_information_requests WHERE incident_id = ? ORDER BY created_at, id`, [id]
     )
   ]);
   return {
@@ -547,6 +779,10 @@ async function getIncidentCase(req, incidentId) {
     participants,
     signatures,
     evidence,
+    activity: REVIEW_ROLES.has(user.role) ? activity : [],
+    informationRequests: REVIEW_ROLES.has(user.role)
+      ? requests
+      : requests.filter((request) => request.recipientEmail.toLowerCase() === user.email.toLowerCase()),
     canReview: REVIEW_ROLES.has(user.role),
     currentUserEmail: user.email
   };
@@ -559,11 +795,18 @@ async function getIncidentEvidence(req, evidenceId) {
     throw httpError('Choose a valid evidence file.', 400);
   const [rows] = await pool.execute(
     `SELECT e.file_name AS fileName, e.mime_type AS mimeType, e.file_data AS fileData,
-            i.reporter_email, i.reported_employee_email, i.assigned_head_email
+            i.reporter_email, i.reported_employee_email, i.assigned_head_email,
+            r.recipient_email AS requestRecipient,
+            EXISTS (
+              SELECT 1 FROM incident_participants p
+              JOIN employees pe ON pe.record_id = p.employee_record_id
+              WHERE p.incident_id = i.id AND LOWER(pe.personal_email) = LOWER(?)
+            ) AS isParticipant
      FROM incident_evidence e
      JOIN incident_reports i ON i.id = e.incident_id
+     LEFT JOIN incident_information_requests r ON r.id = e.request_id
      WHERE e.id = ? LIMIT 1`,
-    [id]
+    [user.email, id]
   );
   const evidence = rows[0];
   if (!evidence) throw httpError('Evidence file not found.', 404);
@@ -573,7 +816,9 @@ async function getIncidentEvidence(req, evidenceId) {
       evidence.reporter_email,
       evidence.reported_employee_email,
       evidence.assigned_head_email
-    ].includes(user.email)
+      , evidence.requestRecipient
+    ].some((email) => email && email.toLowerCase() === user.email.toLowerCase()) &&
+    !evidence.isParticipant
   ) {
     throw httpError('You do not have access to this evidence file.', 403);
   }
@@ -731,7 +976,7 @@ async function getIncidentBadgeCounts(req) {
   let review = 0;
   if (REVIEW_ROLES.has(user.role)) {
     const [[row]] = await pool.execute(
-      "SELECT COUNT(*) AS count FROM incident_reports WHERE status = 'SIGNED'"
+      "SELECT COUNT(*) AS count FROM incident_reports WHERE status IN ('SIGNED', 'UNDER_REVIEW', 'UNDER INVESTIGATION', 'NTE ISSUED', 'EXPLANATION SENT', 'EVALUATION', 'DECISION ISSUED')"
     );
     review = Number(row.count);
   }
@@ -741,7 +986,11 @@ async function getIncidentBadgeCounts(req) {
 async function listPendingIncidentNotifications(req) {
   const user = await requirePerm(req, 'inbox.read');
   const [rows] = await pool.execute(
-    `SELECT n.id, n.notification_type AS type, n.created_at AS createdAt,
+    `SELECT n.id, n.notification_type AS type,
+            CASE WHEN n.notification_type = 'CASE_CLOSED' THEN 'incident-history'
+                 WHEN n.notification_type = 'HR_REVIEW_READY' OR n.notification_type LIKE 'INFO_DONE_%'
+                 THEN 'incident-review' ELSE 'incident-track' END AS target,
+            n.created_at AS createdAt,
             i.id AS incidentId, i.case_number AS caseNumber, i.subject,
             i.status, i.reported_employee_name AS reportedEmployeeName
      FROM incident_notifications n
@@ -771,10 +1020,16 @@ module.exports = {
   searchIncidentEmployees,
   submitIncidentReport,
   listIncidentsForTrack,
+  listIncidentsForHistory,
   listIncidentsForReview,
   getIncidentCase,
   getIncidentEvidence,
   signIncidentCase,
+  transitionIncident,
+  listIncidentRequestRecipients,
+  requestIncidentInformation,
+  addIncidentInvestigationNote,
+  respondToIncidentInformation,
   getIncidentBadgeCounts,
   listPendingIncidentNotifications,
   markIncidentNotificationSeen

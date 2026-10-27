@@ -467,7 +467,7 @@ async function openIncidentCase(incidentId) {
       const link = incidentElement(
         'a',
         '',
-        `${file.fileName} (${formatIncidentBytes(file.byteSize)})`
+        `${file.fileName} (${formatIncidentBytes(file.byteSize)})${file.requestId ? ` · Response to request #${file.requestId}` : ''}`
       );
       link.href = `${INCIDENT_API_BASE}/incidents/evidence/${file.id}`;
       link.download = file.fileName;
@@ -513,10 +513,135 @@ async function openIncidentCase(incidentId) {
   );
   body.appendChild(signatures);
 
+  if (incident.canReview && ['UNDER_REVIEW', 'UNDER INVESTIGATION'].includes(incident.status)) {
+    const workflow = incidentElement('section', 'incident-case-section');
+    workflow.appendChild(incidentElement('h3', '', incident.status === 'UNDER_REVIEW' ? 'HR Review' : 'Investigation'));
+    if (incident.status === 'UNDER_REVIEW') {
+      const reason = incidentElement('textarea');
+      reason.rows = 3;
+      reason.maxLength = 4000;
+      reason.placeholder = 'Reason or preliminary findings';
+      const actions = incidentElement('div', 'actions');
+      const close = incidentElement('button', 'ghost', 'Close for documentation');
+      const investigate = incidentElement('button', '', 'Further investigation required');
+      close.type = investigate.type = 'button';
+      close.onclick = () => runIncidentTransition(incident, 'CLOSE_DOCUMENTATION', reason.value);
+      investigate.onclick = () => runIncidentTransition(incident, 'START_INVESTIGATION', reason.value);
+      actions.append(close, investigate);
+      workflow.append(incidentElement('p', 'note', 'Closing for documentation requires a reason. It does not record a disciplinary violation.'), reason, actions,
+        incidentElement('p', 'note', 'NTE preparation and issuance will be added with the next specification part. An NTE is never issued automatically.'));
+    } else {
+      const note = incidentElement('textarea');
+      note.rows = 4;
+      note.maxLength = 4000;
+      note.placeholder = 'Investigation findings or notes (required)';
+      const files = incidentElement('input');
+      files.type = 'file'; files.multiple = true;
+      files.accept = '.pdf,.doc,.docx,.rtf,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,.txt,.csv,.mp3,.wav,.mp4,.mov';
+      const saveNote = incidentElement('button', '', 'Save investigation note');
+      saveNote.type = 'button';
+      saveNote.onclick = async () => {
+        saveNote.disabled = true;
+        try {
+          await api('addIncidentInvestigationNote', incident.id, note.value, await readIncidentEvidenceFiles(files.files));
+          await openIncidentCase(incident.id);
+        } catch (error) { setIncidentFeedback(document.getElementById('ir-case-feedback'), error.message || String(error), true); }
+        finally { saveNote.disabled = false; }
+      };
+      const closeReason = incidentElement('textarea');
+      closeReason.rows = 3; closeReason.maxLength = 4000;
+      closeReason.placeholder = 'Investigation findings and reason for closure (required)';
+      const close = incidentElement('button', 'ghost', 'Close case');
+      close.type = 'button';
+      close.onclick = () => runIncidentTransition(incident, 'CLOSE_INVESTIGATION', closeReason.value);
+      workflow.append(incidentElement('h4', '', 'Record findings and evidence'), note, files, saveNote, incidentElement('h4', '', 'Close without disciplinary proceedings'), closeReason, close);
+
+      const requestForm = incidentElement('div', 'incident-case-section');
+      requestForm.appendChild(incidentElement('h4', '', 'Request additional information'));
+      const recipient = incidentElement('select');
+      recipient.setAttribute('aria-label', 'Information recipient');
+      recipient.appendChild(new Option('Loading participants…', ''));
+      const requestText = incidentElement('textarea');
+      requestText.rows = 3; requestText.maxLength = 4000; requestText.placeholder = 'Specify what information is needed';
+      const sendRequest = incidentElement('button', '', 'Send request');
+      sendRequest.type = 'button';
+      sendRequest.onclick = async () => {
+        sendRequest.disabled = true;
+        try { await api('requestIncidentInformation', incident.id, recipient.value, requestText.value); await openIncidentCase(incident.id); }
+        catch (error) { setIncidentFeedback(document.getElementById('ir-case-feedback'), error.message || String(error), true); }
+        finally { sendRequest.disabled = false; }
+      };
+      requestForm.append(recipient, requestText, sendRequest);
+      workflow.appendChild(requestForm);
+      api('listIncidentRequestRecipients', incident.id).then((rows) => {
+        recipient.replaceChildren(new Option('Select a participant', ''));
+        rows.forEach((row) => recipient.add(new Option(`${row.name} (${row.email})`, row.email)));
+      }).catch((error) => { recipient.replaceChildren(new Option(error.message || 'Participants unavailable', '')); });
+
+    }
+    body.appendChild(workflow);
+  }
+
+  if (incident.status === 'UNDER INVESTIGATION') {
+    incident.informationRequests
+      .filter((request) => request.recipientEmail.toLowerCase() === incident.currentUserEmail.toLowerCase() && request.status === 'PENDING')
+      .forEach((request) => {
+        const response = incidentElement('section', 'incident-case-section');
+        response.append(incidentElement('h3', '', 'Information requested from you'), incidentElement('p', '', request.requestText));
+        const responseText = incidentElement('textarea'); responseText.rows = 3; responseText.maxLength = 4000; responseText.placeholder = 'Your response (optional when attaching evidence)';
+        const responseFiles = incidentElement('input'); responseFiles.type = 'file'; responseFiles.multiple = true;
+        const submit = incidentElement('button', '', 'Submit information'); submit.type = 'button';
+        submit.onclick = async () => {
+          submit.disabled = true;
+          try { await api('respondToIncidentInformation', incident.id, request.id, responseText.value, await readIncidentEvidenceFiles(responseFiles.files)); await openIncidentCase(incident.id); }
+          catch (error) { setIncidentFeedback(document.getElementById('ir-case-feedback'), error.message || String(error), true); }
+          finally { submit.disabled = false; }
+        };
+        response.append(responseText, responseFiles, submit); body.appendChild(response);
+      });
+  }
+
+  if (incident.informationRequests.length) {
+    const requestsSection = incidentElement('section', 'incident-case-section');
+    requestsSection.appendChild(incidentElement('h3', '', 'Information Requests'));
+    incident.informationRequests.forEach((request) => {
+      requestsSection.append(incidentElement('p', '', `${request.status}: ${request.requestText} — ${request.recipientEmail}`));
+      if (request.responseText) requestsSection.appendChild(incidentElement('p', 'note', `Response: ${request.responseText}`));
+    });
+    body.appendChild(requestsSection);
+  }
+  if (incident.activity.length) {
+    const history = incidentElement('section', 'incident-case-section');
+    history.appendChild(incidentElement('h3', '', 'Case Activity'));
+    const list = incidentElement('ol');
+    incident.activity.forEach((entry) => list.appendChild(incidentElement('li', '', `${entry.action.replaceAll('_', ' ')} — ${entry.details} · ${entry.actorEmail} · ${new Date(entry.createdAt).toLocaleString()}`)));
+    history.appendChild(list); body.appendChild(history);
+  }
+
   setIncidentFeedback(document.getElementById('ir-case-feedback'), '');
   const dialog = document.getElementById('ir-case-dialog');
   if (!dialog.open) dialog.showModal();
   window.requestAnimationFrame(() => padSetup.forEach((setup) => setup()));
+}
+
+async function readIncidentEvidenceFiles(fileList) {
+  const files = [...(fileList || [])];
+  if (files.length > 10 || files.some((file) => file.size > 8 * 1024 * 1024) || files.reduce((sum, file) => sum + file.size, 0) > 18 * 1024 * 1024) throw new Error('Attach up to 10 files, each 8 MB or smaller and 18 MB total.');
+  return Promise.all(files.map(async (file) => ({ fileName: file.name, mimeType: incidentFileMimeType(file), dataUrl: await readIncidentFile(file) })));
+}
+
+async function runIncidentTransition(incident, action, details) {
+  if (action.startsWith('CLOSE_') && !window.confirm('Close this case? This decision will be recorded in the case history.')) return;
+  try {
+    const result = await api('transitionIncident', incident.id, action, details);
+    await window.refreshInboxBadge().catch(() => {});
+    await refreshIncidentBadges();
+    if (document.getElementById('view-incident-track') && !document.getElementById('view-incident-track').hidden) await loadIncidentTrack();
+    if (document.getElementById('view-incident-history') && !document.getElementById('view-incident-history').hidden) await loadIncidentHistory();
+    if (document.getElementById('view-incident-review') && !document.getElementById('view-incident-review').hidden) await loadIncidentReview();
+    await openIncidentCase(incident.id);
+    setIncidentFeedback(document.getElementById('ir-case-feedback'), `Case updated: ${result.status}.`);
+  } catch (error) { setIncidentFeedback(document.getElementById('ir-case-feedback'), error.message || String(error), true); }
 }
 
 function renderIncidentRows(rows, targetId, emptyId) {
@@ -552,9 +677,20 @@ async function loadIncidentTrack() {
   }
 }
 
+async function loadIncidentHistory() {
+  const rows = await api('listIncidentsForHistory');
+  renderIncidentRows(rows, 'ir-history-rows', 'ir-history-empty');
+  if (pendingIncidentCaseId) {
+    const id = pendingIncidentCaseId;
+    pendingIncidentCaseId = null;
+    await openIncidentCase(id);
+  }
+}
+
 async function loadIncidentReview() {
   const rows = await api('listIncidentsForReview');
-  renderIncidentRows(rows, 'ir-review-rows', 'ir-review-empty');
+  const filter = document.getElementById('ir-review-status-filter').value;
+  renderIncidentRows(rows.filter((row) => filter === 'ALL' || (filter === 'CLOSED' ? row.status === 'CLOSED' : row.status !== 'CLOSED')), 'ir-review-rows', 'ir-review-empty');
   if (pendingIncidentCaseId) {
     const id = pendingIncidentCaseId;
     pendingIncidentCaseId = null;
@@ -580,11 +716,12 @@ async function openIncidentRoute(incidentId, target, notificationId = null) {
   if (notificationId)
     await api('markIncidentNotificationSeen', notificationId).catch(() => {});
   pendingIncidentCaseId = Number(incidentId);
-  go(
-    target === 'incident-review'
-      ? ['incident-review', 'Review']
-      : ['incident-track', 'Track']
-  );
+  const destination = {
+    'incident-review': ['incident-review', 'Review'],
+    'incident-history': ['incident-history', 'History'],
+    'incident-track': ['incident-track', 'Track']
+  }[target] || ['incident-track', 'Track'];
+  go(destination);
 }
 
 window.openIncidentCase = openIncidentCase;
@@ -594,9 +731,12 @@ window.selectIncidentCase = (incidentId) => openIncidentCase(incidentId);
 VIEWS['incident-file'] = guard(loadIncidentFile);
 VIEWS['incident-track'] = guard(loadIncidentTrack);
 VIEWS['incident-review'] = guard(loadIncidentReview);
+VIEWS['incident-history'] = guard(loadIncidentHistory);
 
 document.getElementById('ir-track-refresh').onclick = guard(loadIncidentTrack);
 document.getElementById('ir-review-refresh').onclick =
   guard(loadIncidentReview);
+document.getElementById('ir-history-refresh').onclick = guard(loadIncidentHistory);
+document.getElementById('ir-review-status-filter').onchange = guard(loadIncidentReview);
 document.getElementById('ir-case-close').onclick = () =>
   document.getElementById('ir-case-dialog').close();

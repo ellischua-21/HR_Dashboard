@@ -110,10 +110,28 @@
   </section>
 </section>
 
+<section id="view-incident-history" class="view" hidden>
+  <section class="panel">
+    <div class="account-heading">
+      <h2>Closed Incident Reports</h2>
+      <button id="ir-history-refresh" class="ghost" type="button">Refresh</button>
+    </div>
+    <p id="ir-history-empty" class="note" hidden>No closed Incident Reports.</p>
+    <div class="tablewrap"><table><thead><tr><th>Case Number</th><th>Subject</th><th>Employee</th><th>Date</th><th>Status</th><th></th></tr></thead><tbody id="ir-history-rows"></tbody></table></div>
+  </section>
+</section>
+
 <section id="view-incident-review" class="view" hidden>
   <section class="panel">
     <div class="account-heading">
       <h2>Incident Reports</h2>
+      <label>Cases
+        <select id="ir-review-status-filter">
+          <option value="ACTIVE">Active</option>
+          <option value="CLOSED">Closed</option>
+          <option value="ALL">All</option>
+        </select>
+      </label>
       <button id="ir-review-refresh" class="ghost" type="button">
         Refresh
       </button>
