@@ -118,20 +118,47 @@ async function getInbox(req) {
             ? 'Incident Report case closed'
             : notification.notificationType === 'INVESTIGATION_STARTED'
               ? 'Incident Report under investigation'
-              : notification.notificationType.startsWith('INFO_REQ_')
-                ? 'Additional incident information requested'
-                : notification.notificationType.startsWith('INFO_DONE_')
-                  ? 'Additional incident information received'
-                  : 'Incident Report updated',
-      message: `${notification.caseNumber}: ${notification.subject} — ${notification.reportedEmployeeName}`,
+              : notification.notificationType === 'NTE_ISSUED'
+                ? 'Notice to Explain issued'
+                : notification.notificationType === 'EXPLANATION_SENT'
+                  ? 'Employee explanation submitted'
+                  : notification.notificationType.startsWith('EXPLANATION_ADD_')
+                    ? 'Employee additional statement submitted'
+                    : notification.notificationType.startsWith('NTE_OVERDUE')
+                      ? 'NTE explanation is overdue'
+                      : notification.notificationType.startsWith('NTE_EXT_')
+                        ? 'NTE explanation deadline updated'
+                        : notification.notificationType.startsWith('INFO_REQ_')
+                          ? 'Additional incident information requested'
+                          : notification.notificationType.startsWith(
+                                'INFO_DONE_'
+                              )
+                            ? 'Additional incident information received'
+                            : 'Incident Report updated',
+      message:
+        notification.notificationType === 'NTE_ISSUED'
+          ? `${notification.caseNumber} has advanced. Open HRIS to view information available to your account.`
+          : `${notification.caseNumber}: ${notification.subject} — ${notification.reportedEmployeeName}`,
       createdAt: notification.createdAt,
       notificationId: notification.notificationId,
       incidentId: notification.incidentId,
-      target: notification.notificationType === 'CASE_CLOSED'
-        ? (['HR', 'ADMIN'].includes(user.role) ? 'incident-review' : 'incident-history')
-        : needsSignature || notification.notificationType === 'INVESTIGATION_STARTED' || notification.notificationType.startsWith('INFO_REQ_')
-          ? 'incident-track'
-          : 'incident-review'
+      target:
+        ['EXPLANATION_SENT'].includes(notification.notificationType) ||
+        notification.notificationType.startsWith('EXPLANATION_ADD_') ||
+        notification.notificationType.startsWith('NTE_OVERDUE')
+          ? 'incident-review'
+          : notification.notificationType === 'CASE_CLOSED'
+            ? ['HR', 'ADMIN'].includes(user.role)
+              ? 'incident-review'
+              : 'incident-history'
+            : needsSignature ||
+                ['INVESTIGATION_STARTED', 'NTE_ISSUED'].includes(
+                  notification.notificationType
+                ) ||
+                notification.notificationType.startsWith('NTE_EXT_') ||
+                notification.notificationType.startsWith('INFO_REQ_')
+              ? 'incident-track'
+              : 'incident-review'
     });
   });
 

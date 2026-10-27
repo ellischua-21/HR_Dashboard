@@ -1166,13 +1166,19 @@ window.refreshSubmittedFormsBadge = refreshSubmittedFormsBadge;
 
 let pendingAnnouncements = [];
 let pendingIncidentNotifications = [];
+let dailyNteReminders = [];
 
 async function showPendingAnnouncements() {
   pendingAnnouncements = session.perms.includes('announcements.read')
     ? await api('listUnseenAnnouncements')
     : [];
   pendingIncidentNotifications = await api('listPendingIncidentNotifications');
-  if (!pendingAnnouncements.length && !pendingIncidentNotifications.length)
+  dailyNteReminders = await api('listDailyNteReminders');
+  if (
+    !pendingAnnouncements.length &&
+    !pendingIncidentNotifications.length &&
+    !dailyNteReminders.length
+  )
     return;
   const list = $('staff-announcements-list');
   list.replaceChildren();
@@ -1199,17 +1205,30 @@ async function showPendingAnnouncements() {
       HEAD_SIGNATURE: 'Incident Report requires your review and signature',
       HR_REVIEW_READY: 'Incident Report ready for HR review',
       CASE_CLOSED: 'Incident Report case closed',
-      INVESTIGATION_STARTED: 'Incident Report under investigation'
+      INVESTIGATION_STARTED: 'Incident Report under investigation',
+      NTE_ISSUED: 'Notice to Explain issued',
+      EXPLANATION_SENT: 'Employee explanation submitted',
+      NTE_OVERDUE: 'NTE explanation is overdue'
     };
-    title.textContent = titles[notification.type] ||
-      (notification.type.startsWith('INFO_REQ_')
-        ? 'Additional incident information requested'
-        : notification.type.startsWith('INFO_DONE_')
-          ? 'Additional incident information received'
-          : 'Incident Report updated');
+    title.textContent =
+      titles[notification.type] ||
+      (notification.type.startsWith('NTE_OVERDUE')
+        ? 'NTE explanation is overdue'
+        : notification.type.startsWith('NTE_EXT_')
+          ? 'NTE explanation deadline updated'
+          : notification.type.startsWith('EXPLANATION_ADD_')
+            ? 'Employee additional statement submitted'
+            : notification.type.startsWith('INFO_REQ_')
+              ? 'Additional incident information requested'
+              : notification.type.startsWith('INFO_DONE_')
+                ? 'Additional incident information received'
+                : 'Incident Report updated');
     const message = document.createElement('p');
     message.className = 'announcement-message';
-    message.textContent = `${notification.caseNumber}: ${notification.subject} — ${notification.reportedEmployeeName}`;
+    message.textContent =
+      notification.type === 'NTE_ISSUED'
+        ? `${notification.caseNumber} has advanced. Open HRIS to view information available to your account.`
+        : `${notification.caseNumber}: ${notification.subject} — ${notification.reportedEmployeeName}`;
     const open = document.createElement('button');
     open.type = 'button';
     open.textContent = 'Open Incident Report';
@@ -1219,7 +1238,8 @@ async function showPendingAnnouncements() {
         $('staff-announcements-dialog').close();
         await window.openIncidentRoute(
           notification.incidentId,
-          notification.type === 'CASE_CLOSED' && ['HR', 'ADMIN'].includes(session.role)
+          notification.type === 'CASE_CLOSED' &&
+            ['HR', 'ADMIN'].includes(session.role)
             ? 'incident-review'
             : notification.target,
           notification.id
@@ -1231,6 +1251,29 @@ async function showPendingAnnouncements() {
           error.message || String(error);
         $('staff-announcements-feedback').hidden = false;
       }
+    };
+    card.append(title, message, open);
+    list.appendChild(card);
+  });
+  dailyNteReminders.forEach((reminder) => {
+    const card = document.createElement('article');
+    card.className = 'announcement-card';
+    const title = document.createElement('h3');
+    title.textContent = 'You have an NTE requiring an explanation';
+    const message = document.createElement('p');
+    message.className = 'announcement-message';
+    const days = Number(reminder.daysRemaining);
+    message.textContent = reminder.overdueAt
+      ? `${reminder.caseNumber}: your explanation is overdue. Please respond as soon as possible.`
+      : days > 0
+        ? `${reminder.caseNumber}: ${days} working day${days === 1 ? '' : 's'} remaining. Deadline: ${reminder.deadlineDate}.`
+        : `${reminder.caseNumber}: your explanation is due today (${reminder.deadlineDate}).`;
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.textContent = 'Open case in Track';
+    open.onclick = async () => {
+      $('staff-announcements-dialog').close();
+      await window.openIncidentRoute(reminder.incidentId, 'incident-track');
     };
     card.append(title, message, open);
     list.appendChild(card);

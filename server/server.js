@@ -175,6 +175,46 @@ const methods = {
     incidents.signIncidentCase(req, incidentId, role, signature),
   transitionIncident: (req, incidentId, action, details) =>
     incidents.transitionIncident(req, incidentId, action, details),
+  listIncidentCodeProvisions: (req) =>
+    incidents.listIncidentCodeProvisions(req),
+  saveIncidentCodeProvision: (req, data) =>
+    incidents.saveIncidentCodeProvision(req, data),
+  saveIncidentNteDraft: (req, incidentId, data) =>
+    incidents.saveIncidentNteDraft(req, incidentId, data),
+  issueIncidentNte: (req, incidentId, data) =>
+    incidents.issueIncidentNte(req, incidentId, data),
+  saveIncidentExplanationDraft: (req, incidentId, explanation, files) =>
+    incidents.saveIncidentExplanationDraft(req, incidentId, explanation, files),
+  submitIncidentExplanation: (req, incidentId, explanation, files) =>
+    incidents.submitIncidentExplanation(req, incidentId, explanation, files),
+  startIncidentEvaluation: (req, incidentId) =>
+    incidents.startIncidentEvaluation(req, incidentId),
+  submitIncidentExplanationAddendum: (req, incidentId, statement, files) =>
+    incidents.submitIncidentExplanationAddendum(
+      req,
+      incidentId,
+      statement,
+      files
+    ),
+  extendIncidentDeadline: (req, incidentId, deadline, reason) =>
+    incidents.extendIncidentDeadline(req, incidentId, deadline, reason),
+  recordExternalIncidentExplanation: (
+    req,
+    incidentId,
+    explanation,
+    channel,
+    receivedAt,
+    files
+  ) =>
+    incidents.recordExternalIncidentExplanation(
+      req,
+      incidentId,
+      explanation,
+      channel,
+      receivedAt,
+      files
+    ),
+  listDailyNteReminders: (req) => incidents.listDailyNteReminders(req),
   listIncidentRequestRecipients: (req, incidentId) =>
     incidents.listIncidentRequestRecipients(req, incidentId),
   requestIncidentInformation: (req, incidentId, recipient, text) =>
@@ -182,7 +222,13 @@ const methods = {
   addIncidentInvestigationNote: (req, incidentId, text, files) =>
     incidents.addIncidentInvestigationNote(req, incidentId, text, files),
   respondToIncidentInformation: (req, incidentId, requestId, text, files) =>
-    incidents.respondToIncidentInformation(req, incidentId, requestId, text, files),
+    incidents.respondToIncidentInformation(
+      req,
+      incidentId,
+      requestId,
+      text,
+      files
+    ),
   getIncidentBadgeCounts: (req) => incidents.getIncidentBadgeCounts(req),
   listPendingIncidentNotifications: (req) =>
     incidents.listPendingIncidentNotifications(req),
@@ -228,6 +274,82 @@ app.get('/api/incidents/evidence/:evidenceId', async (req, res, next) => {
   }
 });
 
+async function sendIncidentFile(res, file) {
+  const safeName = file.fileName.replace(/[\r\n"\\]/g, '_');
+  const fallbackName = safeName.replace(/[^\x20-\x7E]/g, '_');
+  res.setHeader('Content-Type', file.mimeType);
+  res.setHeader('Content-Length', file.fileData.length);
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${fallbackName}"; filename*=UTF-8''${encodeURIComponent(safeName)}`
+  );
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.send(file.fileData);
+}
+
+app.get('/api/incidents/nte-evidence/:evidenceId', async (req, res, next) => {
+  try {
+    await sendIncidentFile(
+      res,
+      await incidents.getIncidentNteEvidence(req, req.params.evidenceId)
+    );
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get(
+  '/api/incidents/explanation-evidence/:evidenceId',
+  async (req, res, next) => {
+    try {
+      await sendIncidentFile(
+        res,
+        await incidents.getIncidentExplanationEvidence(
+          req,
+          req.params.evidenceId
+        )
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.get(
+  '/api/incidents/explanation-draft-evidence/:evidenceId',
+  async (req, res, next) => {
+    try {
+      await sendIncidentFile(
+        res,
+        await incidents.getIncidentExplanationDraftEvidence(
+          req,
+          req.params.evidenceId
+        )
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+app.get(
+  '/api/incidents/explanation-addendum-evidence/:evidenceId',
+  async (req, res, next) => {
+    try {
+      await sendIncidentFile(
+        res,
+        await incidents.getIncidentExplanationAddendumEvidence(
+          req,
+          req.params.evidenceId
+        )
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 app.use((error, req, res, next) => {
   console.error(error);
   if (res.headersSent) return next(error);
@@ -242,6 +364,21 @@ app.use((error, req, res, next) => {
 
 initializeDatabase()
   .then(() => {
+    incidents
+      .processOverdueIncidentNtes()
+      .catch((error) =>
+        console.error('Could not process overdue Incident NTEs:', error)
+      );
+    setInterval(
+      () => {
+        incidents
+          .processOverdueIncidentNtes()
+          .catch((error) =>
+            console.error('Could not process overdue Incident NTEs:', error)
+          );
+      },
+      15 * 60 * 1000
+    ).unref();
     app.listen(port, '127.0.0.1', () => {
       console.log(`HR Dashboard API ready at http://127.0.0.1:${port}`);
     });

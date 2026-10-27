@@ -327,6 +327,149 @@ async function initializeDatabase() {
     );
   }
 
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_code_provisions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    provision_code VARCHAR(100) NOT NULL,
+    title VARCHAR(191) NOT NULL,
+    description TEXT NOT NULL,
+    active TINYINT(1) NOT NULL DEFAULT 1,
+    created_by VARCHAR(191) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_incident_code_provision (provision_code)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_ntes (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    incident_id BIGINT UNSIGNED NOT NULL,
+    provision_id BIGINT UNSIGNED NOT NULL,
+    provision_code VARCHAR(100) NOT NULL,
+    provision_title VARCHAR(191) NOT NULL,
+    provision_text TEXT NOT NULL,
+    allegation MEDIUMTEXT NOT NULL,
+    issuance_date DATE NOT NULL,
+    receipt_date DATE NOT NULL,
+    response_working_days TINYINT UNSIGNED NOT NULL DEFAULT 5,
+    deadline_date DATE NOT NULL,
+    signer_email VARCHAR(191) NOT NULL,
+    signer_name VARCHAR(191) NOT NULL,
+    signature_data MEDIUMTEXT NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'DRAFT',
+    issued_at TIMESTAMP NULL,
+    overdue_at TIMESTAMP NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_incident_nte_case (incident_id),
+    KEY idx_incident_nte_deadline (status, deadline_date, overdue_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_nte_evidence (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    nte_id BIGINT UNSIGNED NOT NULL,
+    file_name VARCHAR(191) NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
+    byte_size INT UNSIGNED NOT NULL,
+    file_data MEDIUMBLOB NOT NULL,
+    uploaded_by VARCHAR(191) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_incident_nte_evidence (nte_id, id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_explanation_drafts (
+    nte_id BIGINT UNSIGNED NOT NULL,
+    employee_email VARCHAR(191) NOT NULL,
+    explanation MEDIUMTEXT NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (nte_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_explanation_draft_evidence (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    nte_id BIGINT UNSIGNED NOT NULL,
+    file_name VARCHAR(191) NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
+    byte_size INT UNSIGNED NOT NULL,
+    file_data MEDIUMBLOB NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_incident_explanation_draft_files (nte_id, id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_explanations (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    nte_id BIGINT UNSIGNED NOT NULL,
+    submitted_by VARCHAR(191) NOT NULL,
+    explanation MEDIUMTEXT NOT NULL,
+    source VARCHAR(24) NOT NULL DEFAULT 'HRIS',
+    other_channel VARCHAR(191) NULL,
+    submitted_at DATETIME NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_incident_explanations (nte_id, submitted_at, id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_explanation_evidence (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    explanation_id BIGINT UNSIGNED NOT NULL,
+    file_name VARCHAR(191) NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
+    byte_size INT UNSIGNED NOT NULL,
+    file_data MEDIUMBLOB NOT NULL,
+    uploaded_by VARCHAR(191) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_incident_explanation_evidence (explanation_id, id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_explanation_addenda (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    nte_id BIGINT UNSIGNED NOT NULL,
+    submitted_by VARCHAR(191) NOT NULL,
+    statement MEDIUMTEXT NOT NULL,
+    submitted_at DATETIME NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_incident_explanation_addenda (nte_id, submitted_at, id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_explanation_addendum_evidence (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    addendum_id BIGINT UNSIGNED NOT NULL,
+    file_name VARCHAR(191) NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
+    byte_size INT UNSIGNED NOT NULL,
+    file_data MEDIUMBLOB NOT NULL,
+    uploaded_by VARCHAR(191) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_incident_explanation_addendum_evidence (addendum_id, id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_deadline_extensions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    nte_id BIGINT UNSIGNED NOT NULL,
+    previous_deadline DATE NOT NULL,
+    extended_deadline DATE NOT NULL,
+    reason TEXT NOT NULL,
+    approved_by VARCHAR(191) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_incident_deadline_extensions (nte_id, created_at, id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_nte_reminders (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    nte_id BIGINT UNSIGNED NOT NULL,
+    employee_email VARCHAR(191) NOT NULL,
+    reminder_date DATE NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_incident_nte_daily_reminder (nte_id, reminder_date),
+    KEY idx_incident_nte_reminder_employee (employee_email, reminder_date)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
   await pool.query(`CREATE TABLE IF NOT EXISTS form_serial_sequences (
     template_key VARCHAR(64) NOT NULL,
     serial_year SMALLINT UNSIGNED NOT NULL,
