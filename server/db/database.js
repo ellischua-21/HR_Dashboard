@@ -215,6 +215,7 @@ async function initializeDatabase() {
     incident_time TIME NOT NULL,
     description MEDIUMTEXT NOT NULL,
     comments TEXT NOT NULL,
+    document_version CHAR(64) NULL,
     status VARCHAR(32) NOT NULL DEFAULT 'PENDING SIGNATURE',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -234,6 +235,15 @@ async function initializeDatabase() {
   ) {
     await pool.query(
       'ALTER TABLE incident_reports MODIFY COLUMN reporter_employee_id VARCHAR(20) NULL'
+    );
+  }
+
+  const [incidentDocumentVersionColumn] = await pool.query(
+    "SHOW COLUMNS FROM incident_reports LIKE 'document_version'"
+  );
+  if (!incidentDocumentVersionColumn.length) {
+    await pool.query(
+      'ALTER TABLE incident_reports ADD COLUMN document_version CHAR(64) NULL AFTER comments'
     );
   }
 
@@ -259,10 +269,41 @@ async function initializeDatabase() {
     signatory_role VARCHAR(16) NOT NULL,
     signer_email VARCHAR(191) NOT NULL,
     signature_data MEDIUMTEXT NOT NULL,
+    document_version CHAR(64) NOT NULL DEFAULT 'LEGACY-UNVERIFIED',
     signed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (incident_id, signatory_role),
     KEY idx_incident_signature_signer (signer_email, signed_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  const [signatureVersionColumn] = await pool.query(
+    "SHOW COLUMNS FROM incident_signatures LIKE 'document_version'"
+  );
+  if (!signatureVersionColumn.length) {
+    await pool.query(
+      "ALTER TABLE incident_signatures ADD COLUMN document_version CHAR(64) NOT NULL DEFAULT 'LEGACY-UNVERIFIED' AFTER signature_data"
+    );
+  }
+
+  // One case can eventually have multiple accountable employees. Existing
+  // cases keep their current primary subject and are backfilled idempotently.
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_case_subjects (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    incident_id BIGINT UNSIGNED NOT NULL,
+    employee_record_id VARCHAR(20) NOT NULL,
+    employee_email VARCHAR(191) NOT NULL,
+    employee_name VARCHAR(191) NOT NULL,
+    subject_role VARCHAR(24) NOT NULL DEFAULT 'REPORTED_EMPLOYEE',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_incident_case_subject (incident_id, employee_email),
+    KEY idx_incident_subject_employee (employee_email, created_at),
+    KEY idx_incident_subject_case (incident_id, id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  await pool.query(`INSERT IGNORE INTO incident_case_subjects
+    (incident_id, employee_record_id, employee_email, employee_name, subject_role)
+    SELECT id, reported_employee_id, reported_employee_email,
+           reported_employee_name, 'REPORTED_EMPLOYEE'
+    FROM incident_reports`);
 
   await pool.query(`CREATE TABLE IF NOT EXISTS incident_evidence (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -607,6 +648,65 @@ async function initializeDatabase() {
     UNIQUE KEY uq_incident_nte_daily_reminder (nte_id, employee_email, reminder_date),
     KEY idx_incident_nte_reminder_employee (employee_email, reminder_date)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  // Per-subject records let a single incident case hold separate notices,
+  // evaluations, decisions, and finalized history for multiple employees.
+  const subjectScopedTables = [
+    ['incident_ntes', 'uq_incident_nte_case', 'uq_incident_nte_subject'],
+    [
+      'incident_evaluations',
+      'uq_incident_evaluation_case',
+      'uq_incident_evaluation_subject'
+    ],
+    [
+      'incident_decisions',
+      'uq_incident_decision_case',
+      'uq_incident_decision_subject'
+    ],
+    [
+      'incident_disciplinary_history',
+      'uq_incident_disciplinary_case',
+      'uq_incident_disciplinary_subject'
+    ]
+  ];
+  for (const [
+    table,
+    legacyUniqueIndex,
+    subjectUniqueIndex
+  ] of subjectScopedTables) {
+    const [subjectColumn] = await pool.query(
+      `SHOW COLUMNS FROM \`${table}\` LIKE 'subject_id'`
+    );
+    if (!subjectColumn.length) {
+      await pool.query(
+        `ALTER TABLE \`${table}\` ADD COLUMN subject_id BIGINT UNSIGNED NULL AFTER incident_id`
+      );
+    }
+    await pool.query(
+      `UPDATE \`${table}\` scoped
+       JOIN incident_case_subjects subject ON subject.incident_id = scoped.incident_id
+         AND subject.subject_role = 'REPORTED_EMPLOYEE'
+       SET scoped.subject_id = subject.id WHERE scoped.subject_id IS NULL`
+    );
+    const [legacyIndex] = await pool.query(
+      `SHOW INDEX FROM \`${table}\` WHERE Key_name = ?`,
+      [legacyUniqueIndex]
+    );
+    if (legacyIndex.length) {
+      await pool.query(
+        `ALTER TABLE \`${table}\` DROP INDEX \`${legacyUniqueIndex}\``
+      );
+    }
+    const [subjectIndex] = await pool.query(
+      `SHOW INDEX FROM \`${table}\` WHERE Key_name = ?`,
+      [subjectUniqueIndex]
+    );
+    if (!subjectIndex.length) {
+      await pool.query(
+        `ALTER TABLE \`${table}\` ADD UNIQUE KEY \`${subjectUniqueIndex}\` (incident_id, subject_id)`
+      );
+    }
+  }
 
   const [reminderIndex] = await pool.query(
     "SHOW INDEX FROM incident_nte_reminders WHERE Key_name = 'uq_incident_nte_daily_reminder'"

@@ -508,6 +508,56 @@ function openNtePreview(incident, nte) {
   preview.document.close();
 }
 
+function createIncidentReportDocumentHtml(incident) {
+  const signatures = (incident.signatures || [])
+    .map((item) => {
+      const signature = /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(
+        item.signature || ''
+      )
+        ? `<img class="signature" src="${item.signature}" alt="${escapeIncidentHtml(item.role)} signature">`
+        : 'Not signed';
+      const labels = { EMPLOYEE: 'Employee', HEAD: 'Assigned Head', HR: 'HR' };
+      return `<tr><td>${escapeIncidentHtml(labels[item.role] || item.role)}</td><td>${signature}</td><td>${escapeIncidentHtml(item.signerEmail)}</td><td>${escapeIncidentHtml(item.signedAt)}</td></tr>`;
+    })
+    .join('');
+  const participants = (type) =>
+    (incident.participants || [])
+      .filter((item) => item.participantType === type)
+      .map((item) => escapeIncidentHtml(item.name))
+      .join(', ') || 'None recorded';
+  const evidence = (incident.evidence || [])
+    .map((item) => `<li>${escapeIncidentHtml(item.fileName)}</li>`)
+    .join('');
+  const fields = [
+    ['Case Number', incident.caseNumber],
+    ['Reported By', incident.reporterName],
+    ['Department', incident.department],
+    ['Position', incident.position],
+    ['Reported Employee', incident.reportedEmployeeName],
+    ['Employee ID', incident.reportedEmployeeId],
+    ['Date Reported', incident.dateReported],
+    ['Incident Date', incident.incidentDate],
+    ['Incident Time', String(incident.incidentTime).slice(0, 5)],
+    ['Location', incident.location],
+    ['Subject', incident.subject]
+  ]
+    .map(
+      ([label, value]) =>
+        `<div><strong>${escapeIncidentHtml(label)}:</strong> ${escapeIncidentHtml(value)}</div>`
+    )
+    .join('');
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Incident Report - ${escapeIncidentHtml(incident.caseNumber)}</title><style>@page{size:letter;margin:20mm}body{font:14px Arial,sans-serif;color:#172033;line-height:1.5;max-width:780px;margin:24px auto}h1{text-align:center;font-size:22px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:18px 0}pre{font:inherit;white-space:pre-wrap}table{width:100%;border-collapse:collapse}th,td{border:1px solid #aab2bd;padding:8px;text-align:left;vertical-align:top}.signature{max-width:140px;max-height:60px}button{padding:8px 14px}@media print{button{display:none}body{margin:0}}</style></head><body><button onclick="window.print()">Print / Save as PDF</button><h1>INCIDENT REPORT</h1><div class="meta">${fields}</div><h2>Incident Description</h2><pre>${escapeIncidentHtml(incident.description)}</pre><h2>Comments</h2><pre>${escapeIncidentHtml(incident.comments || '')}</pre><p><strong>Persons Involved:</strong> ${participants('INVOLVED')}</p><p><strong>Witnesses:</strong> ${participants('WITNESS')}</p><h2>Supporting Evidence</h2><ul>${evidence || '<li>None attached</li>'}</ul><h2>Signatures</h2><table><thead><tr><th>Role</th><th>Signature</th><th>Signed By</th><th>Date</th></tr></thead><tbody>${signatures || '<tr><td colspan="4">No signatures recorded</td></tr>'}</tbody></table></body></html>`;
+}
+
+function openIncidentReportPreview(incident) {
+  const preview = window.open('', '_blank');
+  if (!preview)
+    throw new Error('Allow the preview window to open, then try again.');
+  preview.document.open();
+  preview.document.write(createIncidentReportDocumentHtml(incident));
+  preview.document.close();
+}
+
 function createDecisionDocumentHtml(incident, decision) {
   const signature = /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(
     decision.approvalSignature || ''
@@ -1567,6 +1617,16 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
 }
 
 function renderIncidentReport(body, incident) {
+  const print = incidentElement('button', 'ghost', 'Print / Save IR as PDF');
+  print.type = 'button';
+  print.addEventListener('click', () => {
+    try {
+      openIncidentReportPreview(incident);
+    } catch (error) {
+      window.alert(error.message || String(error));
+    }
+  });
+  body.appendChild(print);
   const summary = incidentElement('div', 'incident-case-grid');
   [
     ['Status', incident.status],

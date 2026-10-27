@@ -27,6 +27,7 @@ const {
   publicTimeline
 } = require('./incident-management/Activity');
 const { notificationTitle } = require('./incident-management/Notifications');
+const crypto = require('crypto');
 
 const FILING_ROLES = new Set(['HEAD', 'HR', 'ADMIN']);
 const REVIEW_ROLES = new Set(['HR', 'ADMIN']);
@@ -404,14 +405,49 @@ async function submitIncidentReport(req, input = {}) {
       connection,
       Number(dateReported.slice(0, 4))
     );
+    const documentVersion = crypto
+      .createHash('sha256')
+      .update(
+        JSON.stringify({
+          caseNumber,
+          reporter: user.email.toLowerCase(),
+          reporterEmployeeId: reporter.record_id,
+          reporterName: reporter.name || user.full_name || user.email,
+          department: reporter.department || '',
+          position: reporter.position || '',
+          reportedEmployee: employee.email.toLowerCase(),
+          reportedEmployeeId: employee.record_id,
+          reportedEmployeeName: employee.name,
+          assignedHead: assignedHeadEmail,
+          dateReported,
+          subject,
+          incidentDate,
+          location,
+          incidentTime,
+          description,
+          comments,
+          personsInvolved,
+          witnesses,
+          evidence: evidence.map((file) => ({
+            fileName: file.fileName,
+            mimeType: file.mimeType,
+            sha256: crypto
+              .createHash('sha256')
+              .update(file.fileData)
+              .digest('hex')
+          }))
+        })
+      )
+      .digest('hex');
 
     const [result] = await connection.execute(
       `INSERT INTO incident_reports
          (case_number, reporter_email, reporter_employee_id, reporter_name,
           department, position, reported_employee_id, reported_employee_email,
           reported_employee_name, assigned_head_email, date_reported, subject,
-          incident_date, location, incident_time, description, comments, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING SIGNATURE')`,
+          incident_date, location, incident_time, description, comments,
+          document_version, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING SIGNATURE')`,
       [
         caseNumber,
         user.email,
@@ -429,10 +465,17 @@ async function submitIncidentReport(req, input = {}) {
         location,
         incidentTime,
         description,
-        comments
+        comments,
+        documentVersion
       ]
     );
     const incidentId = result.insertId;
+    await connection.execute(
+      `INSERT INTO incident_case_subjects
+         (incident_id, employee_record_id, employee_email, employee_name, subject_role)
+       VALUES (?, ?, ?, ?, 'REPORTED_EMPLOYEE')`,
+      [incidentId, employee.record_id, employee.email, employee.name]
+    );
     for (const [participantType, participants] of [
       ['INVOLVED', personsInvolved],
       ['WITNESS', witnesses]
@@ -1068,6 +1111,18 @@ function normalizeNteInput(input = {}) {
   };
 }
 
+async function getPrimaryIncidentSubjectId(connection, incidentId) {
+  const [[subject]] = await connection.execute(
+    `SELECT id FROM incident_case_subjects
+     WHERE incident_id = ? AND subject_role = 'REPORTED_EMPLOYEE'
+     ORDER BY id LIMIT 1 FOR UPDATE`,
+    [incidentId]
+  );
+  if (!subject)
+    throw httpError('The reported employee is not linked to this case.', 409);
+  return subject.id;
+}
+
 async function upsertIncidentNte(connection, user, incident, input) {
   const fields = normalizeNteInput(input);
   const [[provision]] = await connection.execute(
@@ -1108,14 +1163,19 @@ async function upsertIncidentNte(connection, user, incident, input) {
       ]
     );
   } else {
+    const subjectId = await getPrimaryIncidentSubjectId(
+      connection,
+      incident.id
+    );
     const [result] = await connection.execute(
       `INSERT INTO incident_ntes
-       (incident_id, provision_id, provision_code, provision_title, provision_text,
+       (incident_id, subject_id, provision_id, provision_code, provision_title, provision_text,
         allegation, issuance_date, receipt_date, response_working_days, deadline_date,
         signer_email, signer_name, signature_data)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')`,
       [
         incident.id,
+        subjectId,
         fields.provisionId,
         provision.code,
         provision.title,
@@ -1615,12 +1675,13 @@ async function saveIncidentEvaluation(req, incidentId, input = {}) {
         400
       );
     }
+    const subjectId = await getPrimaryIncidentSubjectId(connection, id);
     await connection.execute(
       `INSERT INTO incident_evaluations
-       (incident_id, finding, findings, rule_id, violation_title, code_reference, severity,
+       (incident_id, subject_id, finding, findings, rule_id, violation_title, code_reference, severity,
         previous_offenses, suggested_action, recommended_action, recommendation_justification,
         remarks, evaluated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE finding = VALUES(finding), findings = VALUES(findings),
         rule_id = VALUES(rule_id), violation_title = VALUES(violation_title),
         code_reference = VALUES(code_reference), severity = VALUES(severity),
@@ -1630,6 +1691,7 @@ async function saveIncidentEvaluation(req, incidentId, input = {}) {
         remarks = VALUES(remarks), evaluated_by = VALUES(evaluated_by), evaluated_at = CURRENT_TIMESTAMP`,
       [
         id,
+        subjectId,
         finding,
         findings,
         rule?.id || null,
@@ -1816,6 +1878,9 @@ async function issueIncidentDecision(req, incidentId, input = {}) {
         'Change the evaluation finding before issuing a no-violation decision.',
         409
       );
+    const subjectId =
+      evaluation.subject_id ||
+      (await getPrimaryIncidentSubjectId(connection, id));
     let finalAction = null;
     if (outcome !== 'NO_VIOLATION') {
       finalAction = normalizeText(
@@ -1837,11 +1902,12 @@ async function issueIncidentDecision(req, incidentId, input = {}) {
     }
     const [insert] = await connection.execute(
       `INSERT INTO incident_decisions
-       (incident_id, evaluation_id, outcome, violation_title, code_reference, severity,
+       (incident_id, subject_id, evaluation_id, outcome, violation_title, code_reference, severity,
         final_action, effective_date, decision_reason, approver_email, approver_name, approval_signature)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
+        subjectId,
         evaluation.id,
         outcome,
         outcome === 'NO_VIOLATION' ? null : evaluation.violation_title,
@@ -1862,11 +1928,12 @@ async function issueIncidentDecision(req, incidentId, input = {}) {
     if (outcome !== 'NO_VIOLATION') {
       await connection.execute(
         `INSERT INTO incident_disciplinary_history
-         (incident_id, decision_id, employee_email, rule_id, violation_title, code_reference,
+         (incident_id, subject_id, decision_id, employee_email, rule_id, violation_title, code_reference,
           severity, corrective_action, effective_date)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
+          subjectId,
           insert.insertId,
           incident.reported_employee_email,
           evaluation.rule_id,
@@ -2315,8 +2382,9 @@ async function getIncidentNteEvidence(req, evidenceId) {
   if (!Number.isSafeInteger(id) || id < 1)
     throw httpError('Choose a valid NTE attachment.', 400);
   const [rows] = await pool.execute(
-    `SELECT f.file_name AS fileName, f.mime_type AS mimeType, f.file_data AS fileData,
-            n.status AS nteStatus, i.reported_employee_email AS employeeEmail
+    `SELECT f.id, f.file_name AS fileName, f.mime_type AS mimeType, f.file_data AS fileData,
+            n.status AS nteStatus, i.case_number AS caseNumber,
+            i.reported_employee_email AS employeeEmail
      FROM incident_nte_evidence f JOIN incident_ntes n ON n.id = f.nte_id
      JOIN incident_reports i ON i.id = n.incident_id WHERE f.id = ? LIMIT 1`,
     [id]
@@ -2329,6 +2397,12 @@ async function getIncidentNteEvidence(req, evidenceId) {
       file.employeeEmail.toLowerCase() !== user.email.toLowerCase())
   )
     throw httpError('You do not have access to this NTE attachment.', 403);
+  await logAudit(
+    user.email,
+    'READ',
+    file.caseNumber,
+    `Downloaded NTE attachment ${file.id}: ${file.fileName}.`
+  );
   return file;
 }
 
@@ -2338,8 +2412,8 @@ async function getIncidentExplanationEvidence(req, evidenceId) {
   if (!Number.isSafeInteger(id) || id < 1)
     throw httpError('Choose a valid explanation attachment.', 400);
   const [rows] = await pool.execute(
-    `SELECT f.file_name AS fileName, f.mime_type AS mimeType, f.file_data AS fileData,
-            i.reported_employee_email AS employeeEmail
+    `SELECT f.id, f.file_name AS fileName, f.mime_type AS mimeType, f.file_data AS fileData,
+            i.case_number AS caseNumber, i.reported_employee_email AS employeeEmail
      FROM incident_explanation_evidence f JOIN incident_explanations e ON e.id = f.explanation_id
      JOIN incident_ntes n ON n.id = e.nte_id JOIN incident_reports i ON i.id = n.incident_id
      WHERE f.id = ? LIMIT 1`,
@@ -2355,6 +2429,12 @@ async function getIncidentExplanationEvidence(req, evidenceId) {
       'You do not have access to this explanation attachment.',
       403
     );
+  await logAudit(
+    user.email,
+    'READ',
+    file.caseNumber,
+    `Downloaded explanation attachment ${file.id}: ${file.fileName}.`
+  );
   return file;
 }
 
@@ -2364,10 +2444,12 @@ async function getIncidentExplanationDraftEvidence(req, evidenceId) {
   if (!Number.isSafeInteger(id) || id < 1)
     throw httpError('Choose a valid draft attachment.', 400);
   const [rows] = await pool.execute(
-    `SELECT f.file_name AS fileName, f.mime_type AS mimeType, f.file_data AS fileData,
-            d.employee_email AS employeeEmail
+    `SELECT f.id, f.file_name AS fileName, f.mime_type AS mimeType, f.file_data AS fileData,
+            i.case_number AS caseNumber, d.employee_email AS employeeEmail
      FROM incident_explanation_draft_evidence f
      JOIN incident_explanation_drafts d ON d.nte_id = f.nte_id
+     JOIN incident_ntes n ON n.id = d.nte_id
+     JOIN incident_reports i ON i.id = n.incident_id
      WHERE f.id = ? LIMIT 1`,
     [id]
   );
@@ -2378,6 +2460,12 @@ async function getIncidentExplanationDraftEvidence(req, evidenceId) {
     file.employeeEmail.toLowerCase() !== user.email.toLowerCase()
   )
     throw httpError('You do not have access to this draft attachment.', 403);
+  await logAudit(
+    user.email,
+    'READ',
+    file.caseNumber,
+    `Downloaded draft explanation attachment ${file.id}: ${file.fileName}.`
+  );
   return file;
 }
 
@@ -2387,8 +2475,8 @@ async function getIncidentExplanationAddendumEvidence(req, evidenceId) {
   if (!Number.isSafeInteger(id) || id < 1)
     throw httpError('Choose a valid additional statement attachment.', 400);
   const [rows] = await pool.execute(
-    `SELECT f.file_name AS fileName, f.mime_type AS mimeType, f.file_data AS fileData,
-            i.reported_employee_email AS employeeEmail
+    `SELECT f.id, f.file_name AS fileName, f.mime_type AS mimeType, f.file_data AS fileData,
+            i.case_number AS caseNumber, i.reported_employee_email AS employeeEmail
      FROM incident_explanation_addendum_evidence f
      JOIN incident_explanation_addenda a ON a.id = f.addendum_id
      JOIN incident_ntes n ON n.id = a.nte_id
@@ -2402,6 +2490,12 @@ async function getIncidentExplanationAddendumEvidence(req, evidenceId) {
     file.employeeEmail.toLowerCase() !== user.email.toLowerCase()
   )
     throw httpError('You do not have access to this attachment.', 403);
+  await logAudit(
+    user.email,
+    'READ',
+    file.caseNumber,
+    `Downloaded statement attachment ${file.id}: ${file.fileName}.`
+  );
   return file;
 }
 
@@ -2678,6 +2772,7 @@ async function getIncidentCase(req, incidentId) {
             assigned_head_email AS assignedHeadEmail,
             date_reported AS dateReported, subject, incident_date AS incidentDate,
             location, incident_time AS incidentTime, description, comments, status,
+            document_version AS documentVersion,
             created_at AS createdAt, updated_at AS updatedAt
      FROM incident_reports WHERE id = ? LIMIT 1`,
     [id]
@@ -2698,6 +2793,13 @@ async function getIncidentCase(req, incidentId) {
   if (!canViewIncident(user, incident) && !isParticipant)
     throw httpError('You do not have access to this Incident Report.', 403);
 
+  await logAudit(
+    user.email,
+    'READ',
+    incident.caseNumber,
+    'Viewed Incident Management case details.'
+  );
+
   const [[participants], [signatures], [evidence], [activity], [requests]] =
     await Promise.all([
       pool.execute(
@@ -2709,7 +2811,8 @@ async function getIncidentCase(req, incidentId) {
       ),
       pool.execute(
         `SELECT signatory_role AS role, signer_email AS signerEmail,
-              signature_data AS signature, signed_at AS signedAt
+              signature_data AS signature, document_version AS documentVersion,
+              signed_at AS signedAt
        FROM incident_signatures WHERE incident_id = ?`,
         [id]
       ),
@@ -2717,8 +2820,15 @@ async function getIncidentCase(req, incidentId) {
         `SELECT id, file_name AS fileName, mime_type AS mimeType,
               byte_size AS byteSize, uploaded_by AS uploadedBy, request_id AS requestId,
               created_at AS createdAt
-       FROM incident_evidence WHERE incident_id = ? ORDER BY id`,
-        [id]
+       FROM incident_evidence e
+       WHERE incident_id = ? AND (
+         e.request_id IS NULL OR ? = 1 OR EXISTS (
+           SELECT 1 FROM incident_information_requests r
+           WHERE r.id = e.request_id AND
+             (LOWER(r.recipient_email) = LOWER(?) OR LOWER(r.requested_by) = LOWER(?))
+         )
+       ) ORDER BY id`,
+        [id, REVIEW_ROLES.has(user.role) ? 1 : 0, user.email, user.email]
       ),
       pool.execute(
         `SELECT action, details, actor_email AS actorEmail, created_at AS createdAt,
@@ -2961,9 +3071,11 @@ async function getIncidentEvidence(req, evidenceId) {
   if (!Number.isSafeInteger(id) || id < 1)
     throw httpError('Choose a valid evidence file.', 400);
   const [rows] = await pool.execute(
-    `SELECT e.file_name AS fileName, e.mime_type AS mimeType, e.file_data AS fileData,
+    `SELECT e.id, e.request_id AS requestId, e.file_name AS fileName,
+            e.mime_type AS mimeType, e.file_data AS fileData,
+            i.case_number AS caseNumber,
             i.reporter_email, i.reported_employee_email, i.assigned_head_email,
-            r.recipient_email AS requestRecipient,
+            r.recipient_email AS requestRecipient, r.requested_by AS requestCreator,
             EXISTS (
               SELECT 1 FROM incident_participants p
               JOIN employees pe ON pe.record_id = p.employee_record_id
@@ -2979,18 +3091,26 @@ async function getIncidentEvidence(req, evidenceId) {
   if (!evidence) throw httpError('Evidence file not found.', 404);
   if (
     !REVIEW_ROLES.has(user.role) &&
-    ![
-      evidence.reporter_email,
-      evidence.reported_employee_email,
-      evidence.assigned_head_email,
-      evidence.requestRecipient
-    ].some(
-      (email) => email && email.toLowerCase() === user.email.toLowerCase()
-    ) &&
-    !evidence.isParticipant
+    (evidence.requestId
+      ? ![evidence.requestRecipient, evidence.requestCreator].some(
+          (email) => email && email.toLowerCase() === user.email.toLowerCase()
+        )
+      : ![
+          evidence.reporter_email,
+          evidence.reported_employee_email,
+          evidence.assigned_head_email
+        ].some(
+          (email) => email && email.toLowerCase() === user.email.toLowerCase()
+        ) && !evidence.isParticipant)
   ) {
     throw httpError('You do not have access to this evidence file.', 403);
   }
+  await logAudit(
+    user.email,
+    'READ',
+    evidence.caseNumber,
+    `Downloaded incident evidence ${evidence.id}: ${evidence.fileName}.`
+  );
   return evidence;
 }
 
@@ -3024,6 +3144,7 @@ async function signIncidentCase(req, incidentId, signatoryRole, signatureData) {
     await connection.beginTransaction();
     const [rows] = await connection.execute(
       `SELECT id, case_number, status, reporter_email, reported_employee_email,
+              document_version,
               reported_employee_name, assigned_head_email
        FROM incident_reports WHERE id = ? FOR UPDATE`,
       [id]
@@ -3072,9 +3193,15 @@ async function signIncidentCase(req, incidentId, signatoryRole, signatureData) {
 
     await connection.execute(
       `INSERT INTO incident_signatures
-         (incident_id, signatory_role, signer_email, signature_data)
-       VALUES (?, ?, ?, ?)`,
-      [id, signatoryRole, user.email, signature]
+         (incident_id, signatory_role, signer_email, signature_data, document_version)
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        id,
+        signatoryRole,
+        user.email,
+        signature,
+        incident.document_version || 'LEGACY-UNVERIFIED'
+      ]
     );
 
     let nextStatus = incident.status;
