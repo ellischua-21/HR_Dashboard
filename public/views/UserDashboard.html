@@ -3,13 +3,22 @@
     <p id="uf_assigned_head" class="note"></p>
     <p id="uf_global_feedback" class="okmsg" hidden></p>
     <div class="user-form-summary" aria-label="Form submission summary">
-      <article class="user-form-stat"><span>Total submitted</span><strong id="uf_total">0</strong></article>
-      <article class="user-form-stat"><span>Pending</span><strong id="uf_pending">0</strong></article>
-      <article class="user-form-stat"><span>Approved</span><strong id="uf_approved">0</strong></article>
-      <article class="user-form-stat"><span>Rejected</span><strong id="uf_rejected">0</strong></article>
+      <article class="user-form-stat">
+        <span>Total submitted</span><strong id="uf_total">0</strong>
+      </article>
+      <article class="user-form-stat">
+        <span>Pending</span><strong id="uf_pending">0</strong>
+      </article>
+      <article class="user-form-stat">
+        <span>Approved</span><strong id="uf_approved">0</strong>
+      </article>
+      <article class="user-form-stat">
+        <span>Rejected</span><strong id="uf_rejected">0</strong>
+      </article>
     </div>
     <div class="toolbar form-filters">
-      <label for="uf_history_status">Status
+      <label for="uf_history_status"
+        >Status
         <select id="uf_history_status">
           <option value="">All statuses</option>
           <option value="PENDING">Pending</option>
@@ -17,16 +26,34 @@
           <option value="REJECTED">Rejected</option>
         </select>
       </label>
-      <label for="uf_history_type">Form type
-        <select id="uf_history_type"><option value="">All form types</option></select>
+      <label for="uf_history_type"
+        >Form type
+        <select id="uf_history_type">
+          <option value="">All form types</option>
+        </select>
       </label>
-      <label class="form-search" for="uf_history_search">Search
-        <input id="uf_history_search" type="search" placeholder="Serial number, form, or details">
+      <label class="form-search" for="uf_history_search"
+        >Search
+        <input
+          id="uf_history_search"
+          type="search"
+          placeholder="Serial number, form, or details"
+        />
       </label>
     </div>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>Serial Number</th><th>Form</th><th>Days pending</th><th>Submitted</th><th>Status</th><th>Review reason</th><th>Actions</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Serial Number</th>
+            <th>Form</th>
+            <th>Days pending</th>
+            <th>Submitted</th>
+            <th>Status</th>
+            <th>Review reason</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
         <tbody id="uf_history"></tbody>
       </table>
     </div>
@@ -40,17 +67,28 @@
 <section id="view-leave-requests" class="view" hidden>
   <section class="panel">
     <div class="account-heading">
-      <button id="uf_review_refresh" class="ghost" type="button">Refresh</button>
+      <button id="uf_review_refresh" class="ghost" type="button">
+        Refresh
+      </button>
     </div>
     <p id="uf_review_feedback" class="okmsg" hidden></p>
     <div class="user-form-summary" aria-label="Submitted form status summary">
-      <article class="user-form-stat"><span>Total Requested</span><strong id="uf_review_total">0</strong></article>
-      <article class="user-form-stat"><span>Pending</span><strong id="uf_review_pending">0</strong></article>
-      <article class="user-form-stat"><span>Approved</span><strong id="uf_review_approved">0</strong></article>
-      <article class="user-form-stat"><span>Rejected</span><strong id="uf_review_rejected">0</strong></article>
+      <article class="user-form-stat">
+        <span>Total Requested</span><strong id="uf_review_total">0</strong>
+      </article>
+      <article class="user-form-stat">
+        <span>Pending</span><strong id="uf_review_pending">0</strong>
+      </article>
+      <article class="user-form-stat">
+        <span>Approved</span><strong id="uf_review_approved">0</strong>
+      </article>
+      <article class="user-form-stat">
+        <span>Rejected</span><strong id="uf_review_rejected">0</strong>
+      </article>
     </div>
     <div class="toolbar form-filters">
-      <label for="uf_review_status">Status
+      <label for="uf_review_status"
+        >Status
         <select id="uf_review_status">
           <option value="">All statuses</option>
           <option value="PENDING">Pending</option>
@@ -58,16 +96,34 @@
           <option value="REJECTED">Rejected</option>
         </select>
       </label>
-      <label for="uf_review_type">Form type
-        <select id="uf_review_type"><option value="">All form types</option></select>
+      <label for="uf_review_type"
+        >Form type
+        <select id="uf_review_type">
+          <option value="">All form types</option>
+        </select>
       </label>
-      <label class="form-search" for="uf_review_search">Search
-        <input id="uf_review_search" type="search" placeholder="Serial number, form, applicant, or details">
+      <label class="form-search" for="uf_review_search"
+        >Search
+        <input
+          id="uf_review_search"
+          type="search"
+          placeholder="Serial number, form, applicant, or details"
+        />
       </label>
     </div>
     <div class="tablewrap">
       <table>
-      <thead><tr><th>Serial Number</th><th>Form</th><th>Applicant</th><th>Submitted</th><th>Status</th><th>Review reason</th><th>Review</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Serial Number</th>
+            <th>Form</th>
+            <th>Applicant</th>
+            <th>Submitted</th>
+            <th>Status</th>
+            <th>Review reason</th>
+            <th>Review</th>
+          </tr>
+        </thead>
         <tbody id="uf_review"></tbody>
       </table>
     </div>
@@ -78,11 +134,18 @@
   <form id="leave-form">
     <h2 id="leave-form-title">Leave Application</h2>
     <div class="fgrid">
-      <label>Name<input name="name" type="text" maxlength="191" required></label>
-      <label>Employee number<input name="employeeNo" type="text" maxlength="191"></label>
-      <label>Position<input name="position" maxlength="191" required></label>
-      <label>Department<input name="department" maxlength="191" required></label>
-      <label>Type of leave
+      <label
+        >Name<input name="name" type="text" maxlength="191" required
+      /></label>
+      <label
+        >Employee number<input name="employeeNo" type="text" maxlength="191"
+      /></label>
+      <label>Position<input name="position" maxlength="191" required /></label>
+      <label
+        >Department<input name="department" maxlength="191" required
+      /></label>
+      <label
+        >Type of leave
         <select name="leaveType" required>
           <option value="">Choose a leave type</option>
           <option>Vacation Leave (VL)</option>
@@ -93,22 +156,61 @@
           <option>Others</option>
         </select>
       </label>
-      <label id="leave-other-wrap" hidden>Other leave type<input name="otherLeaveType" maxlength="100"></label>
-      <label>From<input name="dateFrom" type="date" required></label>
-      <label>To<input name="dateTo" type="date" required></label>
-      <label>No. of days<input name="days" type="number" min="0.5" max="365" step="0.5" required></label>
+      <label id="leave-other-wrap" hidden
+        >Other leave type<input name="otherLeaveType" maxlength="100"
+      /></label>
+      <label>From<input name="dateFrom" type="date" required /></label>
+      <label>To<input name="dateTo" type="date" required /></label>
+      <label
+        >No. of days<input
+          name="days"
+          type="number"
+          min="0.5"
+          max="365"
+          step="0.5"
+          required
+      /></label>
     </div>
-    <label class="leave-reason">Reason<textarea name="reason" maxlength="500" rows="3" required></textarea></label>
+    <label class="leave-reason"
+      >Reason<textarea
+        name="reason"
+        maxlength="500"
+        rows="3"
+        required
+      ></textarea>
+    </label>
     <fieldset>
       <legend>Leave pay</legend>
-      <label><input name="payType" type="radio" value="WITH_PAY" required> With pay</label>
-      <label><input name="payType" type="radio" value="WITHOUT_PAY" required> Without pay</label>
+      <label
+        ><input name="payType" type="radio" value="WITH_PAY" required /> With
+        pay</label
+      >
+      <label
+        ><input name="payType" type="radio" value="WITHOUT_PAY" required />
+        Without pay</label
+      >
     </fieldset>
-    <label class="leave-confirm form-acknowledgment"><input class="acknowledgment-checkbox" name="confirmation" type="checkbox" required><span>I confirm that the information in this form is accurate.</span></label>
+    <label class="leave-confirm form-acknowledgment"
+      ><input
+        class="acknowledgment-checkbox"
+        name="confirmation"
+        type="checkbox"
+        required
+      /><span
+        >I confirm that the information in this form is accurate.</span
+      ></label
+    >
     <div class="signature-pad-field">
       <span>Electronic signature</span>
-      <canvas id="leave-signature-pad" class="signature-pad" aria-label="Draw your electronic signature" tabindex="0"></canvas>
-      <button id="leave-signature-clear" class="ghost" type="button">Clear signature</button>
+      <canvas
+        id="leave-signature-pad"
+        class="signature-pad"
+        aria-label="Draw your electronic signature"
+        tabindex="0"
+      ></canvas>
+      <button id="leave-signature-clear" class="ghost" type="button">
+        Clear signature
+      </button>
     </div>
     <p id="uf_submit_feedback" class="okmsg" hidden></p>
     <div class="actions">
@@ -131,15 +233,28 @@
     <h2 id="user-template-title"></h2>
     <p id="user-template-feedback" class="errs" hidden></p>
     <div id="user-template-fields" class="fgrid"></div>
-    <label id="user-template-confirmation" class="form-acknowledgment"><input name="confirmation" type="checkbox" required><span>I confirm that the information in this form is accurate.</span></label>
+    <label id="user-template-confirmation" class="form-acknowledgment"
+      ><input name="confirmation" type="checkbox" required /><span
+        >I confirm that the information in this form is accurate.</span
+      ></label
+    >
     <div class="signature-pad-field">
       <span>Electronic signature</span>
-      <canvas id="template-signature-pad" class="signature-pad" aria-label="Draw your electronic signature" tabindex="0"></canvas>
-      <button id="template-signature-clear" class="ghost" type="button">Clear signature</button>
+      <canvas
+        id="template-signature-pad"
+        class="signature-pad"
+        aria-label="Draw your electronic signature"
+        tabindex="0"
+      ></canvas>
+      <button id="template-signature-clear" class="ghost" type="button">
+        Clear signature
+      </button>
     </div>
     <div class="actions">
       <button id="user-template-submit" type="submit">Submit for review</button>
-      <button id="user-template-cancel" class="ghost" type="button">Cancel</button>
+      <button id="user-template-cancel" class="ghost" type="button">
+        Cancel
+      </button>
     </div>
   </form>
 </dialog>
@@ -150,13 +265,22 @@
     <p id="head-signature-control" class="note"></p>
     <div class="signature-pad-field">
       <span>Head signature</span>
-      <canvas id="head-signature-pad" class="signature-pad" aria-label="Draw your electronic signature" tabindex="0"></canvas>
-      <button id="head-signature-clear" class="ghost" type="button">Clear signature</button>
+      <canvas
+        id="head-signature-pad"
+        class="signature-pad"
+        aria-label="Draw your electronic signature"
+        tabindex="0"
+      ></canvas>
+      <button id="head-signature-clear" class="ghost" type="button">
+        Clear signature
+      </button>
     </div>
     <p id="head-signature-feedback" class="errs" hidden></p>
     <div class="actions">
       <button type="submit">Sign and forward to HR/Admin</button>
-      <button id="head-signature-cancel" class="ghost" type="button">Cancel</button>
+      <button id="head-signature-cancel" class="ghost" type="button">
+        Cancel
+      </button>
     </div>
   </form>
 </dialog>
@@ -167,19 +291,28 @@
     <p id="hr-signature-control" class="note"></p>
     <fieldset id="hr-leave-balances" class="hr-leave-balances" hidden>
       <legend>For HR use only</legend>
-      <label>VL balance<input name="vlBalance" maxlength="100"></label>
-      <label>SL balance<input name="slBalance" maxlength="100"></label>
-      <label>SIL balance<input name="silBalance" maxlength="100"></label>
+      <label>VL balance<input name="vlBalance" maxlength="100" /></label>
+      <label>SL balance<input name="slBalance" maxlength="100" /></label>
+      <label>SIL balance<input name="silBalance" maxlength="100" /></label>
     </fieldset>
     <div class="signature-pad-field">
       <span>HR/Admin signature</span>
-      <canvas id="hr-signature-pad" class="signature-pad" aria-label="Draw your electronic signature" tabindex="0"></canvas>
-      <button id="hr-signature-clear" class="ghost" type="button">Clear signature</button>
+      <canvas
+        id="hr-signature-pad"
+        class="signature-pad"
+        aria-label="Draw your electronic signature"
+        tabindex="0"
+      ></canvas>
+      <button id="hr-signature-clear" class="ghost" type="button">
+        Clear signature
+      </button>
     </div>
     <p id="hr-signature-feedback" class="errs" hidden></p>
     <div class="actions">
       <button type="submit">Sign and approve</button>
-      <button id="hr-signature-cancel" class="ghost" type="button">Cancel</button>
+      <button id="hr-signature-cancel" class="ghost" type="button">
+        Cancel
+      </button>
     </div>
   </form>
 </dialog>
@@ -188,18 +321,29 @@
   <form id="form-rejection-form">
     <h2>Reject form</h2>
     <p id="form-rejection-control" class="note"></p>
-    <fieldset id="form-rejection-leave-balances" class="hr-leave-balances" hidden>
+    <fieldset
+      id="form-rejection-leave-balances"
+      class="hr-leave-balances"
+      hidden
+    >
       <legend>For HR use only</legend>
-      <label>VL balance<input name="vlBalance" maxlength="100"></label>
-      <label>SL balance<input name="slBalance" maxlength="100"></label>
-      <label>SIL balance<input name="silBalance" maxlength="100"></label>
+      <label>VL balance<input name="vlBalance" maxlength="100" /></label>
+      <label>SL balance<input name="slBalance" maxlength="100" /></label>
+      <label>SIL balance<input name="silBalance" maxlength="100" /></label>
     </fieldset>
     <label for="form-rejection-reason">Reason for rejection</label>
-    <textarea id="form-rejection-reason" maxlength="500" rows="4" required></textarea>
+    <textarea
+      id="form-rejection-reason"
+      maxlength="500"
+      rows="4"
+      required
+    ></textarea>
     <p id="form-rejection-feedback" class="errs" hidden></p>
     <div class="actions">
       <button type="submit">Reject form</button>
-      <button id="form-rejection-cancel" class="ghost" type="button">Cancel</button>
+      <button id="form-rejection-cancel" class="ghost" type="button">
+        Cancel
+      </button>
     </div>
   </form>
 </dialog>
@@ -209,6 +353,8 @@
   <div id="staff-announcements-list" class="announcement-list"></div>
   <p id="staff-announcements-feedback" class="errs" hidden></p>
   <div class="actions">
-    <button id="staff-announcements-acknowledge" type="button">Acknowledge</button>
+    <button id="staff-announcements-acknowledge" type="button">
+      Acknowledge
+    </button>
   </div>
 </dialog>

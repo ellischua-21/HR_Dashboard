@@ -1,46 +1,189 @@
 <section id="view-employees" class="view" hidden>
   <div class="toolbar">
-    <input id="e_search" type="search" placeholder="Search name or employee number" aria-label="Search">
-    <select id="e_company" aria-label="Company"></select><select id="e_department" aria-label="Department"></select><select id="e_status" aria-label="Status"></select>
+    <input
+      id="e_search"
+      type="search"
+      placeholder="Search name or employee number"
+      aria-label="Search"
+    />
+    <select id="e_company" aria-label="Company"></select
+    ><select id="e_department" aria-label="Department"></select
+    ><select id="e_status" aria-label="Status"></select>
     <button id="e_go">Search</button><span class="sp"></span>
-    <button class="ghost" id="e_import">Import</button><button class="ghost" id="e_export">Export CSV</button><button id="e_add">Add employee</button>
+    <button class="ghost" id="e_import">Import</button
+    ><button class="ghost" id="e_export">Export CSV</button
+    ><button id="e_add">Add employee</button>
   </div>
   <div id="importPanel" class="panel" hidden>
     <h2>Import employees from Excel or CSV</h2>
-    <div class="toolbar"><input type="file" id="i_file" accept=".csv,.xlsx,.xls"><button class="ghost" id="i_tpl">Download template</button></div>
+    <div class="toolbar">
+      <input type="file" id="i_file" accept=".csv,.xlsx,.xls" /><button
+        class="ghost"
+        id="i_tpl"
+      >
+        Download template
+      </button>
+    </div>
     <div class="tablewrap" id="i_map" hidden></div>
-    <div class="actions" id="i_act" hidden><button class="ghost" id="i_validate">Validate</button><button id="i_commit" disabled>Import valid rows</button></div>
+    <div class="actions" id="i_act" hidden>
+      <button class="ghost" id="i_validate">Validate</button
+      ><button id="i_commit" disabled>Import valid rows</button>
+    </div>
     <div id="i_result"></div>
   </div>
-  <div class="tablewrap"><table><thead id="e_head"></thead><tbody id="e_body"></tbody></table></div>
-  <div class="pager"><span class="note" id="e_info"></span><button class="ghost" id="e_prev">Previous</button><button class="ghost" id="e_next">Next</button></div>
-  <dialog id="profile"><div id="p_body"></div>
-    <div class="actions"><button id="p_edit">Edit</button><button class="ghost" id="p_print">Print</button><button class="ghost" id="p_archive">Archive</button><button class="ghost" id="p_close">Close</button></div></dialog>
+  <div class="tablewrap">
+    <table>
+      <thead id="e_head"></thead>
+      <tbody id="e_body"></tbody>
+    </table>
+  </div>
+  <div class="pager">
+    <span class="note" id="e_info"></span
+    ><button class="ghost" id="e_prev">Previous</button
+    ><button class="ghost" id="e_next">Next</button>
+  </div>
+  <dialog id="profile">
+    <div id="p_body"></div>
+    <div class="actions">
+      <button id="p_edit">Edit</button
+      ><button class="ghost" id="p_print">Print</button
+      ><button class="ghost" id="p_archive">Archive</button
+      ><button class="ghost" id="p_close">Close</button>
+    </div>
+  </dialog>
 </section>
 <section id="view-register" class="view" hidden>
-  <p class="note" id="r_mode"></p>
-  <div id="r_form"></div>
+  <p class="note" id="r_mode" hidden></p>
+  <!-- Section headings and field order are declared here. Field labels, types, and permissions come from the server form metadata. -->
+  <div id="r_form">
+    <fieldset hidden>
+      <legend>Personal information</legend>
+      <div
+        class="fgrid"
+        data-employee-fields="
+        last_name first_name middle_name birthday age birth_place gender civil_status education
+      "
+      ></div>
+      <div data-employee-tables></div>
+    </fieldset>
+    <fieldset hidden>
+      <legend>Employment information</legend>
+      <div
+        class="fgrid"
+        data-employee-fields="
+        emp_no company location position department rank reports_to date_employed status function_type network transfer_eff
+      "
+      ></div>
+      <div data-employee-tables></div>
+    </fieldset>
+    <fieldset hidden>
+      <legend>Contact information</legend>
+      <div
+        class="fgrid"
+        data-employee-fields="
+        address permanent_address contact_no landline_no personal_email company_contact_no
+      "
+      ></div>
+      <div data-employee-tables></div>
+    </fieldset>
+    <fieldset hidden>
+      <legend>Family background</legend>
+      <div
+        class="fgrid"
+        data-employee-fields="
+        father_name father_occupation mother_maiden mother_occupation siblings spouse_name children
+      "
+      ></div>
+      <div data-employee-tables></div>
+    </fieldset>
+    <fieldset hidden>
+      <legend>Church and Organizations/Memberships</legend>
+      <div
+        class="fgrid"
+        data-employee-fields="church_has church_position orgs"
+      ></div>
+      <div data-employee-tables></div>
+    </fieldset>
+    <fieldset hidden>
+      <legend>Contact in case of emergency</legend>
+      <div
+        class="fgrid"
+        data-employee-fields="
+        emergency_name emergency_address emergency_no emergency_relationship
+      "
+      ></div>
+      <div data-employee-tables></div>
+    </fieldset>
+    <fieldset hidden>
+      <legend>Social Media</legend>
+      <div
+        class="fgrid"
+        data-employee-fields="facebook instagram tiktok youtube twitter"
+      ></div>
+      <div data-employee-tables></div>
+    </fieldset>
+    <fieldset hidden>
+      <legend>Benefits and government information</legend>
+      <div
+        class="fgrid"
+        data-employee-fields="hmo tin pagibig sss philhealth gov_deduction"
+      ></div>
+      <div data-employee-tables></div>
+    </fieldset>
+    <fieldset hidden>
+      <legend>Compensation information</legend>
+      <div class="fgrid" data-employee-fields="salary_structure fte"></div>
+      <div data-employee-tables></div>
+    </fieldset>
+  </div>
   <section id="r_account_access" class="panel">
     <h2>Account access request</h2>
     <div class="fgrid">
-      <label for="r_account_role">Assigned role
+      <label for="r_account_role"
+        >Assigned role
         <select id="r_account_role">
           <option value="STAFF">STAFF</option>
           <option value="HEAD">HEAD</option>
           <option value="HR">HR</option>
         </select>
       </label>
-      <label for="r_account_password">Initial password
-        <input id="r_account_password" type="password" minlength="12" maxlength="128" autocomplete="new-password" required>
+      <label for="r_account_password"
+        >Initial password
+        <input
+          id="r_account_password"
+          type="password"
+          minlength="12"
+          maxlength="128"
+          autocomplete="new-password"
+          required
+        />
       </label>
-      <label for="r_account_password_confirm">Confirm initial password
-        <input id="r_account_password_confirm" type="password" minlength="12" maxlength="128" autocomplete="new-password" required>
+      <label for="r_account_password_confirm"
+        >Confirm initial password
+        <input
+          id="r_account_password_confirm"
+          type="password"
+          minlength="12"
+          maxlength="128"
+          autocomplete="new-password"
+          required
+        />
       </label>
     </div>
     <p id="r_head_assignment_note" class="note"></p>
   </section>
-  <div class="actions"><button id="r_preview">Review and save</button><button class="ghost" id="r_cancel">Cancel</button></div>
+  <div class="actions">
+    <button id="r_preview">Review and save</button
+    ><button class="ghost" id="r_cancel">Cancel</button>
+  </div>
   <p id="r_msg" class="okmsg" hidden></p>
-  <dialog id="preview"><h2 style="margin-top:0">Review before saving</h2><div id="pv_body"></div><div id="pv_err"></div>
-    <div class="actions"><button id="pv_save">Save employee</button><button class="ghost" id="pv_back">Back to form</button></div></dialog>
+  <dialog id="preview">
+    <h2 style="margin-top: 0">Review before saving</h2>
+    <div id="pv_body"></div>
+    <div id="pv_err"></div>
+    <div class="actions">
+      <button id="pv_save">Save employee</button
+      ><button class="ghost" id="pv_back">Back to form</button>
+    </div>
+  </dialog>
 </section>

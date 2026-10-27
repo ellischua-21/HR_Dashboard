@@ -9,10 +9,19 @@ function hashPassword(password) {
 function verifyPassword(password, stored) {
   if (typeof password !== 'string' || !stored) return false;
   const [algorithm, salt, hash] = stored.split('$');
-  if (algorithm !== 'scrypt' || !salt || !hash || !/^[a-f0-9]{128}$/i.test(hash)) return false;
+  if (
+    algorithm !== 'scrypt' ||
+    !salt ||
+    !hash ||
+    !/^[a-f0-9]{128}$/i.test(hash)
+  )
+    return false;
   const expected = Buffer.from(hash, 'hex');
   const actual = crypto.scryptSync(password, salt, expected.length);
-  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+  return (
+    expected.length === actual.length &&
+    crypto.timingSafeEqual(expected, actual)
+  );
 }
 
 module.exports = { hashPassword, verifyPassword };

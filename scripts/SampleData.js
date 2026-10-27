@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 const { pool, initializeDatabase } = require('../server/db/database');
-const { LISTS } = require('../server/config/Config');
+const { LISTS } = require('../server/config/EmployeeSchema');
 const { importEmployees } = require('../server/services/ImportService');
 const { requirePerm } = require('../server/middleware/Auth');
 const { logAudit } = require('../server/services/AuditService');
@@ -9,17 +9,25 @@ const { logAudit } = require('../server/services/AuditService');
 function makeSampleRows(count) {
   const lists = LISTS;
   let seed = 42;
-  const random = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
-  const pick = items => items[Math.floor(random() * items.length)];
+  const random = () =>
+    (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
+  const pick = (items) => items[Math.floor(random() * items.length)];
   const day = (startYear, endYear) => {
-    const value = new Date(Date.UTC(
-      startYear + Math.floor(random() * (endYear - startYear)),
-      Math.floor(random() * 12), 1 + Math.floor(random() * 28)));
+    const value = new Date(
+      Date.UTC(
+        startYear + Math.floor(random() * (endYear - startYear)),
+        Math.floor(random() * 12),
+        1 + Math.floor(random() * 28)
+      )
+    );
     return value.toISOString().slice(0, 10);
   };
   return Array.from({ length: count }, (_, index) => {
     const number = String(index + 1).padStart(3, '0');
-    const status = random() < 0.85 ? 'Active' : pick(['Resigned', 'Terminated', 'Inactive', 'Probationary']);
+    const status =
+      random() < 0.85
+        ? 'Active'
+        : pick(['Resigned', 'Terminated', 'Inactive', 'Probationary']);
     return {
       last_name: 'Sample',
       first_name: 'Employee ' + number,
@@ -52,21 +60,33 @@ function makeSampleRows(count) {
 async function main() {
   await initializeDatabase();
   const action = process.argv[2];
-  const email = String(process.argv[3] || '').trim().toLowerCase();
+  const email = String(process.argv[3] || '')
+    .trim()
+    .toLowerCase();
   const req = { session: { userEmail: email } };
   if (action === 'generate') {
     const count = Math.max(1, Math.min(Number(process.argv[4]) || 60, 500));
     const result = await importEmployees(req, makeSampleRows(count), true);
-    console.log(`Imported ${result.imported} of ${result.total} sample employee(s).`);
-    if (result.errors.length) console.log(JSON.stringify(result.errors.slice(0, 5)));
+    console.log(
+      `Imported ${result.imported} of ${result.total} sample employee(s).`
+    );
+    if (result.errors.length)
+      console.log(JSON.stringify(result.errors.slice(0, 5)));
   } else if (action === 'archive') {
     const user = await requirePerm(req, 'emp.archive');
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
       const [result] = await connection.execute(
-        "UPDATE employees SET record_status = 'Archived' WHERE emp_no LIKE 'SAMPLE-%' AND record_status <> 'Archived'");
-      await logAudit(user.email, 'ARCHIVE', '', 'Sample data archived: ' + result.affectedRows, connection);
+        "UPDATE employees SET record_status = 'Archived' WHERE emp_no LIKE 'SAMPLE-%' AND record_status <> 'Archived'"
+      );
+      await logAudit(
+        user.email,
+        'ARCHIVE',
+        '',
+        'Sample data archived: ' + result.affectedRows,
+        connection
+      );
       await connection.commit();
       console.log(`Archived ${result.affectedRows} sample employee(s).`);
     } catch (error) {
@@ -76,13 +96,17 @@ async function main() {
       connection.release();
     }
   } else {
-    throw new Error('Usage: npm run sample-data -- generate|archive admin@example.com [count]');
+    throw new Error(
+      'Usage: npm run sample-data -- generate|archive admin@example.com [count]'
+    );
   }
 }
 
-main().catch(error => {
-  console.error(error.message);
-  process.exitCode = 1;
-}).finally(async () => {
-  await pool.end();
-});
+main()
+  .catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await pool.end();
+  });

@@ -1,27 +1,43 @@
-const { EMP_FIELDS, F, CFG } = require('../config/Config');
-const { pool, getLists, nextSequence, syncCounter, quote } = require('../db/database');
+const { EMP_FIELDS, F } = require('../config/EmployeeSchema');
+const { CFG } = require('../config/Config');
+const {
+  pool,
+  getLists,
+  nextSequence,
+  syncCounter,
+  quote
+} = require('../db/database');
 const { requirePerm } = require('../middleware/Auth');
 const { logAudit } = require('./AuditService');
-const { cleanField, validateEmployee, fullName } = require('../utils/Validation');
+const {
+  cleanField,
+  validateEmployee,
+  fullName
+} = require('../utils/Validation');
 const { dbValue } = require('./EmployeeService');
 
 async function importEmployees(req, records, commit) {
   const user = await requirePerm(req, 'emp.write');
-  if (!Array.isArray(records) || records.length > 500) throw new Error('Import at most 500 rows per request.');
+  if (!Array.isArray(records) || records.length > 500)
+    throw new Error('Import at most 500 rows per request.');
   const canSensitive = user.perms.includes('emp.sensitive');
   const lists = await getLists();
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
-    const [existingRows] = await connection.execute('SELECT emp_no FROM employees WHERE emp_no IS NOT NULL FOR UPDATE');
-    const existing = new Set(existingRows.map(row => String(row.emp_no).toLowerCase()));
+    const [existingRows] = await connection.execute(
+      'SELECT emp_no FROM employees WHERE emp_no IS NOT NULL FOR UPDATE'
+    );
+    const existing = new Set(
+      existingRows.map((row) => String(row.emp_no).toLowerCase())
+    );
     const seen = new Set();
     const good = [];
     const errors = [];
 
     records.forEach((record, index) => {
       const clean = {};
-      EMP_FIELDS.forEach(field => {
+      EMP_FIELDS.forEach((field) => {
         if (F.has(field, 'C')) return;
         if (F.has(field, 'S') && !canSensitive) {
           clean[field[0]] = '';
@@ -29,7 +45,9 @@ async function importEmployees(req, records, commit) {
         }
         let value = cleanField(field, record[field[0]]);
         if (field[2] === 'list' && value) {
-          const match = (lists[field[4]] || []).find(item => item.toLowerCase() === value.toLowerCase());
+          const match = (lists[field[4]] || []).find(
+            (item) => item.toLowerCase() === value.toLowerCase()
+          );
           if (match) value = match;
         }
         clean[field[0]] = value;
@@ -37,9 +55,12 @@ async function importEmployees(req, records, commit) {
       clean.name = fullName(clean);
       const rowErrors = validateEmployee(clean, lists);
       const employeeNumber = clean.emp_no.toLowerCase();
-      if (employeeNumber && existing.has(employeeNumber)) rowErrors.push('Employee Number already exists');
-      if (employeeNumber && seen.has(employeeNumber)) rowErrors.push('Duplicate Employee Number in file');
-      if (rowErrors.length) errors.push({ row: record._line || index + 2, errors: rowErrors });
+      if (employeeNumber && existing.has(employeeNumber))
+        rowErrors.push('Employee Number already exists');
+      if (employeeNumber && seen.has(employeeNumber))
+        rowErrors.push('Duplicate Employee Number in file');
+      if (rowErrors.length)
+        errors.push({ row: record._line || index + 2, errors: rowErrors });
       else {
         seen.add(employeeNumber);
         good.push(clean);
@@ -64,10 +85,17 @@ async function importEmployees(req, records, commit) {
         };
         await connection.execute(
           `INSERT INTO employees (${keys.map(quote).join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`,
-          keys.map(key => dbValue(F.get(key), record[key])));
+          keys.map((key) => dbValue(F.get(key), record[key]))
+        );
       }
       imported = good.length;
-      await logAudit(user.email, 'CREATE', '', 'Bulk import: ' + imported + ' employee(s)', connection);
+      await logAudit(
+        user.email,
+        'CREATE',
+        '',
+        'Bulk import: ' + imported + ' employee(s)',
+        connection
+      );
       await syncCounter(connection);
     }
     await connection.commit();

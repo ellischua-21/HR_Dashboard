@@ -1,5 +1,5 @@
 const mysql = require('mysql2/promise');
-const { EMP_FIELDS, LISTS } = require('../config/Config');
+const { EMP_FIELDS, LISTS } = require('../config/EmployeeSchema');
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST || '127.0.0.1',
@@ -13,7 +13,7 @@ const pool = mysql.createPool({
   charset: 'utf8mb4'
 });
 
-const quote = name => '`' + name.replace(/`/g, '``') + '`';
+const quote = (name) => '`' + name.replace(/`/g, '``') + '`';
 
 function employeeColumn(field) {
   const [key, , type] = field;
@@ -42,18 +42,31 @@ async function initializeDatabase() {
 
   // Keep the existing personal login address while removing the obsolete Email and
   // Corporate Email employee fields. Older installs used corp_email for Personal Email.
-  const [personalEmailColumn] = await pool.query("SHOW COLUMNS FROM employees LIKE 'personal_email'");
-  const [legacyCorpEmailColumn] = await pool.query("SHOW COLUMNS FROM employees LIKE 'corp_email'");
+  const [personalEmailColumn] = await pool.query(
+    "SHOW COLUMNS FROM employees LIKE 'personal_email'"
+  );
+  const [legacyCorpEmailColumn] = await pool.query(
+    "SHOW COLUMNS FROM employees LIKE 'corp_email'"
+  );
   if (!personalEmailColumn.length) {
     if (legacyCorpEmailColumn.length) {
-      await pool.query('ALTER TABLE employees CHANGE COLUMN corp_email personal_email TEXT NULL');
+      await pool.query(
+        'ALTER TABLE employees CHANGE COLUMN corp_email personal_email TEXT NULL'
+      );
     } else {
-      await pool.query('ALTER TABLE employees ADD COLUMN personal_email TEXT NULL');
+      await pool.query(
+        'ALTER TABLE employees ADD COLUMN personal_email TEXT NULL'
+      );
     }
   }
   for (const obsoleteColumn of ['corp_email', 'email']) {
-    const [column] = await pool.query(`SHOW COLUMNS FROM employees LIKE '${obsoleteColumn}'`);
-    if (column.length) await pool.query(`ALTER TABLE employees DROP COLUMN \`${obsoleteColumn}\``);
+    const [column] = await pool.query(
+      `SHOW COLUMNS FROM employees LIKE '${obsoleteColumn}'`
+    );
+    if (column.length)
+      await pool.query(
+        `ALTER TABLE employees DROP COLUMN \`${obsoleteColumn}\``
+      );
   }
 
   await pool.query(`CREATE TABLE IF NOT EXISTS user_roles (
@@ -67,22 +80,40 @@ async function initializeDatabase() {
     PRIMARY KEY (email)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
-  const [userColumns] = await pool.query("SHOW COLUMNS FROM user_roles LIKE 'full_name'");
+  const [userColumns] = await pool.query(
+    "SHOW COLUMNS FROM user_roles LIKE 'full_name'"
+  );
   if (!userColumns.length) {
-    await pool.query("ALTER TABLE user_roles ADD COLUMN full_name VARCHAR(191) NOT NULL DEFAULT '' AFTER email");
+    await pool.query(
+      "ALTER TABLE user_roles ADD COLUMN full_name VARCHAR(191) NOT NULL DEFAULT '' AFTER email"
+    );
   }
-  const [headColumns] = await pool.query("SHOW COLUMNS FROM user_roles LIKE 'assigned_head_email'");
+  const [headColumns] = await pool.query(
+    "SHOW COLUMNS FROM user_roles LIKE 'assigned_head_email'"
+  );
   if (!headColumns.length) {
-    await pool.query("ALTER TABLE user_roles ADD COLUMN assigned_head_email VARCHAR(191) NULL AFTER role");
+    await pool.query(
+      'ALTER TABLE user_roles ADD COLUMN assigned_head_email VARCHAR(191) NULL AFTER role'
+    );
   }
-  const [hrHeadColumns] = await pool.query("SHOW COLUMNS FROM user_roles LIKE 'is_hr_head'");
+  const [hrHeadColumns] = await pool.query(
+    "SHOW COLUMNS FROM user_roles LIKE 'is_hr_head'"
+  );
   if (!hrHeadColumns.length) {
-    await pool.query("ALTER TABLE user_roles ADD COLUMN is_hr_head TINYINT(1) NOT NULL DEFAULT 0 AFTER assigned_head_email");
+    await pool.query(
+      'ALTER TABLE user_roles ADD COLUMN is_hr_head TINYINT(1) NOT NULL DEFAULT 0 AFTER assigned_head_email'
+    );
   }
-  await pool.query("UPDATE user_roles SET role = 'STAFF' WHERE role IN ('USER', 'MANAGER')");
-  await pool.query("UPDATE user_roles SET role = 'STAFF' WHERE role = 'EXECUTIVE'");
+  await pool.query(
+    "UPDATE user_roles SET role = 'STAFF' WHERE role IN ('USER', 'MANAGER')"
+  );
+  await pool.query(
+    "UPDATE user_roles SET role = 'STAFF' WHERE role = 'EXECUTIVE'"
+  );
   await pool.query("UPDATE user_roles SET role = 'HR' WHERE role = 'HR_STAFF'");
-  await pool.query("UPDATE user_roles SET role = 'ADMIN' WHERE role IN ('SYSTEM_ADMIN', 'HR_ADMIN')");
+  await pool.query(
+    "UPDATE user_roles SET role = 'ADMIN' WHERE role IN ('SYSTEM_ADMIN', 'HR_ADMIN')"
+  );
 
   await pool.query(`CREATE TABLE IF NOT EXISTS account_requests (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -101,9 +132,13 @@ async function initializeDatabase() {
     ['assigned_head_email', 'VARCHAR(191) NULL AFTER assigned_role']
   ];
   for (const [column, definition] of accountRequestColumns) {
-    const [existing] = await pool.query(`SHOW COLUMNS FROM account_requests LIKE '${column}'`);
+    const [existing] = await pool.query(
+      `SHOW COLUMNS FROM account_requests LIKE '${column}'`
+    );
     if (!existing.length) {
-      await pool.query(`ALTER TABLE account_requests ADD COLUMN \`${column}\` ${definition}`);
+      await pool.query(
+        `ALTER TABLE account_requests ADD COLUMN \`${column}\` ${definition}`
+      );
     }
   }
 
@@ -140,17 +175,26 @@ async function initializeDatabase() {
     ['hr_signature', 'MEDIUMTEXT NULL AFTER head_signed_at']
   ];
   for (const [column, definition] of formColumns) {
-    const [existing] = await pool.query(`SHOW COLUMNS FROM user_forms LIKE '${column}'`);
+    const [existing] = await pool.query(
+      `SHOW COLUMNS FROM user_forms LIKE '${column}'`
+    );
     if (!existing.length) {
-      await pool.query(`ALTER TABLE user_forms ADD COLUMN \`${column}\` ${definition}`);
+      await pool.query(
+        `ALTER TABLE user_forms ADD COLUMN \`${column}\` ${definition}`
+      );
     }
   }
-  const [headIndexes] = await pool.query("SHOW INDEX FROM user_forms WHERE Key_name = 'idx_user_form_head_queue'");
+  const [headIndexes] = await pool.query(
+    "SHOW INDEX FROM user_forms WHERE Key_name = 'idx_user_form_head_queue'"
+  );
   if (!headIndexes.length) {
     await pool.query(
-      'ALTER TABLE user_forms ADD KEY idx_user_form_head_queue (head_reviewer_email, review_stage, submitted_at)');
+      'ALTER TABLE user_forms ADD KEY idx_user_form_head_queue (head_reviewer_email, review_stage, submitted_at)'
+    );
   }
-  await pool.query("UPDATE user_forms SET review_stage = 'HR' WHERE review_stage NOT IN ('HEAD', 'HR')");
+  await pool.query(
+    "UPDATE user_forms SET review_stage = 'HR' WHERE review_stage NOT IN ('HEAD', 'HR')"
+  );
 
   await pool.query(`CREATE TABLE IF NOT EXISTS form_serial_sequences (
     template_key VARCHAR(64) NOT NULL,
@@ -178,9 +222,12 @@ async function initializeDatabase() {
     KEY idx_audit_user_time (user_email, event_time)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
   const [auditUserTimeIndexes] = await pool.query(
-    "SHOW INDEX FROM audit_logs WHERE Key_name = 'idx_audit_user_time'");
+    "SHOW INDEX FROM audit_logs WHERE Key_name = 'idx_audit_user_time'"
+  );
   if (!auditUserTimeIndexes.length) {
-    await pool.query('ALTER TABLE audit_logs ADD KEY idx_audit_user_time (user_email, event_time)');
+    await pool.query(
+      'ALTER TABLE audit_logs ADD KEY idx_audit_user_time (user_email, event_time)'
+    );
   }
 
   await pool.query(`CREATE TABLE IF NOT EXISTS hr_announcements (
@@ -223,20 +270,28 @@ async function initializeDatabase() {
     PRIMARY KEY (counter_name)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
-  const insertLookup = 'INSERT IGNORE INTO lookup_values (list_name, `value`, active) VALUES (?, ?, 1)';
+  const insertLookup =
+    'INSERT IGNORE INTO lookup_values (list_name, `value`, active) VALUES (?, ?, 1)';
   for (const [listName, values] of Object.entries(LISTS)) {
-    for (const value of values) await pool.execute(insertLookup, [listName, value]);
+    for (const value of values)
+      await pool.execute(insertLookup, [listName, value]);
   }
   await pool.execute(
     'INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VALUES (?, ?, ?)',
-    ['PAGE_SIZE', '25', 'Rows per page']);
+    ['PAGE_SIZE', '25', 'Rows per page']
+  );
   await pool.execute(
     'INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VALUES (?, ?, ?)',
-    ['TENURE_RULE', 'FROM_DATE_EMPLOYED', 'Tenure calculation rule']);
+    ['TENURE_RULE', 'FROM_DATE_EMPLOYED', 'Tenure calculation rule']
+  );
   await pool.execute(
     'INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VALUES (?, ?, ?)',
-    ['HRIS_DATA_VER', '0', 'Data version used for cache invalidation']);
-  await pool.execute('INSERT IGNORE INTO counters (counter_name, counter_value) VALUES (?, ?)', ['HRIS_EMP_COUNTER', 0]);
+    ['HRIS_DATA_VER', '0', 'Data version used for cache invalidation']
+  );
+  await pool.execute(
+    'INSERT IGNORE INTO counters (counter_name, counter_value) VALUES (?, ?)',
+    ['HRIS_EMP_COUNTER', 0]
+  );
   const connection = await pool.getConnection();
   try {
     await syncCounter(connection);
@@ -246,28 +301,48 @@ async function initializeDatabase() {
 }
 
 async function getLists() {
-  const [rows] = await pool.query('SELECT list_name, `value` FROM lookup_values WHERE active = 1 ORDER BY `value`');
-  const result = Object.fromEntries(Object.keys(LISTS).map(name => [name, []]));
-  rows.forEach(row => {
-    if (Object.prototype.hasOwnProperty.call(result, row.list_name)) result[row.list_name].push(row.value);
+  const [rows] = await pool.query(
+    'SELECT list_name, `value` FROM lookup_values WHERE active = 1 ORDER BY `value`'
+  );
+  const result = Object.fromEntries(
+    Object.keys(LISTS).map((name) => [name, []])
+  );
+  rows.forEach((row) => {
+    if (Object.prototype.hasOwnProperty.call(result, row.list_name))
+      result[row.list_name].push(row.value);
   });
   return result;
 }
 
 async function nextSequence(connection) {
   const [rows] = await connection.execute(
-    'SELECT counter_value FROM counters WHERE counter_name = ? FOR UPDATE', ['HRIS_EMP_COUNTER']);
+    'SELECT counter_value FROM counters WHERE counter_name = ? FOR UPDATE',
+    ['HRIS_EMP_COUNTER']
+  );
   if (!rows.length) throw new Error('Employee counter is not initialized.');
   const next = Number(rows[0].counter_value) + 1;
-  await connection.execute('UPDATE counters SET counter_value = ? WHERE counter_name = ?', [next, 'HRIS_EMP_COUNTER']);
+  await connection.execute(
+    'UPDATE counters SET counter_value = ? WHERE counter_name = ?',
+    [next, 'HRIS_EMP_COUNTER']
+  );
   return next;
 }
 
 async function syncCounter(connection) {
-  const [rows] = await connection.execute('SELECT COALESCE(MAX(seq_no), 0) AS last_value FROM employees');
+  const [rows] = await connection.execute(
+    'SELECT COALESCE(MAX(seq_no), 0) AS last_value FROM employees'
+  );
   await connection.execute(
     'UPDATE counters SET counter_value = GREATEST(counter_value, ?) WHERE counter_name = ?',
-    [Number(rows[0].last_value), 'HRIS_EMP_COUNTER']);
+    [Number(rows[0].last_value), 'HRIS_EMP_COUNTER']
+  );
 }
 
-module.exports = { pool, initializeDatabase, getLists, nextSequence, syncCounter, quote };
+module.exports = {
+  pool,
+  initializeDatabase,
+  getLists,
+  nextSequence,
+  syncCounter,
+  quote
+};

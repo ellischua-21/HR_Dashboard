@@ -11,13 +11,18 @@ This version keeps the existing dashboard screens and browser behavior, serves t
 ## Project layout
 
 - `public/` contains the browser application: `index.html`, CSS, JavaScript, and HTML view fragments.
-- `shared/` contains form templates used by both the browser and the API.
-- `server/` contains the Node.js API, grouped into `config/`, `db/`, `middleware/`, `services/`, and `utils/`.
+- `public/views/` contains page markup; `public/js/` contains page controllers and shared navigation behavior; `public/css/` contains application styles.
+- `shared/` contains form templates and status rules used by both the browser and the API.
+- `server/` contains the Node.js API, grouped into `config/`, `db/`, `middleware/`, `services/`, and `utils/`. `config/` separates application settings, employee schema, and role permissions.
 - `scripts/` contains setup and administrator command-line tools.
 - `tests/` contains the Node.js test suite.
 - `node_modules/` contains installed dependencies and can be recreated with `npm.cmd install`.
 
 Apache uses the root `.htaccess` file to redirect `http://localhost/HR_Dashboard/` to `public/` and block access to server-side code and dependencies.
+
+## Code organization
+
+Keep page structure in its matching `public/views/` fragment and page-specific behavior in the matching `public/js/` controller. Put reusable browser behavior in a shared controller or module rather than duplicating it across pages. Keep form definitions shared when they are consumed by both the browser and API; forms with distinct workflows may keep dedicated markup and behavior. Put business rules and data validation on the server, with reusable logic in `server/services/` and authoritative field/permission definitions in `server/config/`. Use `npm.cmd run format` to format first-party JavaScript, HTML, and CSS consistently.
 
 ## First-time setup
 
@@ -69,7 +74,7 @@ Apache uses the root `.htaccess` file to redirect `http://localhost/HR_Dashboard
 
 There is no public account-request option on the sign-in screen. HR and ADMIN create account requests through **Employee Registration** using the employee's Personal Email, a role (STAFF, HEAD, or HR), an initial password, and an optional assigned Head. STAFF requests require an assigned Head. New accounts remain unable to sign in until an ADMIN approves them.
 
-Users and HR can use **Account Management** to change their own password by entering the current password and a new password (12–128 characters). System Administrators can change their password in **Manage Accounts**, alongside registration requests, role assignment, and account lists.
+All users can change their own password by entering the current password and a new password (12–128 characters) in **Change Password**. ADMIN manages registration requests and accounts in **Manage Accounts**.
 
 Only an account with the `ADMIN` role sees **Manage Accounts** and can approve or reject requests. The role and assigned Head appear in each request and are fixed when approved:
 

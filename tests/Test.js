@@ -7,11 +7,11 @@ const {
   fullName,
   isValidDate
 } = require('../server/utils/Validation');
+const { EMP_FIELDS } = require('../server/config/EmployeeSchema');
 const {
-  EMP_FIELDS,
   ACCOUNT_ROLE_MAP,
   ROLE_PERMS
-} = require('../server/config/Config');
+} = require('../server/config/Permissions');
 const { hashPassword, verifyPassword } = require('../server/utils/Password');
 const {
   validateHeadAssignment,

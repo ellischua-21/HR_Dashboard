@@ -25,11 +25,7 @@ function bindPasswordChange(formId, feedbackId) {
 
     submit.disabled = true;
     try {
-      await api(
-        'changeMyPassword',
-        currentPassword,
-        newPassword
-      );
+      await api('changeMyPassword', currentPassword, newPassword);
       form.reset();
       feedback.className = 'okmsg';
       feedback.textContent = 'Password changed successfully.';

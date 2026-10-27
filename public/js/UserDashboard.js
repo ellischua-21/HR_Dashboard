@@ -723,11 +723,11 @@ async function submitLeaveRequest(event) {
     };
     if (formBeingEdited) {
       await api(
-          'updateMyForm',
-          formBeingEdited.id,
-          formBeingEdited.template_key,
-          formData
-        );
+        'updateMyForm',
+        formBeingEdited.id,
+        formBeingEdited.template_key,
+        formData
+      );
     } else {
       await api('submitLeaveForm', formData);
     }

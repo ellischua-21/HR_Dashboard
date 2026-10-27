@@ -1,9 +1,22 @@
 <section id="view-reports" class="view" hidden>
-  <div class="toolbar"><select id="rp_id" aria-label="Report"></select><button id="rp_run">Run report</button><span class="sp"></span>
-    <button class="ghost" id="rp_export">Export CSV</button><button class="ghost" id="rp_print">Print</button></div>
+  <div class="toolbar">
+    <select id="rp_id" aria-label="Report"></select
+    ><button id="rp_run">Run report</button><span class="sp"></span>
+    <button class="ghost" id="rp_export">Export CSV</button
+    ><button class="ghost" id="rp_print">Print</button>
+  </div>
   <div class="toolbar" id="rp_filters"></div>
-  <div class="tablewrap"><table><thead id="rp_head"></thead><tbody id="rp_body"></tbody></table></div>
-  <div class="pager"><span class="note" id="rp_info"></span><button class="ghost" id="rp_prev">Previous</button><button class="ghost" id="rp_next">Next</button></div>
+  <div class="tablewrap">
+    <table>
+      <thead id="rp_head"></thead>
+      <tbody id="rp_body"></tbody>
+    </table>
+  </div>
+  <div class="pager">
+    <span class="note" id="rp_info"></span
+    ><button class="ghost" id="rp_prev">Previous</button
+    ><button class="ghost" id="rp_next">Next</button>
+  </div>
 </section>
 <section id="view-inbox" class="view" hidden>
   <section class="panel">
@@ -11,14 +24,16 @@
       <button id="inbox-refresh" class="ghost" type="button">Refresh</button>
     </div>
     <div class="toolbar form-filters">
-      <label for="inbox-type-filter">Type
+      <label for="inbox-type-filter"
+        >Type
         <select id="inbox-type-filter">
           <option value="">All types</option>
           <option value="ANNOUNCEMENT">Announcements</option>
           <option value="FORM">Forms</option>
         </select>
       </label>
-      <label for="inbox-status-filter">Status
+      <label for="inbox-status-filter"
+        >Status
         <select id="inbox-status-filter">
           <option value="">All statuses</option>
           <option value="NEW">New</option>
@@ -29,43 +44,80 @@
         </select>
       </label>
     </div>
-    <p id="inbox-empty" class="note" hidden>No inbox items match these filters.</p>
+    <p id="inbox-empty" class="note" hidden>
+      No inbox items match these filters.
+    </p>
     <div id="inbox-items" class="announcement-list"></div>
   </section>
 </section>
 <section id="view-executive" class="view" hidden>
   <div class="toolbar" id="ex_filters"></div>
-  <div class="toolbar"><button id="ex_run">Apply filters</button><button class="ghost" id="ex_print">Print / save as PDF</button><span class="note" id="ex_period"></span></div>
+  <div class="toolbar">
+    <button id="ex_run">Apply filters</button
+    ><button class="ghost" id="ex_print">Print / save as PDF</button
+    ><span class="note" id="ex_period"></span>
+  </div>
   <div class="kpis" id="ex_kpis"></div>
   <div class="grid" id="ex_charts"></div>
-  <div class="grid" id="ex_tables" style="margin-top:16px"></div>
-  <div class="panel" style="margin-top:16px"><h2>Notes and upcoming data</h2><ul class="obs" id="ex_notes"></ul></div>
+  <div class="grid" id="ex_tables" style="margin-top: 16px"></div>
+  <div class="panel" style="margin-top: 16px">
+    <h2>Notes and upcoming data</h2>
+    <ul class="obs" id="ex_notes"></ul>
+  </div>
 </section>
 <section id="view-audit" class="view" hidden>
   <div class="toolbar form-filters">
-    <label for="au_from">From
-      <input id="au_from" type="datetime-local">
+    <label for="au_from"
+      >From
+      <input id="au_from" type="datetime-local" />
     </label>
-    <label for="au_to">To
-      <input id="au_to" type="datetime-local">
+    <label for="au_to"
+      >To
+      <input id="au_to" type="datetime-local" />
     </label>
-    <label for="au_user">User email
-      <input id="au_user" type="email" maxlength="191" placeholder="Exact user email">
+    <label for="au_user"
+      >User email
+      <input
+        id="au_user"
+        type="email"
+        maxlength="191"
+        placeholder="Exact user email"
+      />
     </label>
     <button id="au_apply" type="button">Apply filters</button>
     <button id="au_clear" class="ghost" type="button">Clear</button>
   </div>
-  <div class="tablewrap"><table><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Record</th><th>Detail</th></tr></thead><tbody id="au_body"></tbody></table></div>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>User</th>
+          <th>Action</th>
+          <th>Record</th>
+          <th>Detail</th>
+        </tr>
+      </thead>
+      <tbody id="au_body"></tbody>
+    </table>
+  </div>
 </section>
 <section id="view-announcements" class="view" hidden>
   <section class="panel">
     <form id="announcement-create-form">
       <label for="announcement-title">Title</label>
-      <input id="announcement-title" type="text" maxlength="160" required>
+      <input id="announcement-title" type="text" maxlength="160" required />
       <label for="announcement-message">Message</label>
-      <textarea id="announcement-message" maxlength="5000" rows="5" required></textarea>
+      <textarea
+        id="announcement-message"
+        maxlength="5000"
+        rows="5"
+        required
+      ></textarea>
       <p id="announcement-create-feedback" class="okmsg" hidden></p>
-      <div class="actions"><button type="submit">Publish announcement</button></div>
+      <div class="actions">
+        <button type="submit">Publish announcement</button>
+      </div>
     </form>
   </section>
   <section class="panel">

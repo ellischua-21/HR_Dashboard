@@ -9,7 +9,7 @@
     "create-user": "node scripts/create-user.js",
     "sample-data": "node scripts/SampleData.js",
     "test": "node --test tests/Test.js",
-    "format": "prettier --write \"public/js/*.js\" \"shared/*.js\""
+    "format": "prettier --write \"public/**/*.{html,css,js}\" \"server/**/*.js\" \"shared/**/*.js\" \"scripts/**/*.js\" \"tests/**/*.js\""
   },
   "engines": {
     "node": ">=18"

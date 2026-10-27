@@ -3,7 +3,21 @@
     <div class="account-heading">
       <button id="am_refresh" class="ghost" type="button">Refresh</button>
     </div>
-    <div class="tablewrap"><table><thead><tr><th>Name</th><th>Personal Email</th><th>Assigned role</th><th>Assigned Head</th><th>Requested</th><th>Actions</th></tr></thead><tbody id="am_requests"></tbody></table></div>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Personal Email</th>
+            <th>Assigned role</th>
+            <th>Assigned Head</th>
+            <th>Requested</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="am_requests"></tbody>
+      </table>
+    </div>
   </section>
 </section>
 <section id="view-accounts" class="view" hidden>
@@ -11,9 +25,78 @@
     <button id="am_save_changes" type="button" disabled>Save Changes</button>
   </div>
   <div class="account-lists">
-  <section class="panel"><h2>STAFF</h2><div class="tablewrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Assigned Head</th><th>Status</th><th>Created</th><th>Assignment</th></tr></thead><tbody id="am_users"></tbody></table></div></section>
-  <section class="panel"><h2>HEAD</h2><div class="tablewrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Assigned Head</th><th>Status</th><th>Created</th><th>Assignment</th></tr></thead><tbody id="am_heads"></tbody></table></div></section>
-  <section class="panel"><h2>HR</h2><div class="tablewrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Head HR</th><th>Status</th><th>Created</th></tr></thead><tbody id="am_hr"></tbody></table></div></section>
-  <section class="panel"><h2>Admins</h2><div class="tablewrap"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Created</th></tr></thead><tbody id="am_admins"></tbody></table></div></section>
+    <section class="panel">
+      <h2>STAFF</h2>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Assigned Head</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Assignment</th>
+            </tr>
+          </thead>
+          <tbody id="am_users"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>HEAD</h2>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Assigned Head</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Assignment</th>
+            </tr>
+          </thead>
+          <tbody id="am_heads"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>HR</h2>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Head HR</th>
+              <th>Status</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="am_hr"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Admins</h2>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="am_admins"></tbody>
+        </table>
+      </div>
+    </section>
   </div>
 </section>

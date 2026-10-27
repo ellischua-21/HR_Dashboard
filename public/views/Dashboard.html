@@ -1,6 +1,6 @@
-<form class="filters" id="filters" onsubmit="return false">
-  <label>From<input type="date" id="f_dateFrom"></label>
-  <label>To (reporting date)<input type="date" id="f_dateTo"></label>
+<form class="filters" id="filters" onsubmit="return false;">
+  <label>From<input type="date" id="f_dateFrom" /></label>
+  <label>To (reporting date)<input type="date" id="f_dateTo" /></label>
   <label>Company<select id="f_company"></select></label>
   <label>Department<select id="f_department"></select></label>
   <label>Work location<select id="f_location"></select></label>
@@ -12,8 +12,14 @@
 </form>
 <div class="kpis" id="kpis"></div>
 <div class="grid">
-  <div class="panel"><h2>Workforce observations</h2><ul class="obs" id="obs"></ul>
-    <p class="note" id="asof"></p></div>
-  <div class="panel"><h2>Data completeness</h2><div id="quality"></div></div>
+  <div class="panel">
+    <h2>Workforce observations</h2>
+    <ul class="obs" id="obs"></ul>
+    <p class="note" id="asof"></p>
+  </div>
+  <div class="panel">
+    <h2>Data completeness</h2>
+    <div id="quality"></div>
+  </div>
 </div>
-<div class="grid" id="charts" style="margin-top:16px"></div>
+<div class="grid" id="charts" style="margin-top: 16px"></div>

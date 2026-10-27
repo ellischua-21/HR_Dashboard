@@ -5,81 +5,6 @@ let META = null,
   CUR = null,
   IMP = null,
   HEAD_OPTIONS = [];
-const SECTIONS = [
-  [
-    'Personal information',
-    [
-      'last_name',
-      'first_name',
-      'middle_name',
-      'birthday',
-      'age',
-      'birth_place',
-      'gender',
-      'civil_status',
-      'education'
-    ]
-  ],
-  [
-    'Employment information',
-    [
-      'emp_no',
-      'company',
-      'location',
-      'position',
-      'department',
-      'rank',
-      'reports_to',
-      'date_employed',
-      'status',
-      'function_type',
-      'network',
-      'transfer_eff'
-    ]
-  ],
-  [
-    'Contact information',
-    [
-      'address',
-      'permanent_address',
-      'contact_no',
-      'landline_no',
-      'personal_email',
-      'company_contact_no'
-    ]
-  ],
-  [
-    'Family background',
-    [
-      'father_name',
-      'father_occupation',
-      'mother_maiden',
-      'mother_occupation',
-      'siblings',
-      'spouse_name',
-      'children'
-    ]
-  ],
-  [
-    'Church and Organizations/Memberships',
-    ['church_has', 'church_position', 'orgs']
-  ],
-  [
-    'Contact in case of emergency',
-    [
-      'emergency_name',
-      'emergency_address',
-      'emergency_no',
-      'emergency_relationship'
-    ]
-  ],
-  ['Social Media', ['facebook', 'instagram', 'tiktok', 'youtube', 'twitter']],
-  [
-    'Benefits and government information',
-    ['hmo', 'tin', 'pagibig', 'sss', 'philhealth', 'gov_deduction']
-  ],
-  ['Compensation information', ['salary_structure', 'fte']]
-];
 const TABLES = {
   siblings: {
     title: 'Siblings',
@@ -230,6 +155,16 @@ const el = (t, txt, cls) => {
 };
 const fld = (k) => META.fields.find((f) => f.key === k);
 const can = (p) => session.perms.includes(p);
+function employeeFormSections() {
+  return Array.from($('r_form').querySelectorAll('[data-employee-fields]')).map(
+    (group) => ({
+      group,
+      fieldset: group.closest('fieldset'),
+      title: group.closest('fieldset').querySelector('legend').textContent,
+      keys: group.dataset.employeeFields.trim().split(/\s+/)
+    })
+  );
+}
 async function ensureMeta() {
   if (!META) META = await api('getFormMeta');
 }
@@ -396,7 +331,7 @@ async function showProfile(id) {
   body.appendChild(
     el('p', CUR.position + ' · ' + CUR.department + ' · ' + CUR.company, 'note')
   );
-  SECTIONS.forEach(([title, keys]) => {
+  employeeFormSections().forEach(({ title, keys }) => {
     const dl = el('dl'),
       tabs = [];
     keys.forEach((k) => {
@@ -458,7 +393,8 @@ VIEWS.register = guard(async () => {
   HEAD_OPTIONS = rec ? [] : await api('listAssignableHeads');
   $('r_mode').textContent = rec
     ? 'Editing ' + rec.name + ' (' + rec.record_id + ')'
-    : 'New employee. Fields marked * are required.';
+    : '';
+  $('r_mode').hidden = !rec;
   $('r_msg').textContent = '';
   $('r_msg').hidden = true;
   $('r_account_access').hidden = Boolean(rec);
@@ -467,20 +403,23 @@ VIEWS.register = guard(async () => {
   $('r_account_password_confirm').disabled = Boolean(rec);
   $('r_preview').disabled = false;
   const box = $('r_form');
-  box.innerHTML = '';
-  SECTIONS.forEach(([title, keys]) => {
-    const fs = el('fieldset'),
-      g = el('div', undefined, 'fgrid'),
-      tabs = [];
-    fs.appendChild(el('legend', title));
+  const sections = employeeFormSections();
+  sections.forEach(({ group, fieldset }) => {
+    group.replaceChildren();
+    fieldset.querySelector('[data-employee-tables]').replaceChildren();
+    fieldset.hidden = true;
+  });
+  sections.forEach(({ group, fieldset: fs, keys }) => {
+    const tables = fs.querySelector('[data-employee-tables]');
+    const tabs = [];
     keys.forEach((k) => {
       if (k === 'age') {
-        const l = el('label', 'Age (automatic)'),
+        const l = el('label', 'Age'),
           i = el('input');
         i.id = 'ff_age';
         i.readOnly = true;
         l.appendChild(i);
-        g.appendChild(l);
+        group.appendChild(l);
         return;
       }
       const f = fld(k);
@@ -536,12 +475,12 @@ VIEWS.register = guard(async () => {
       } else {
         lab.appendChild(inp);
       }
-      g.appendChild(lab);
+      group.appendChild(lab);
     });
-    if (!g.childElementCount && !tabs.length) return;
-    fs.appendChild(g);
-    tabs.forEach((f) => fs.appendChild(tableEditor(f.key, rec && rec[f.key])));
-    box.appendChild(fs);
+    tabs.forEach((f) =>
+      tables.appendChild(tableEditor(f.key, rec && rec[f.key]))
+    );
+    fs.hidden = !group.childElementCount && !tables.childElementCount;
   });
   $('r_account_role').value = 'STAFF';
   $('r_account_role').onchange = updateRegistrationRoleHelp;
