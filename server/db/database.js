@@ -196,6 +196,99 @@ async function initializeDatabase() {
     "UPDATE user_forms SET review_stage = 'HR' WHERE review_stage NOT IN ('HEAD', 'HR')"
   );
 
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_reports (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    case_number VARCHAR(20) NOT NULL,
+    reporter_email VARCHAR(191) NOT NULL,
+    reporter_employee_id VARCHAR(20) NULL,
+    reporter_name VARCHAR(191) NOT NULL,
+    department VARCHAR(191) NOT NULL DEFAULT '',
+    position VARCHAR(191) NOT NULL DEFAULT '',
+    reported_employee_id VARCHAR(20) NOT NULL,
+    reported_employee_email VARCHAR(191) NOT NULL,
+    reported_employee_name VARCHAR(191) NOT NULL,
+    assigned_head_email VARCHAR(191) NULL,
+    date_reported DATE NOT NULL,
+    subject VARCHAR(191) NOT NULL,
+    incident_date DATE NOT NULL,
+    location VARCHAR(191) NOT NULL,
+    incident_time TIME NOT NULL,
+    description MEDIUMTEXT NOT NULL,
+    comments TEXT NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'PENDING SIGNATURE',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_incident_case_number (case_number),
+    KEY idx_incident_reporter (reporter_email, created_at),
+    KEY idx_incident_employee (reported_employee_email, status, created_at),
+    KEY idx_incident_head (assigned_head_email, status, created_at),
+    KEY idx_incident_status (status, created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+  const [incidentReporterIdColumn] = await pool.query(
+    "SHOW COLUMNS FROM incident_reports LIKE 'reporter_employee_id'"
+  );
+  if (
+    incidentReporterIdColumn[0] &&
+    incidentReporterIdColumn[0].Null === 'NO'
+  ) {
+    await pool.query(
+      'ALTER TABLE incident_reports MODIFY COLUMN reporter_employee_id VARCHAR(20) NULL'
+    );
+  }
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_case_sequences (
+    case_year SMALLINT UNSIGNED NOT NULL,
+    sequence_value INT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (case_year)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_participants (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    incident_id BIGINT UNSIGNED NOT NULL,
+    participant_type VARCHAR(16) NOT NULL,
+    employee_record_id VARCHAR(20) NULL,
+    full_name VARCHAR(191) NOT NULL,
+    sort_order TINYINT UNSIGNED NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_incident_participants (incident_id, participant_type, sort_order)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_signatures (
+    incident_id BIGINT UNSIGNED NOT NULL,
+    signatory_role VARCHAR(16) NOT NULL,
+    signer_email VARCHAR(191) NOT NULL,
+    signature_data MEDIUMTEXT NOT NULL,
+    signed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (incident_id, signatory_role),
+    KEY idx_incident_signature_signer (signer_email, signed_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_evidence (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    incident_id BIGINT UNSIGNED NOT NULL,
+    file_name VARCHAR(191) NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
+    byte_size INT UNSIGNED NOT NULL,
+    file_data MEDIUMBLOB NOT NULL,
+    uploaded_by VARCHAR(191) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_incident_evidence_case (incident_id, id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS incident_notifications (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    incident_id BIGINT UNSIGNED NOT NULL,
+    recipient_email VARCHAR(191) NOT NULL,
+    notification_type VARCHAR(32) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    viewed_at TIMESTAMP NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_incident_notification (incident_id, recipient_email, notification_type),
+    KEY idx_incident_notification_inbox (recipient_email, created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
   await pool.query(`CREATE TABLE IF NOT EXISTS form_serial_sequences (
     template_key VARCHAR(64) NOT NULL,
     serial_year SMALLINT UNSIGNED NOT NULL,

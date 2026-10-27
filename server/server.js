@@ -14,6 +14,7 @@ const announcements = require('./services/AnnouncementService');
 const inbox = require('./services/InboxService');
 const accounts = require('./services/AccountService');
 const userForms = require('./services/FormService');
+const incidents = require('./services/IncidentService');
 const { verifyPassword } = require('./utils/Password');
 
 const app = express();
@@ -159,7 +160,23 @@ const methods = {
   getFormReviewSummary: (req, scope) =>
     userForms.getFormReviewSummaryForUser(req, scope),
   reviewUserForm: (req, formId, decision, notes, signature, hrFields) =>
-    userForms.reviewUserForm(req, formId, decision, notes, signature, hrFields)
+    userForms.reviewUserForm(req, formId, decision, notes, signature, hrFields),
+  getIncidentFileContext: (req) => incidents.getIncidentFileContext(req),
+  searchIncidentEmployees: (req, query, purpose) =>
+    incidents.searchIncidentEmployees(req, query, purpose),
+  submitIncidentReport: (req, input) =>
+    incidents.submitIncidentReport(req, input),
+  listIncidentsForTrack: (req) => incidents.listIncidentsForTrack(req),
+  listIncidentsForReview: (req) => incidents.listIncidentsForReview(req),
+  getIncidentCase: (req, incidentId) =>
+    incidents.getIncidentCase(req, incidentId),
+  signIncidentCase: (req, incidentId, role, signature) =>
+    incidents.signIncidentCase(req, incidentId, role, signature),
+  getIncidentBadgeCounts: (req) => incidents.getIncidentBadgeCounts(req),
+  listPendingIncidentNotifications: (req) =>
+    incidents.listPendingIncidentNotifications(req),
+  markIncidentNotificationSeen: (req, notificationId) =>
+    incidents.markIncidentNotificationSeen(req, notificationId)
 };
 
 app.post('/api/:method', async (req, res, next) => {
@@ -178,18 +195,38 @@ app.post('/api/:method', async (req, res, next) => {
   }
 });
 
+app.get('/api/incidents/evidence/:evidenceId', async (req, res, next) => {
+  try {
+    const evidence = await incidents.getIncidentEvidence(
+      req,
+      req.params.evidenceId
+    );
+    const safeName = evidence.fileName.replace(/[\r\n"\\]/g, '_');
+    const fallbackName = safeName.replace(/[^\x20-\x7E]/g, '_');
+    res.setHeader('Content-Type', evidence.mimeType);
+    res.setHeader('Content-Length', evidence.fileData.length);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${fallbackName}"; filename*=UTF-8''${encodeURIComponent(safeName)}`
+    );
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.send(evidence.fileData);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.use((error, req, res, next) => {
   console.error(error);
   if (res.headersSent) return next(error);
   const status = Number(error.status) || 500;
-  res
-    .status(status)
-    .json({
-      error:
-        status >= 500
-          ? 'The request failed. Check the Node.js server log.'
-          : error.message
-    });
+  res.status(status).json({
+    error:
+      status >= 500
+        ? 'The request failed. Check the Node.js server log.'
+        : error.message
+  });
 });
 
 initializeDatabase()

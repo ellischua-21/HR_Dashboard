@@ -12,8 +12,9 @@ This version keeps the existing dashboard screens and browser behavior, serves t
 
 - `public/` contains the browser application: `index.html`, CSS, JavaScript, and HTML view fragments.
 - `public/views/` contains page markup; `public/js/` contains page controllers and shared navigation behavior; `public/css/` contains application styles.
+- `public/views/incident-management/` and `public/js/incident-management/` contain the Incident Management interface and its role-based navigation/controller code.
 - `shared/` contains form templates and status rules used by both the browser and the API.
-- `server/` contains the Node.js API, grouped into `config/`, `db/`, `middleware/`, `services/`, and `utils/`. `config/` separates application settings, employee schema, and role permissions.
+- `server/` contains the Node.js API, grouped into `config/`, `db/`, `middleware/`, `services/`, and `utils/`. `config/` separates application settings, employee schema, and role permissions; domain workflows belong in `services/`.
 - `scripts/` contains setup and administrator command-line tools.
 - `tests/` contains the Node.js test suite.
 - `node_modules/` contains installed dependencies and can be recreated with `npm.cmd install`.
@@ -22,7 +23,7 @@ Apache uses the root `.htaccess` file to redirect `http://localhost/HR_Dashboard
 
 ## Code organization
 
-Keep page structure in its matching `public/views/` fragment and page-specific behavior in the matching `public/js/` controller. Put reusable browser behavior in a shared controller or module rather than duplicating it across pages. Keep form definitions shared when they are consumed by both the browser and API; forms with distinct workflows may keep dedicated markup and behavior. Put business rules and data validation on the server, with reusable logic in `server/services/` and authoritative field/permission definitions in `server/config/`. Use `npm.cmd run format` to format first-party JavaScript, HTML, and CSS consistently.
+Keep page structure in its matching `public/views/` fragment and page-specific behavior in the matching `public/js/` controller. Put reusable browser behavior in a shared controller or module rather than duplicating it across pages. Keep form definitions shared when they are consumed by both the browser and API; forms with distinct workflows may keep dedicated markup and behavior. Put business rules and data validation on the server, with reusable logic in `server/services/` and authoritative field/permission definitions in `server/config/`. Incident Report tables are added by the existing database initialization, and the shared signature pad is in `public/js/SignaturePad.js`. Use `npm.cmd run format` to format first-party JavaScript, HTML, and CSS consistently.
 
 ## First-time setup
 

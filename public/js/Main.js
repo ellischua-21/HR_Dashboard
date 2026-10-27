@@ -154,6 +154,13 @@ async function init() {
         count.hidden = true;
         count.setAttribute('aria-label', 'unseen inbox entries');
         a.appendChild(count);
+      } else if (n[0] === 'incident-track' || n[0] === 'incident-review') {
+        const count = document.createElement('span');
+        count.id = `${n[0]}-count`;
+        count.className = 'nav-count';
+        count.hidden = true;
+        count.setAttribute('aria-label', 'incident cases requiring attention');
+        a.appendChild(count);
       }
       a.onclick = () => go(n);
       a.onkeydown = (e) => {
@@ -214,6 +221,10 @@ async function init() {
         'Reports',
         groupItems(['executive', 'reports', 'audit', 'announcements'])
       );
+      addNavGroup(
+        'Incident Management',
+        window.INCIDENT_MANAGEMENT_NAVIGATION.forRole(session.role)
+      );
       if (session.role === 'ADMIN') {
         addNavGroup(
           'Manage Accounts',
@@ -228,6 +239,10 @@ async function init() {
         .forEach(addNavLink);
     } else {
       addNavGroup('Forms', formItems, true);
+      addNavGroup(
+        'Incident Management',
+        window.INCIDENT_MANAGEMENT_NAVIGATION.forRole(session.role)
+      );
       visibleNavItems.forEach(addNavLink);
     }
     $('menuBtn').onclick = () => document.body.classList.toggle('open');
@@ -258,15 +273,26 @@ async function init() {
           window
             .refreshInboxBadge()
             .catch((error) => showErr(error.message || String(error)));
+        if (!document.hidden)
+          window
+            .refreshIncidentBadges()
+            .catch((error) => showErr(error.message || String(error)));
       });
+      window
+        .refreshIncidentBadges()
+        .catch((error) => showErr(error.message || String(error)));
+      window.setInterval(() => {
+        if (!document.hidden)
+          window
+            .refreshIncidentBadges()
+            .catch((error) => showErr(error.message || String(error)));
+      }, 60000);
+      window
+        .showPendingAnnouncements()
+        .catch((error) => showErr(error.message || String(error)));
     }
     if (isFormSubmitter) {
       go(USER_NAV[0]);
-      if (session.perms.includes('announcements.read')) {
-        window
-          .showPendingAnnouncements()
-          .catch((error) => showErr(error.message || String(error)));
-      }
       if (isHead) {
         window
           .refreshSubmittedFormsBadge('ALL')

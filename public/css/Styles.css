@@ -1324,6 +1324,162 @@ legend {
 .account-lists td:last-child button {
   padding: 5px 10px;
 }
+.incident-form fieldset {
+  margin: 0 0 16px;
+  padding: 16px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+}
+.incident-form legend {
+  padding: 0 6px;
+  font-weight: 600;
+}
+.incident-form > label,
+.incident-form fieldset > label {
+  display: grid;
+  gap: 5px;
+  margin: 12px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.incident-form input,
+.incident-form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  color: var(--ink);
+  background: #fff;
+  font: inherit;
+}
+.incident-form input[readonly] {
+  background: #f5f6f8;
+}
+.incident-search-field {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.incident-suggestions {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% - 1px);
+  right: 0;
+  left: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--rule);
+  border-radius: 0 0 5px 5px;
+  background: #fff;
+  box-shadow: 0 6px 18px rgb(20 33 61 / 14%);
+}
+.incident-suggestion {
+  display: grid;
+  width: 100%;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+}
+.incident-suggestion:hover,
+.incident-suggestion:focus-visible {
+  background: #f7eef1;
+  color: var(--brand);
+}
+.incident-suggestion small,
+.incident-no-suggestions {
+  color: var(--muted);
+  font-size: 12px;
+}
+.incident-no-suggestions {
+  margin: 0;
+  padding: 9px 10px;
+}
+.incident-participant-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 8px 0 16px;
+}
+.incident-case-dialog {
+  width: min(900px, calc(100vw - 28px));
+  max-height: min(90vh, 1000px);
+  overflow-y: auto;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--card);
+}
+.incident-case-dialog::backdrop {
+  background: rgb(15 23 42 / 55%);
+}
+.incident-case-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 20px;
+}
+.incident-case-field {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--rule);
+  overflow-wrap: anywhere;
+}
+.incident-case-field strong {
+  color: var(--muted);
+  font-size: 12px;
+}
+.incident-case-section {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: #fff;
+}
+.incident-case-section h3 {
+  margin-top: 0;
+}
+.incident-case-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.incident-signature-field {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule);
+}
+.incident-signature-image {
+  display: block;
+  width: min(100%, 560px);
+  height: 112px;
+  object-fit: contain;
+  object-position: left center;
+  border-bottom: 1px solid var(--ink);
+  background: #fff;
+}
+.incident-signature-pad {
+  height: 120px;
+}
+.incident-signature-field .actions {
+  margin-top: 8px;
+}
+@media (max-width: 700px) {
+  .incident-participant-list {
+    grid-template-columns: 1fr;
+  }
+  .incident-case-grid {
+    grid-template-columns: 1fr;
+  }
+}
 @media (min-width: 1200px) {
   .account-lists {
     grid-template-columns: repeat(3, minmax(0, 1fr));

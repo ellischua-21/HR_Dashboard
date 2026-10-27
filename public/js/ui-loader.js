@@ -15,7 +15,11 @@ if (stylesheet)
     ['reports-fragment', 'views/Reports.html'],
     ['accounts-fragment', 'views/Accounts.html'],
     ['account-settings-fragment', 'views/AccountSettings.html'],
-    ['user-dashboard-fragment', 'views/UserDashboard.html']
+    ['user-dashboard-fragment', 'views/UserDashboard.html'],
+    [
+      'incident-management-fragment',
+      'views/incident-management/IncidentManagement.html'
+    ]
   ];
   for (const [target, path] of fragments) {
     const url = new URL(
@@ -30,12 +34,15 @@ if (stylesheet)
   for (const path of [
     '../shared/FormTemplates.js',
     '../shared/FormStatus.js',
+    'js/incident-management/Navigation.js',
+    'js/SignaturePad.js',
     'js/Main.js',
     'js/Employees.js',
     'js/Reports.js',
     'js/Accounts.js',
     'js/UserDashboard.js',
-    'js/AccountSettings.js'
+    'js/AccountSettings.js',
+    'js/incident-management/IncidentManagement.js'
   ]) {
     await new Promise((resolve, reject) => {
       const script = document.createElement('script');

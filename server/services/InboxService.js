@@ -79,6 +79,48 @@ async function getInbox(req) {
     });
   }
 
+  const [incidentNotifications] = await pool.execute(
+    `SELECT n.id AS notificationId, n.notification_type AS notificationType,
+            n.created_at AS createdAt, n.viewed_at AS viewedAt,
+            i.id AS incidentId, i.case_number AS caseNumber, i.subject,
+            i.reported_employee_name AS reportedEmployeeName, i.status,
+            CASE
+              WHEN n.notification_type = 'EMPLOYEE_SIGNATURE' AND employee_signature.incident_id IS NULL THEN 1
+              WHEN n.notification_type = 'HEAD_SIGNATURE' AND head_signature.incident_id IS NULL THEN 1
+              ELSE 0
+            END AS requiresAction
+     FROM incident_notifications n
+     JOIN incident_reports i ON i.id = n.incident_id
+     LEFT JOIN incident_signatures employee_signature
+       ON employee_signature.incident_id = i.id
+       AND employee_signature.signatory_role = 'EMPLOYEE'
+     LEFT JOIN incident_signatures head_signature
+       ON head_signature.incident_id = i.id
+       AND head_signature.signatory_role = 'HEAD'
+     WHERE n.recipient_email = ?
+     ORDER BY n.created_at DESC, n.id DESC LIMIT 500`,
+    [user.email]
+  );
+  incidentNotifications.forEach((notification) => {
+    const needsSignature = Boolean(notification.requiresAction);
+    items.push({
+      id: `incident-${notification.notificationId}`,
+      type: 'INCIDENT',
+      status: needsSignature ? 'ACTION_REQUIRED' : notification.status,
+      unseen: !notification.viewedAt,
+      title: needsSignature
+        ? 'Incident Report requires your acknowledgment'
+        : notification.notificationType === 'HR_REVIEW_READY'
+          ? 'Incident Report sent to HR for review'
+          : 'Incident Report signature recorded',
+      message: `${notification.caseNumber}: ${notification.subject} — ${notification.reportedEmployeeName}`,
+      createdAt: notification.createdAt,
+      notificationId: notification.notificationId,
+      incidentId: notification.incidentId,
+      target: needsSignature ? 'incident-track' : 'incident-review'
+    });
+  });
+
   return items.sort(
     (first, second) =>
       new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()
@@ -99,6 +141,9 @@ async function markInboxSeen(req) {
   const formIds = items
     .filter((item) => item.type === 'FORM')
     .map((item) => Number(item.formId));
+  const incidentNotificationIds = items
+    .filter((item) => item.type === 'INCIDENT')
+    .map((item) => Number(item.notificationId));
 
   if (announcementIds.length) {
     const placeholders = announcementIds.map(() => '?').join(', ');
@@ -116,7 +161,21 @@ async function markInboxSeen(req) {
       params
     );
   }
-  return { ok: true, count: announcementIds.length + formIds.length };
+  let incidentCount = 0;
+  if (incidentNotificationIds.length) {
+    const placeholders = incidentNotificationIds.map(() => '?').join(', ');
+    const [result] = await pool.execute(
+      `UPDATE incident_notifications
+       SET viewed_at = COALESCE(viewed_at, CURRENT_TIMESTAMP)
+       WHERE recipient_email = ? AND id IN (${placeholders})`,
+      [user.email, ...incidentNotificationIds]
+    );
+    incidentCount = result.affectedRows;
+  }
+  return {
+    ok: true,
+    count: announcementIds.length + formIds.length + incidentCount
+  };
 }
 
 module.exports = { getInbox, getInboxNotificationCount, markInboxSeen };

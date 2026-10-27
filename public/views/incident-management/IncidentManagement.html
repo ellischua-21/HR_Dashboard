@@ -1,0 +1,149 @@
+<section id="view-incident-file" class="view" hidden>
+  <form id="incident-file-form" class="panel incident-form">
+    <h2>Incident Report</h2>
+    <fieldset>
+      <legend>Report Details</legend>
+      <div class="fgrid">
+        <label>Reported By<input id="ir-reporter-name" readonly /></label>
+        <label>Department<input id="ir-reporter-department" readonly /></label>
+        <label>Position<input id="ir-reporter-position" readonly /></label>
+        <label
+          >Date of Report<input id="ir-date-reported" type="date" readonly
+        /></label>
+        <label class="incident-search-field">
+          Employee Being Reported
+          <input
+            id="ir-reported-employee"
+            type="search"
+            autocomplete="off"
+            required
+          />
+          <input id="ir-reported-employee-id" type="hidden" />
+          <div
+            id="ir-reported-employee-options"
+            class="incident-suggestions"
+            role="listbox"
+            hidden
+          ></div>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Incident Information</legend>
+      <div class="fgrid">
+        <label>Subject<input id="ir-subject" maxlength="191" required /></label>
+        <label
+          >Date of Incident<input id="ir-incident-date" type="date" required
+        /></label>
+        <label
+          >Location<input id="ir-location" maxlength="191" required
+        /></label>
+        <label>Time<input id="ir-time" type="time" required /></label>
+      </div>
+      <label for="ir-description">Incident Description</label>
+      <textarea
+        id="ir-description"
+        rows="7"
+        maxlength="12000"
+        required
+      ></textarea>
+
+      <h3>Names of Persons Involved</h3>
+      <div id="ir-persons-involved" class="incident-participant-list"></div>
+
+      <h3>Names of Witnesses</h3>
+      <div id="ir-witnesses" class="incident-participant-list"></div>
+
+      <label for="ir-comments">Comment</label>
+      <textarea id="ir-comments" rows="4" maxlength="3000"></textarea>
+    </fieldset>
+
+    <fieldset>
+      <legend>Supporting Evidence</legend>
+      <label for="ir-evidence"
+        >Attach documents, images, audio, or video (up to 10 files, 8 MB each;
+        18 MB total)</label
+      >
+      <input
+        id="ir-evidence"
+        type="file"
+        accept=".pdf,.doc,.docx,.rtf,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,.txt,.csv,.mp3,.wav,.mp4,.mov"
+        multiple
+      />
+      <div id="ir-evidence-list" class="note" aria-live="polite"></div>
+    </fieldset>
+
+    <p class="note">
+      The reported employee’s and assigned Head’s signatures acknowledge receipt
+      of this report; they do not indicate admission of wrongdoing.
+    </p>
+    <p id="ir-file-feedback" role="status" hidden></p>
+    <div class="actions">
+      <button id="ir-submit" type="submit">Submit Incident Report</button>
+    </div>
+  </form>
+</section>
+
+<section id="view-incident-track" class="view" hidden>
+  <section class="panel">
+    <div class="account-heading">
+      <h2>Incident Reports</h2>
+      <button id="ir-track-refresh" class="ghost" type="button">Refresh</button>
+    </div>
+    <p id="ir-track-empty" class="note" hidden>No Incident Reports to track.</p>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Case Number</th>
+            <th>Subject</th>
+            <th>Employee</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="ir-track-rows"></tbody>
+      </table>
+    </div>
+  </section>
+</section>
+
+<section id="view-incident-review" class="view" hidden>
+  <section class="panel">
+    <div class="account-heading">
+      <h2>Incident Reports</h2>
+      <button id="ir-review-refresh" class="ghost" type="button">
+        Refresh
+      </button>
+    </div>
+    <p id="ir-review-empty" class="note" hidden>
+      No Incident Reports to review.
+    </p>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Case Number</th>
+            <th>Subject</th>
+            <th>Employee</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="ir-review-rows"></tbody>
+      </table>
+    </div>
+  </section>
+</section>
+
+<dialog id="ir-case-dialog" class="incident-case-dialog">
+  <div class="account-heading">
+    <h2 id="ir-case-title">Incident Report</h2>
+    <button id="ir-case-close" class="ghost" type="button">Close</button>
+  </div>
+  <div id="ir-case-body"></div>
+  <p id="ir-case-feedback" role="status" hidden></p>
+</dialog>

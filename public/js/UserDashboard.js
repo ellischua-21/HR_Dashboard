@@ -130,130 +130,19 @@ function appendFormField(parent, label, value, className = '') {
   parent.appendChild(item);
 }
 
-function createSignaturePad(canvas, clearButton) {
-  const context = canvas.getContext('2d');
-  let hasSignature = false;
-  let drawing = false;
-
-  function clear() {
-    const bounds = canvas.getBoundingClientRect();
-    const ratio = window.devicePixelRatio || 1;
-    canvas.width = Math.max(1, Math.round(bounds.width * ratio));
-    canvas.height = Math.max(1, Math.round(bounds.height * ratio));
-    context.setTransform(ratio, 0, 0, ratio, 0, 0);
-    context.fillStyle = '#fff';
-    context.fillRect(0, 0, bounds.width, bounds.height);
-    context.strokeStyle = '#14213d';
-    context.lineWidth = 2.5;
-    context.lineCap = 'round';
-    context.lineJoin = 'round';
-    hasSignature = false;
-  }
-
-  function position(event) {
-    const bounds = canvas.getBoundingClientRect();
-    return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
-  }
-
-  canvas.addEventListener('pointerdown', (event) => {
-    event.preventDefault();
-    drawing = true;
-    canvas.setPointerCapture(event.pointerId);
-    const point = position(event);
-    context.beginPath();
-    context.arc(point.x, point.y, context.lineWidth / 2, 0, Math.PI * 2);
-    context.fillStyle = context.strokeStyle;
-    context.fill();
-    context.beginPath();
-    context.moveTo(point.x, point.y);
-    hasSignature = true;
-  });
-  canvas.addEventListener('pointermove', (event) => {
-    if (!drawing) return;
-    const point = position(event);
-    context.lineTo(point.x, point.y);
-    context.stroke();
-    hasSignature = true;
-  });
-  const stopDrawing = () => {
-    drawing = false;
-  };
-  canvas.addEventListener('pointerup', stopDrawing);
-  canvas.addEventListener('pointercancel', stopDrawing);
-  clearButton.addEventListener('click', clear);
-  clear();
-
-  return {
-    clear,
-    hasSignature: () => hasSignature,
-    toDataURL: () => {
-      if (!hasSignature) return '';
-      const { data, width, height } = context.getImageData(
-        0,
-        0,
-        canvas.width,
-        canvas.height
-      );
-      let minX = width,
-        minY = height,
-        maxX = -1,
-        maxY = -1;
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          const offset = (y * width + x) * 4;
-          if (
-            data[offset] < 245 ||
-            data[offset + 1] < 245 ||
-            data[offset + 2] < 245
-          ) {
-            minX = Math.min(minX, x);
-            minY = Math.min(minY, y);
-            maxX = Math.max(maxX, x);
-            maxY = Math.max(maxY, y);
-          }
-        }
-      }
-      if (maxX < minX || maxY < minY) return '';
-      const output = document.createElement('canvas');
-      output.width = 560;
-      output.height = 112;
-      const outputContext = output.getContext('2d');
-      outputContext.fillStyle = '#fff';
-      outputContext.fillRect(0, 0, output.width, output.height);
-      const sourceWidth = maxX - minX + 1;
-      const sourceHeight = maxY - minY + 1;
-      const scale = Math.min(520 / sourceWidth, 90 / sourceHeight);
-      const drawWidth = sourceWidth * scale;
-      const drawHeight = sourceHeight * scale;
-      outputContext.drawImage(
-        canvas,
-        minX,
-        minY,
-        sourceWidth,
-        sourceHeight,
-        (output.width - drawWidth) / 2,
-        (output.height - drawHeight) / 2,
-        drawWidth,
-        drawHeight
-      );
-      return output.toDataURL('image/png');
-    }
-  };
-}
-
-const leaveSignaturePad = createSignaturePad(
+const leaveSignaturePad = window.createSignaturePad(
   $('leave-signature-pad'),
   $('leave-signature-clear')
 );
-const templateSignaturePad = createSignaturePad(
+const templateSignaturePad = window.createSignaturePad(
   $('template-signature-pad'),
   $('template-signature-clear')
 );
-const headSignaturePad = createSignaturePad(
+const headSignaturePad = window.createSignaturePad(
   $('head-signature-pad'),
   $('head-signature-clear')
 );
-const hrSignaturePad = createSignaturePad(
+const hrSignaturePad = window.createSignaturePad(
   $('hr-signature-pad'),
   $('hr-signature-clear')
 );
@@ -1276,10 +1165,15 @@ async function refreshSubmittedFormsBadge(scope = 'HR') {
 window.refreshSubmittedFormsBadge = refreshSubmittedFormsBadge;
 
 let pendingAnnouncements = [];
+let pendingIncidentNotifications = [];
 
 async function showPendingAnnouncements() {
-  pendingAnnouncements = await api('listUnseenAnnouncements');
-  if (!pendingAnnouncements.length) return;
+  pendingAnnouncements = session.perms.includes('announcements.read')
+    ? await api('listUnseenAnnouncements')
+    : [];
+  pendingIncidentNotifications = await api('listPendingIncidentNotifications');
+  if (!pendingAnnouncements.length && !pendingIncidentNotifications.length)
+    return;
   const list = $('staff-announcements-list');
   list.replaceChildren();
   pendingAnnouncements.forEach((announcement) => {
@@ -1296,6 +1190,46 @@ async function showPendingAnnouncements() {
     card.append(title, message, details);
     list.appendChild(card);
   });
+  pendingIncidentNotifications.forEach((notification) => {
+    const card = document.createElement('article');
+    card.className = 'announcement-card';
+    const title = document.createElement('h3');
+    title.textContent = notification.type.endsWith('_SIGNATURE')
+      ? 'Incident Report requires your acknowledgment'
+      : 'Incident Report ready for HR review';
+    const message = document.createElement('p');
+    message.className = 'announcement-message';
+    message.textContent = `${notification.caseNumber}: ${notification.subject} — ${notification.reportedEmployeeName}`;
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.textContent = 'Open Incident Report';
+    open.onclick = async () => {
+      open.disabled = true;
+      try {
+        $('staff-announcements-dialog').close();
+        await window.openIncidentRoute(
+          notification.incidentId,
+          notification.type === 'HR_REVIEW_READY'
+            ? 'incident-review'
+            : 'incident-track',
+          notification.id
+        );
+      } catch (error) {
+        open.disabled = false;
+        $('staff-announcements-dialog').showModal();
+        $('staff-announcements-feedback').textContent =
+          error.message || String(error);
+        $('staff-announcements-feedback').hidden = false;
+      }
+    };
+    card.append(title, message, open);
+    list.appendChild(card);
+  });
+  $('staff-announcements-dialog').querySelector('h2').textContent =
+    'Notifications';
+  $('staff-announcements-acknowledge').textContent = pendingAnnouncements.length
+    ? 'Acknowledge announcements'
+    : 'Close';
   $('staff-announcements-feedback').hidden = true;
   $('staff-announcements-dialog').showModal();
 }
@@ -1306,10 +1240,11 @@ async function acknowledgePendingAnnouncements() {
   button.disabled = true;
   feedback.hidden = true;
   try {
-    await api(
-      'markAnnouncementsSeen',
-      pendingAnnouncements.map((announcement) => announcement.id)
-    );
+    if (pendingAnnouncements.length)
+      await api(
+        'markAnnouncementsSeen',
+        pendingAnnouncements.map((announcement) => announcement.id)
+      );
     pendingAnnouncements = [];
     $('staff-announcements-dialog').close();
   } catch (error) {

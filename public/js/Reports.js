@@ -359,6 +359,16 @@ function renderInbox() {
       view.type = 'button';
       view.onclick = () => go(target);
       card.appendChild(view);
+    } else if (item.type === 'INCIDENT') {
+      const view = el('button', 'Open Incident Report');
+      view.type = 'button';
+      view.onclick = () =>
+        window.openIncidentRoute(
+          item.incidentId,
+          item.target,
+          item.notificationId
+        );
+      card.appendChild(view);
     }
 
     items.appendChild(card);
