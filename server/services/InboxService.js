@@ -1,5 +1,7 @@
+const { notificationTitle } = require('./incident-management/Notifications');
 const {
-  incidentNotificationTarget
+  incidentNotificationTarget,
+  incidentAccessScope
 } = require('./incident-management/Tracking');
 const { pool } = require('../db/database');
 const { requirePerm } = require('../middleware/Auth');
@@ -82,14 +84,15 @@ async function getInbox(req) {
     });
   }
 
+  const incidentScope = incidentAccessScope(user, 'i');
   const [incidentNotifications] = await pool.execute(
     `SELECT n.id AS notificationId, n.notification_type AS notificationType,
             n.created_at AS createdAt, n.viewed_at AS viewedAt,
             i.id AS incidentId, i.case_number AS caseNumber, i.subject,
             i.reported_employee_name AS reportedEmployeeName, i.status,
             CASE
-              WHEN n.notification_type = 'EMPLOYEE_SIGNATURE' AND employee_signature.incident_id IS NULL THEN 1
-              WHEN n.notification_type = 'HEAD_SIGNATURE' AND head_signature.incident_id IS NULL THEN 1
+              WHEN i.status = 'PENDING SIGNATURE' AND n.notification_type = 'EMPLOYEE_SIGNATURE' AND employee_signature.incident_id IS NULL THEN 1
+              WHEN i.status = 'PENDING SIGNATURE' AND n.notification_type = 'HEAD_SIGNATURE' AND head_signature.incident_id IS NULL THEN 1
               ELSE 0
             END AS requiresAction
      FROM incident_notifications n
@@ -100,9 +103,9 @@ async function getInbox(req) {
      LEFT JOIN incident_signatures head_signature
        ON head_signature.incident_id = i.id
        AND head_signature.signatory_role = 'HEAD'
-     WHERE n.recipient_email = ?
+     WHERE n.recipient_email = ? AND ${incidentScope.sql}
      ORDER BY n.created_at DESC, n.id DESC LIMIT 500`,
-    [user.email]
+    [user.email, ...incidentScope.values]
   );
   incidentNotifications.forEach((notification) => {
     const needsSignature = Boolean(notification.requiresAction);
@@ -111,47 +114,7 @@ async function getInbox(req) {
       type: 'INCIDENT',
       status: needsSignature ? 'ACTION_REQUIRED' : notification.status,
       unseen: !notification.viewedAt,
-      title: needsSignature
-        ? notification.notificationType === 'HEAD_SIGNATURE'
-          ? 'Incident Report requires your review and signature'
-          : 'Incident Report requires your acknowledgment'
-        : notification.notificationType === 'IR_SUBMITTED'
-          ? 'Incident Report submitted'
-          : notification.notificationType === 'DECISION_PENDING'
-            ? 'Incident evaluation ready for final decision'
-            : notification.notificationType === 'HR_REVIEW_READY'
-              ? 'Incident Report sent to HR for review'
-              : notification.notificationType === 'CASE_CLOSED'
-                ? 'Incident Report case closed'
-                : notification.notificationType === 'INVESTIGATION_STARTED'
-                  ? 'Incident Report under investigation'
-                  : notification.notificationType === 'NTE_ISSUED'
-                    ? 'Notice to Explain issued'
-                    : notification.notificationType === 'DECISION_ISSUED'
-                      ? 'Incident Report decision issued'
-                      : notification.notificationType === 'EXPLANATION_SENT'
-                        ? 'Employee explanation submitted'
-                        : notification.notificationType.startsWith(
-                              'EXPLANATION_ADD_'
-                            )
-                          ? 'Employee additional statement submitted'
-                          : notification.notificationType.startsWith(
-                                'NTE_OVERDUE'
-                              )
-                            ? 'NTE explanation is overdue'
-                            : notification.notificationType.startsWith(
-                                  'NTE_EXT_'
-                                )
-                              ? 'NTE explanation deadline updated'
-                              : notification.notificationType.startsWith(
-                                    'INFO_REQ_'
-                                  )
-                                ? 'Additional incident information requested'
-                                : notification.notificationType.startsWith(
-                                      'INFO_DONE_'
-                                    )
-                                  ? 'Additional incident information received'
-                                  : 'Incident Report updated',
+      title: notificationTitle(notification.notificationType),
       message:
         notification.notificationType === 'NTE_ISSUED'
           ? `${notification.caseNumber} has advanced. Open HRIS to view information available to your account.`

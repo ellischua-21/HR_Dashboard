@@ -354,6 +354,7 @@
       );
       content.appendChild(evaluation);
     }
+    window.IncidentTimeline.render(content, incident);
     ui.renderDecision(content, view);
     if (tracking.currentStage === 'DECISION ISSUED' && !incident.decision)
       content.appendChild(

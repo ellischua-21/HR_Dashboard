@@ -22,6 +22,12 @@ const {
 } = require('./incident-management/Conduct');
 const { listIncidentsForHistory } = require('./incident-management/Archive');
 
+const {
+  TARGET_STATUS,
+  publicTimeline
+} = require('./incident-management/Activity');
+const { notificationTitle } = require('./incident-management/Notifications');
+
 const FILING_ROLES = new Set(['HEAD', 'HR', 'ADMIN']);
 const REVIEW_ROLES = new Set(['HR', 'ADMIN']);
 const MAX_EVIDENCE_FILES = 10;
@@ -475,18 +481,44 @@ async function submitIncidentReport(req, input = {}) {
         [incidentId, assignedHeadEmail]
       );
     }
-    await connection.execute(
-      `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type)
-       SELECT ?, email, 'IR_SUBMITTED' FROM user_roles WHERE active = 1 AND role IN ('HR', 'ADMIN')`,
-      [incidentId]
+    const createdCase = {
+      id: incidentId,
+      case_number: caseNumber,
+      status: null,
+      reporter_email: user.email,
+      reported_employee_email: employee.email,
+      assigned_head_email: assignedHeadEmail
+    };
+    await recordIncidentActivity(
+      connection,
+      user,
+      createdCase,
+      'IR_CREATED',
+      'Incident Report created.'
     );
-    await logAudit(
-      user.email,
-      'INCIDENT_CREATED',
-      caseNumber,
-      `Incident report filed for ${employee.name}`,
-      connection
+    await recordIncidentActivity(
+      connection,
+      user,
+      createdCase,
+      'IR_SUBMITTED',
+      'Incident Report submitted for required signatures.'
     );
+    await recordIncidentActivity(
+      connection,
+      user,
+      { ...createdCase, status: 'PENDING SIGNATURE' },
+      'EMPLOYEE_SIGNATURE_REQUESTED',
+      'Employee acknowledgment requested.'
+    );
+    if (assignedHeadEmail)
+      await recordIncidentActivity(
+        connection,
+        user,
+        { ...createdCase, status: 'PENDING SIGNATURE' },
+        'HEAD_SIGNATURE_REQUESTED',
+        'Head acknowledgment requested.'
+      );
+    await notifyIncidentParties(connection, createdCase, 'IR_SUBMITTED');
     await connection.commit();
     return {
       ok: true,
@@ -660,12 +692,23 @@ async function recordIncidentActivity(
   user,
   incident,
   action,
-  details
+  details,
+  metadata = {}
 ) {
-  await connection.execute(
-    `INSERT INTO incident_activity (incident_id, actor_email, action, details)
-     VALUES (?, ?, ?, ?)`,
-    [incident.id, user.email, action, details]
+  const [result] = await connection.execute(
+    `INSERT INTO incident_activity (incident_id, actor_email, action, details, previous_status, new_status, document_reference)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      incident.id,
+      user.email,
+      action,
+      details,
+      metadata.previousStatus === undefined
+        ? incident.status || null
+        : metadata.previousStatus,
+      metadata.newStatus || TARGET_STATUS[action] || incident.status || null,
+      metadata.documentReference || null
+    ]
   );
   await logAudit(
     user.email,
@@ -674,6 +717,7 @@ async function recordIncidentActivity(
     details,
     connection
   );
+  return result.insertId;
 }
 
 async function notifyIncidentParties(connection, incident, type) {
@@ -692,6 +736,10 @@ async function notifyIncidentParties(connection, incident, type) {
     [incident.id]
   );
   participantAccounts.forEach((account) => recipients.add(account.email));
+  const [reviewers] = await connection.execute(
+    "SELECT email FROM user_roles WHERE active = 1 AND role IN ('HR', 'ADMIN')"
+  );
+  reviewers.forEach((account) => recipients.add(account.email));
   for (const email of recipients) {
     await connection.execute(
       `INSERT IGNORE INTO incident_notifications
@@ -1184,7 +1232,20 @@ async function issueIncidentNte(req, incidentId, input = {}) {
       user,
       incident,
       'NTE_ISSUED',
-      `NTE issued with ${nte.deadlineDate} explanation deadline.`
+      `NTE issued with ${nte.deadlineDate} explanation deadline.`,
+      { documentReference: 'NTE:' + nte.nteId }
+    );
+    await recordIncidentActivity(
+      connection,
+      user,
+      incident,
+      'NTE_RECEIVED',
+      'Documented receipt date: ' + nte.receiptDate,
+      {
+        previousStatus: 'NTE ISSUED',
+        newStatus: 'NTE ISSUED',
+        documentReference: 'NTE:' + nte.nteId
+      }
     );
     await notifyIncidentParties(connection, incident, 'NTE_ISSUED');
     await connection.commit();
@@ -1345,7 +1406,8 @@ async function submitIncidentExplanation(
       user,
       incident,
       'EXPLANATION_SENT',
-      'Employee submitted an explanation through HRIS.'
+      'Employee submitted an explanation through HRIS.',
+      { documentReference: 'EXPLANATION:' + result.insertId }
     );
     await connection.execute(
       `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type)
@@ -1392,6 +1454,7 @@ async function startIncidentEvaluation(req, incidentId) {
       'EVALUATION_STARTED',
       'HR opened the submitted explanation for evaluation.'
     );
+    await notifyIncidentParties(connection, incident, 'EVALUATION_STARTED');
     await connection.commit();
     return { ok: true, status: 'EVALUATION' };
   } catch (error) {
@@ -1819,6 +1882,14 @@ async function issueIncidentDecision(req, incidentId, input = {}) {
       connection,
       user,
       incident,
+      'DECISION_APPROVED',
+      'Authorized approval recorded.',
+      { documentReference: 'DECISION:' + insert.insertId }
+    );
+    await recordIncidentActivity(
+      connection,
+      user,
+      incident,
       'DECISION_ISSUED',
       outcome === 'NO_VIOLATION'
         ? 'Final decision issued: no violation established.'
@@ -2110,7 +2181,8 @@ async function recordExternalIncidentExplanation(
       user,
       incident,
       'EXPLANATION_RECEIVED_EXTERNALLY',
-      `Explanation received through ${channelText}.`
+      `Explanation received through ${channelText}.`,
+      { documentReference: 'EXPLANATION:' + result.insertId }
     );
     await connection.execute(
       `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type)
@@ -2155,17 +2227,45 @@ async function processOverdueIncidentNtes() {
             : 'NTE_OVERDUE'
         ]
       );
-      await connection.execute(
-        `INSERT INTO incident_activity (incident_id, actor_email, action, details)
-         VALUES (?, 'SYSTEM', 'EXPLANATION_OVERDUE', 'The NTE explanation deadline passed without a recorded explanation.')`,
-        [row.incidentId]
+      await recordIncidentActivity(
+        connection,
+        { email: 'SYSTEM' },
+        {
+          id: row.incidentId,
+          case_number: row.caseNumber,
+          status: 'NTE ISSUED'
+        },
+        'EXPLANATION_OVERDUE',
+        'The NTE explanation deadline passed without a recorded explanation.',
+        { documentReference: 'NTE:' + row.nteId }
       );
-      await logAudit(
-        'SYSTEM',
-        'INCIDENT_EXPLANATION_OVERDUE',
-        row.caseNumber,
-        'NTE explanation deadline passed.',
-        connection
+    }
+    const [[setting]] = await connection.execute(
+      "SELECT setting_value FROM system_settings WHERE setting_key = 'INCIDENT_NTE_REMINDER_DAYS'"
+    );
+    const configured = Number(setting?.setting_value ?? 2);
+    const threshold =
+      Number.isInteger(configured) && configured >= 0 && configured <= 30
+        ? configured
+        : 2;
+    const [upcoming] = await connection.execute(
+      `SELECT n.id AS nteId, n.incident_id AS incidentId,
+      DATE_FORMAT(n.deadline_date, '%Y-%m-%d') AS deadlineDate, i.reported_employee_email AS employeeEmail
+      FROM incident_ntes n JOIN incident_reports i ON i.id = n.incident_id
+      WHERE n.status = 'ISSUED' AND i.status = 'NTE ISSUED' AND n.deadline_date >= ?
+      AND n.deadline_date <= DATE_ADD(?, INTERVAL 60 DAY) FOR UPDATE`,
+      [today, today]
+    );
+    for (const notice of upcoming) {
+      if (workingDaysBetween(today, notice.deadlineDate) > threshold) continue;
+      await connection.execute(
+        `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type)
+        VALUES (?, ?, ?)`,
+        [
+          notice.incidentId,
+          notice.employeeEmail,
+          'NTE_DUE_' + notice.deadlineDate.replaceAll('-', '')
+        ]
       );
     }
     await connection.commit();
@@ -2180,7 +2280,6 @@ async function processOverdueIncidentNtes() {
 
 async function listDailyNteReminders(req) {
   const user = await requirePerm(req, 'inbox.read');
-  if (user.role !== 'STAFF') return [];
   await processOverdueIncidentNtes();
   const today = currentManilaDate();
   const [cases] = await pool.execute(
@@ -2196,12 +2295,14 @@ async function listDailyNteReminders(req) {
   for (const item of cases) {
     const [result] = await pool.execute(
       `INSERT IGNORE INTO incident_nte_reminders (nte_id, employee_email, reminder_date)
-       VALUES (?, ?, ?)`,
-      [item.nteId, user.email, today]
+       SELECT n.id, ?, ? FROM incident_ntes n JOIN incident_reports i ON i.id = n.incident_id
+       WHERE n.id = ? AND n.status = 'ISSUED' AND i.status = 'NTE ISSUED' AND LOWER(i.reported_employee_email) = LOWER(?)`,
+      [user.email, today, item.nteId, user.email]
     );
     if (result.affectedRows)
       reminders.push({
         ...item,
+        dueToday: item.deadlineDate === today,
         daysRemaining: workingDaysBetween(today, item.deadlineDate)
       });
   }
@@ -2391,7 +2492,8 @@ async function requestIncidentInformation(
       user,
       incident,
       'INFORMATION_REQUESTED',
-      `${recipient}: ${text}`
+      `${recipient}: ${text}`,
+      { documentReference: 'INFORMATION_REQUEST:' + result.insertId }
     );
     const notificationType = `INFO_REQ_${result.insertId}`.slice(0, 32);
     await connection.execute(
@@ -2452,6 +2554,20 @@ async function addIncidentInvestigationNote(
           user.email
         ]
       );
+    if (evidence.length) {
+      const activityId = await recordIncidentActivity(
+        connection,
+        user,
+        incident,
+        'EVIDENCE_SUBMITTED',
+        'Supporting evidence added to the case.'
+      );
+      await connection.execute(
+        `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type)
+        SELECT ?, email, ? FROM user_roles WHERE active = 1 AND role IN ('HR', 'ADMIN')`,
+        [id, 'EVIDENCE_' + activityId]
+      );
+    }
     await connection.commit();
     return { ok: true };
   } catch (error) {
@@ -2524,11 +2640,17 @@ async function respondToIncidentInformation(
       user,
       incident,
       'INFORMATION_PROVIDED',
-      `Response submitted for request ${request}.`
+      `Response submitted for request ${request}.`,
+      { documentReference: 'INFORMATION_REQUEST:' + request }
     );
     await connection.execute(
       `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type) VALUES (?, ?, ?)`,
       [id, requests[0].requested_by, `INFO_DONE_${request}`.slice(0, 32)]
+    );
+    await connection.execute(
+      `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type)
+      SELECT ?, email, ? FROM user_roles WHERE active = 1 AND role IN ('HR', 'ADMIN')`,
+      [id, 'INFO_DONE_' + request]
     );
     await connection.commit();
     return { ok: true };
@@ -2599,7 +2721,8 @@ async function getIncidentCase(req, incidentId) {
         [id]
       ),
       pool.execute(
-        `SELECT action, details, actor_email AS actorEmail, created_at AS createdAt
+        `SELECT action, details, actor_email AS actorEmail, created_at AS createdAt,
+              previous_status AS previousStatus, new_status AS newStatus, document_reference AS documentReference
        FROM incident_activity WHERE incident_id = ? ORDER BY created_at, id`,
         [id]
       ),
@@ -2798,6 +2921,7 @@ async function getIncidentCase(req, incidentId) {
   return {
     ...incident,
     policyReferences,
+    timeline: publicTimeline(incident, activity, signatures),
     tracking: buildIncidentTracking(
       incident,
       signatures,
@@ -2899,7 +3023,7 @@ async function signIncidentCase(req, incidentId, signatoryRole, signatureData) {
   try {
     await connection.beginTransaction();
     const [rows] = await connection.execute(
-      `SELECT id, case_number, status, reported_employee_email,
+      `SELECT id, case_number, status, reporter_email, reported_employee_email,
               reported_employee_name, assigned_head_email
        FROM incident_reports WHERE id = ? FOR UPDATE`,
       [id]
@@ -2975,23 +3099,40 @@ async function signIncidentCase(req, incidentId, signatoryRole, signatureData) {
           "UPDATE incident_reports SET status = 'SIGNED' WHERE id = ? AND status = 'PENDING SIGNATURE'",
           [id]
         );
-        await connection.execute(
-          `INSERT IGNORE INTO incident_notifications
-             (incident_id, recipient_email, notification_type)
-           SELECT ?, email, 'HR_REVIEW_READY' FROM user_roles
-           WHERE active = 1 AND role IN ('HR', 'ADMIN')`,
-          [id]
-        );
       }
     }
 
-    await logAudit(
-      user.email,
-      `INCIDENT_${signatoryRole}_SIGNED`,
-      incident.case_number,
-      `Incident Report signed as ${signatoryRole}`,
-      connection
+    await recordIncidentActivity(
+      connection,
+      user,
+      incident,
+      signatoryRole + '_SIGNED',
+      'Acknowledgment signature recorded.',
+      {
+        newStatus: incident.status,
+        documentReference: 'SIGNATURE:' + signatoryRole
+      }
     );
+    if (nextStatus === 'SIGNED' && incident.status !== 'SIGNED') {
+      await recordIncidentActivity(
+        connection,
+        user,
+        incident,
+        'SIGNATURES_COMPLETED',
+        'Required acknowledgment signatures completed.'
+      );
+      await notifyIncidentParties(connection, incident, 'HR_REVIEW_READY');
+    }
+    if (signatoryRole === 'HR') {
+      await recordIncidentActivity(
+        connection,
+        user,
+        incident,
+        'HR_REVIEW_STARTED',
+        'HR review started after signature completion.'
+      );
+      await notifyIncidentParties(connection, incident, 'HR_REVIEW_STARTED');
+    }
     await connection.commit();
     return { ok: true, caseNumber: incident.case_number, status: nextStatus };
   } catch (error) {
@@ -3029,21 +3170,24 @@ async function getIncidentBadgeCounts(req) {
 
 async function listPendingIncidentNotifications(req) {
   const user = await requirePerm(req, 'inbox.read');
-  await processOverdueIncidentNtes();
+  const scope = incidentAccessScope(user, 'i');
   const [rows] = await pool.execute(
-    `SELECT n.id, n.notification_type AS type,
-            n.created_at AS createdAt,
-            i.id AS incidentId, i.case_number AS caseNumber, i.subject,
-            i.status, i.reported_employee_name AS reportedEmployeeName
-     FROM incident_notifications n
-     JOIN incident_reports i ON i.id = n.incident_id
-     WHERE n.recipient_email = ? AND n.viewed_at IS NULL
-     ORDER BY n.created_at, n.id LIMIT 100`,
-    [user.email]
+    `SELECT n.id, n.notification_type AS type, n.created_at AS createdAt,
+    i.id AS incidentId, i.case_number AS caseNumber, i.subject, i.status,
+    i.reported_employee_name AS reportedEmployeeName FROM incident_notifications n
+    JOIN incident_reports i ON i.id = n.incident_id
+    WHERE n.recipient_email = ? AND n.viewed_at IS NULL AND i.status = 'PENDING SIGNATURE'
+      AND ((n.notification_type = 'EMPLOYEE_SIGNATURE' AND LOWER(i.reported_employee_email) = LOWER(?)
+        AND NOT EXISTS (SELECT 1 FROM incident_signatures s WHERE s.incident_id = i.id AND s.signatory_role = 'EMPLOYEE'))
+      OR (n.notification_type = 'HEAD_SIGNATURE' AND LOWER(i.assigned_head_email) = LOWER(?)
+        AND NOT EXISTS (SELECT 1 FROM incident_signatures s WHERE s.incident_id = i.id AND s.signatory_role = 'HEAD')))
+      AND ${scope.sql} ORDER BY n.created_at, n.id LIMIT 100`,
+    [user.email, user.email, user.email, ...scope.values]
   );
   return rows.map((notification) => ({
     ...notification,
-    target: incidentNotificationTarget(user.role, notification.status)
+    title: notificationTitle(notification.type),
+    target: incidentNotificationTarget(user.role)
   }));
 }
 

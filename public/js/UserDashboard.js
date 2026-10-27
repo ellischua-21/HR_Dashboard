@@ -1168,12 +1168,35 @@ let pendingAnnouncements = [];
 let pendingIncidentNotifications = [];
 let dailyNteReminders = [];
 
+let announcementPopupLoading = false;
 async function showPendingAnnouncements() {
-  pendingAnnouncements = session.perms.includes('announcements.read')
-    ? await api('listUnseenAnnouncements')
-    : [];
-  pendingIncidentNotifications = await api('listPendingIncidentNotifications');
-  dailyNteReminders = await api('listDailyNteReminders');
+  if (
+    announcementPopupLoading ||
+    !session ||
+    document.hidden ||
+    document.querySelector('dialog[open]')
+  )
+    return;
+  announcementPopupLoading = true;
+  try {
+    await loadPendingAnnouncementsPopup();
+  } finally {
+    announcementPopupLoading = false;
+  }
+}
+async function loadPendingAnnouncementsPopup() {
+  const owner = session.email;
+  const [announcements, notifications, reminders] = await Promise.all([
+    session.perms.includes('announcements.read')
+      ? api('listUnseenAnnouncements')
+      : Promise.resolve([]),
+    api('listPendingIncidentNotifications'),
+    api('listDailyNteReminders')
+  ]);
+  if (owner !== session?.email) return;
+  pendingAnnouncements = announcements;
+  pendingIncidentNotifications = notifications;
+  dailyNteReminders = reminders;
   if (
     !pendingAnnouncements.length &&
     !pendingIncidentNotifications.length &&
@@ -1200,32 +1223,7 @@ async function showPendingAnnouncements() {
     const card = document.createElement('article');
     card.className = 'announcement-card';
     const title = document.createElement('h3');
-    const titles = {
-      EMPLOYEE_SIGNATURE: 'Incident Report requires your acknowledgment',
-      HEAD_SIGNATURE: 'Incident Report requires your review and signature',
-      HR_REVIEW_READY: 'Incident Report ready for HR review',
-      IR_SUBMITTED: 'Incident Report submitted',
-      DECISION_PENDING: 'Incident evaluation ready for final decision',
-      CASE_CLOSED: 'Incident Report case closed',
-      INVESTIGATION_STARTED: 'Incident Report under investigation',
-      NTE_ISSUED: 'Notice to Explain issued',
-      DECISION_ISSUED: 'Incident Report decision issued',
-      EXPLANATION_SENT: 'Employee explanation submitted',
-      NTE_OVERDUE: 'NTE explanation is overdue'
-    };
-    title.textContent =
-      titles[notification.type] ||
-      (notification.type.startsWith('NTE_OVERDUE')
-        ? 'NTE explanation is overdue'
-        : notification.type.startsWith('NTE_EXT_')
-          ? 'NTE explanation deadline updated'
-          : notification.type.startsWith('EXPLANATION_ADD_')
-            ? 'Employee additional statement submitted'
-            : notification.type.startsWith('INFO_REQ_')
-              ? 'Additional incident information requested'
-              : notification.type.startsWith('INFO_DONE_')
-                ? 'Additional incident information received'
-                : 'Incident Report updated');
+    title.textContent = notification.title;
     const message = document.createElement('p');
     message.className = 'announcement-message';
     message.textContent =
@@ -1270,10 +1268,14 @@ async function showPendingAnnouncements() {
       ? `${reminder.caseNumber}: your explanation is overdue. Please respond as soon as possible.`
       : days > 0
         ? `${reminder.caseNumber}: ${days} working day${days === 1 ? '' : 's'} remaining. Deadline: ${reminder.deadlineDate}.`
-        : `${reminder.caseNumber}: your explanation is due today (${reminder.deadlineDate}).`;
+        : reminder.dueToday
+          ? `${reminder.caseNumber}: your explanation is due today (${reminder.deadlineDate}).`
+          : `${reminder.caseNumber}: 0 working days remaining. Deadline: ${reminder.deadlineDate}.`;
     const open = document.createElement('button');
     open.type = 'button';
-    open.textContent = 'Open case in Track';
+    open.textContent = ['HR', 'ADMIN'].includes(session.role)
+      ? 'Open case in Review'
+      : 'Open case in Track';
     open.onclick = async () => {
       $('staff-announcements-dialog').close();
       await window.openIncidentRoute(reminder.incidentId, 'incident-track');
@@ -1301,7 +1303,13 @@ async function acknowledgePendingAnnouncements() {
         'markAnnouncementsSeen',
         pendingAnnouncements.map((announcement) => announcement.id)
       );
+    await Promise.all(
+      pendingIncidentNotifications.map((notification) =>
+        api('markIncidentNotificationSeen', notification.id)
+      )
+    );
     pendingAnnouncements = [];
+    pendingIncidentNotifications = [];
     $('staff-announcements-dialog').close();
   } catch (error) {
     feedback.textContent = error.message || String(error);

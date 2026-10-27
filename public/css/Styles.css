@@ -1786,6 +1786,21 @@ legend {
   border-left: 3px solid var(--teal);
   background: var(--surface, #f7f8fa);
 }
+.incident-public-timeline ol {
+  padding-left: 24px;
+}
+.incident-public-timeline li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.incident-public-timeline li > * {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.incident-public-timeline time {
+  font-size: 13px;
+  margin: 4px 0;
+}
 #view-incident-history [hidden],
 #view-incident-code-of-conduct [hidden] {
   display: none !important;

@@ -44,6 +44,7 @@ if (stylesheet)
     'js/AccountSettings.js',
     'js/incident-management/IncidentManagement.js',
     'js/incident-management/Progress.js',
+    'js/incident-management/Timeline.js',
     'js/incident-management/Track.js',
     'js/incident-management/Review.js',
     'js/incident-management/History.js',

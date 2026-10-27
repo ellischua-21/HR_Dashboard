@@ -300,6 +300,23 @@ async function initializeDatabase() {
     KEY idx_incident_activity_case (incident_id, created_at, id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
+  for (const column of [
+    'previous_status',
+    'new_status',
+    'document_reference'
+  ]) {
+    const [existing] = await pool.query(
+      'SHOW COLUMNS FROM incident_activity LIKE ?',
+      [column]
+    );
+    if (!existing.length)
+      await pool.query(
+        'ALTER TABLE incident_activity ADD COLUMN ' +
+          column +
+          ' VARCHAR(191) NULL'
+      );
+  }
+
   await pool.query(`CREATE TABLE IF NOT EXISTS incident_information_requests (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     incident_id BIGINT UNSIGNED NOT NULL,
@@ -587,9 +604,20 @@ async function initializeDatabase() {
     reminder_date DATE NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY uq_incident_nte_daily_reminder (nte_id, reminder_date),
+    UNIQUE KEY uq_incident_nte_daily_reminder (nte_id, employee_email, reminder_date),
     KEY idx_incident_nte_reminder_employee (employee_email, reminder_date)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  const [reminderIndex] = await pool.query(
+    "SHOW INDEX FROM incident_nte_reminders WHERE Key_name = 'uq_incident_nte_daily_reminder'"
+  );
+  if (
+    !reminderIndex.some((column) => column.Column_name === 'employee_email')
+  ) {
+    await pool.query(
+      'ALTER TABLE incident_nte_reminders DROP INDEX uq_incident_nte_daily_reminder, ADD UNIQUE KEY uq_incident_nte_daily_reminder (nte_id, employee_email, reminder_date)'
+    );
+  }
 
   await pool.query(`CREATE TABLE IF NOT EXISTS form_serial_sequences (
     template_key VARCHAR(64) NOT NULL,
@@ -717,6 +745,14 @@ async function initializeDatabase() {
   await pool.execute(
     'INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VALUES (?, ?, ?)',
     ['HRIS_DATA_VER', '0', 'Data version used for cache invalidation']
+  );
+  await pool.execute(
+    'INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VALUES (?, ?, ?)',
+    [
+      'INCIDENT_NTE_REMINDER_DAYS',
+      '2',
+      'Working days before the explanation deadline to send an inbox reminder (0-30)'
+    ]
   );
   await pool.execute(
     'INSERT IGNORE INTO counters (counter_name, counter_value) VALUES (?, ?)',

@@ -290,6 +290,12 @@ async function init() {
       window
         .showPendingAnnouncements()
         .catch((error) => showErr(error.message || String(error)));
+      window.setInterval(() => {
+        if (!document.hidden)
+          window
+            .showPendingAnnouncements()
+            .catch((error) => showErr(error.message || String(error)));
+      }, 60000);
     }
     if (isFormSubmitter) {
       go(USER_NAV[0]);

@@ -1966,19 +1966,33 @@ async function openIncidentCase(incidentId, options = {}) {
     });
     body.appendChild(requestsSection);
   }
-  if (incident.activity.length) {
+  window.IncidentTimeline.render(body, incident);
+  if (incident.canReview && incident.activity.length) {
     const history = incidentElement('section', 'incident-case-section');
-    history.appendChild(incidentElement('h3', '', 'Case Activity'));
+    history.appendChild(incidentElement('h3', '', 'Internal Case Activity'));
     const list = incidentElement('ol');
-    incident.activity.forEach((entry) =>
-      list.appendChild(
-        incidentElement(
-          'li',
-          '',
-          `${entry.action.replaceAll('_', ' ')} — ${entry.details} · ${entry.actorEmail} · ${new Date(entry.createdAt).toLocaleString()}`
-        )
+    incident.activity.forEach((entry) => {
+      const item = incidentElement(
+        'li',
+        '',
+        `${entry.action.replaceAll('_', ' ')} — ${entry.details} · ${entry.actorEmail} · ${new Date(entry.createdAt).toLocaleString()}`
+      );
+      if (
+        entry.previousStatus &&
+        entry.newStatus &&
+        entry.previousStatus !== entry.newStatus
       )
-    );
+        item.appendChild(
+          incidentElement(
+            'p',
+            'note',
+            `${window.IncidentProgress.label(entry.previousStatus)} → ${window.IncidentProgress.label(entry.newStatus)}`
+          )
+        );
+      if (entry.documentReference)
+        item.appendChild(incidentElement('p', 'note', entry.documentReference));
+      list.appendChild(item);
+    });
     history.appendChild(list);
     body.appendChild(history);
   }
@@ -2095,6 +2109,9 @@ async function openIncidentRoute(incidentId, target, notificationId = null) {
   if (notificationId)
     await api('markIncidentNotificationSeen', notificationId).catch(() => {});
   pendingIncidentCaseId = Number(incidentId);
+  target = ['HR', 'ADMIN'].includes(session.role)
+    ? 'incident-review'
+    : 'incident-track';
   const destination = {
     'incident-review': ['incident-review', 'Review'],
     'incident-history': ['incident-history', 'History'],

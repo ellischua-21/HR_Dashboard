@@ -24,13 +24,16 @@ function canViewIncident(user, incident) {
 }
 
 // The same involvement scope is used by the selector, polling and persistent badge.
-function incidentAccessScope(user) {
+function incidentAccessScope(user, alias = '') {
+  if (alias && !/^[a-z_]+$/i.test(alias))
+    throw new Error('Invalid incident table alias.');
+  const prefix = alias ? `${alias}.` : '';
   if (['HR', 'ADMIN'].includes(user.role)) return { sql: '1 = 1', values: [] };
   if (!['STAFF', 'HEAD'].includes(user.role))
     return { sql: '1 = 0', values: [] };
   return {
-    sql: `(LOWER(reporter_email) = LOWER(?) OR LOWER(reported_employee_email) = LOWER(?)
-      OR LOWER(assigned_head_email) = LOWER(?) OR id IN (
+    sql: `(LOWER(${prefix}reporter_email) = LOWER(?) OR LOWER(${prefix}reported_employee_email) = LOWER(?)
+      OR LOWER(${prefix}assigned_head_email) = LOWER(?) OR ${prefix}id IN (
         SELECT p.incident_id FROM incident_participants p
         JOIN employees e ON e.record_id = p.employee_record_id
         WHERE LOWER(e.personal_email) = LOWER(?)
@@ -39,9 +42,9 @@ function incidentAccessScope(user) {
   };
 }
 
-function incidentNotificationTarget(role, status) {
+function incidentNotificationTarget(role) {
   if (['HR', 'ADMIN'].includes(role)) return 'incident-review';
-  return status === 'CLOSED' ? 'incident-history' : 'incident-track';
+  return 'incident-track';
 }
 
 function buildIncidentTracking(

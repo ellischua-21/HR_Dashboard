@@ -66,6 +66,7 @@ test('Review counters and paginated results are read from one database snapshot'
       ++releases;
     },
     execute: async (sql, values) => {
+      if (sql.includes('FROM system_settings')) return [[]];
       if (sql.includes('FROM incident_ntes n')) return [[]]; // overdue sweep
       if (sql.includes('AS totalCases')) {
         assert.match(sql, /SUM\(incident_reports.status = 'UNDER_REVIEW'\)/);
@@ -188,7 +189,7 @@ test('HR cannot issue a decision before evaluation or mutate an archived case', 
   assert.equal(rollbacks, 4);
 });
 
-test('HR event links consistently open Review; other accounts retain Track and History routes', () => {
+test('event links open Review for HR/ADMIN and Track for STAFF/HEAD, including closed cases', () => {
   for (const role of ['HR', 'ADMIN'])
     for (const status of [
       'PENDING SIGNATURE',
@@ -198,10 +199,7 @@ test('HR event links consistently open Review; other accounts retain Track and H
     ])
       assert.equal(incidentNotificationTarget(role, status), 'incident-review');
   for (const role of ['STAFF', 'HEAD']) {
-    assert.equal(
-      incidentNotificationTarget(role, 'CLOSED'),
-      'incident-history'
-    );
+    assert.equal(incidentNotificationTarget(role, 'CLOSED'), 'incident-track');
     assert.equal(
       incidentNotificationTarget(role, 'NTE ISSUED'),
       'incident-track'
