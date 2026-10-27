@@ -88,26 +88,64 @@
 <section id="view-incident-track" class="view" hidden>
   <section class="panel">
     <div class="account-heading">
-      <h2>Incident Reports</h2>
+      <h2>TRACK</h2>
       <button id="ir-track-refresh" class="ghost" type="button">Refresh</button>
     </div>
-    <p id="ir-track-empty" class="note" hidden>No Incident Reports to track.</p>
-    <div class="tablewrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Case Number</th>
-            <th>Subject</th>
-            <th>Employee</th>
-            <th>Date</th>
-            <th>Status</th>
-            <th>Response Deadline</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="ir-track-rows"></tbody>
-      </table>
+    <div class="incident-search-field incident-track-selector">
+      <label for="ir-track-selector">Select a case</label>
+      <input
+        id="ir-track-selector"
+        type="search"
+        autocomplete="off"
+        placeholder="Search case number, employee, or subject"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded="false"
+        aria-controls="ir-track-options"
+      />
+      <div
+        id="ir-track-options"
+        class="incident-suggestions"
+        role="listbox"
+        hidden
+      ></div>
     </div>
+    <p id="ir-track-empty" class="note" hidden>No Incident Reports to track.</p>
+    <p id="ir-track-feedback" role="status" aria-live="polite" hidden></p>
+  </section>
+  <section
+    id="ir-track-progress-panel"
+    class="panel incident-track-progress-panel"
+    hidden
+  >
+    <h3 id="ir-track-case-heading"></h3>
+    <p id="ir-track-status" role="status" aria-live="polite"></p>
+    <div
+      class="incident-track-scroll"
+      tabindex="0"
+      aria-label="Case progress. Scroll horizontally to view all stages."
+    >
+      <ol
+        id="ir-track-progress"
+        class="incident-track-progress"
+        aria-label="Incident stages"
+      ></ol>
+    </div>
+    <p id="ir-track-closure" class="incident-track-closure" hidden></p>
+  </section>
+  <section
+    id="ir-track-content-panel"
+    class="panel incident-track-content-panel"
+    hidden
+  >
+    <div id="ir-track-content"></div>
+    <p
+      id="ir-track-action-feedback"
+      role="status"
+      aria-live="polite"
+      hidden
+    ></p>
+    <div id="ir-track-actions" class="actions incident-track-actions"></div>
   </section>
 </section>
 

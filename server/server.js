@@ -167,6 +167,8 @@ const methods = {
   submitIncidentReport: (req, input) =>
     incidents.submitIncidentReport(req, input),
   listIncidentsForTrack: (req) => incidents.listIncidentsForTrack(req),
+  getIncidentTrackingVersion: (req, incidentId) =>
+    incidents.getIncidentTrackingVersion(req, incidentId),
   listIncidentsForHistory: (req) => incidents.listIncidentsForHistory(req),
   listIncidentsForReview: (req) => incidents.listIncidentsForReview(req),
   getIncidentCase: (req, incidentId) =>

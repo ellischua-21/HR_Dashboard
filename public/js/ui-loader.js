@@ -42,7 +42,8 @@ if (stylesheet)
     'js/Accounts.js',
     'js/UserDashboard.js',
     'js/AccountSettings.js',
-    'js/incident-management/IncidentManagement.js'
+    'js/incident-management/IncidentManagement.js',
+    'js/incident-management/Track.js'
   ]) {
     await new Promise((resolve, reject) => {
       const script = document.createElement('script');

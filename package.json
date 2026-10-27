@@ -8,7 +8,7 @@
     "setup": "node scripts/Setup.js",
     "create-user": "node scripts/create-user.js",
     "sample-data": "node scripts/SampleData.js",
-    "test": "node --test tests/Test.js",
+    "test": "node --test tests/Test.js tests/IncidentTracking.test.js",
     "format": "prettier --write \"public/**/*.{html,css,js}\" \"server/**/*.js\" \"shared/**/*.js\" \"scripts/**/*.js\" \"tests/**/*.js\""
   },
   "engines": {

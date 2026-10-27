@@ -3,6 +3,11 @@ const { pool } = require('../db/database');
 const { requirePerm } = require('../middleware/Auth');
 const { logAudit } = require('./AuditService');
 const { isValidDate } = require('../utils/Validation');
+const {
+  canViewIncident,
+  incidentAccessScope,
+  buildIncidentTracking
+} = require('./incident-management/Tracking');
 
 const FILING_ROLES = new Set(['HEAD', 'HR', 'ADMIN']);
 const REVIEW_ROLES = new Set(['HR', 'ADMIN']);
@@ -517,38 +522,47 @@ async function listIncidentsForHistory(req) {
   if (!['STAFF', 'HEAD'].includes(user.role)) {
     throw httpError('History is available to STAFF and HEAD accounts.', 403);
   }
+  const scope = incidentAccessScope(user);
   const [rows] = await pool.execute(
     `SELECT ${incidentListFields()}
      FROM incident_reports
      WHERE status = 'CLOSED'
-       AND (reporter_email = ? OR reported_employee_email = ? OR assigned_head_email = ?
-         OR id IN (
-           SELECT p.incident_id FROM incident_participants p
-           JOIN employees e ON e.record_id = p.employee_record_id
-           WHERE LOWER(e.personal_email) = LOWER(?)
-         ))
+       AND ${scope.sql}
      ORDER BY updated_at DESC, id DESC LIMIT 300`,
-    [user.email, user.email, user.email, user.email]
+    scope.values
   );
   return addIncidentCountdown(rows);
 }
 
 async function listIncidentsForTrack(req) {
   const user = await requirePerm(req, 'inbox.read');
+  const scope = incidentAccessScope(user);
   const [rows] = await pool.execute(
-    `SELECT ${incidentListFields()}
+    `SELECT id, case_number AS caseNumber, subject,
+            reported_employee_name AS reportedEmployeeName, status
      FROM incident_reports
-     WHERE status <> 'CLOSED'
-       AND (reporter_email = ? OR reported_employee_email = ? OR assigned_head_email = ?
-         OR id IN (
-           SELECT p.incident_id FROM incident_participants p
-           JOIN employees e ON e.record_id = p.employee_record_id
-           WHERE LOWER(e.personal_email) = LOWER(?)
-         ))
-     ORDER BY created_at DESC, id DESC LIMIT 300`,
-    [user.email, user.email, user.email, user.email]
+     WHERE ${scope.sql}
+     ORDER BY (status = 'CLOSED'), updated_at DESC, id DESC`,
+    scope.values
   );
-  return addIncidentCountdown(rows);
+  return rows;
+}
+
+async function getIncidentTrackingVersion(req, incidentId) {
+  const user = await requirePerm(req, 'inbox.read');
+  const id = Number(incidentId);
+  if (!Number.isSafeInteger(id) || id < 1)
+    throw httpError('Choose a valid Incident Report.', 400);
+  const scope = incidentAccessScope(user);
+  const [[row]] = await pool.execute(
+    `SELECT CONCAT_WS(':', status, updated_at,
+       (SELECT COALESCE(MAX(a.id), 0) FROM incident_activity a WHERE a.incident_id = incident_reports.id),
+       (SELECT COALESCE(MAX(s.id), 0) FROM incident_signatures s WHERE s.incident_id = incident_reports.id)) AS version
+     FROM incident_reports WHERE id = ? AND ${scope.sql}`,
+    [id, ...scope.values]
+  );
+  if (!row) throw httpError('Incident Report not found or access denied.', 404);
+  return row;
 }
 
 async function listIncidentsForReview(req) {
@@ -2486,15 +2500,6 @@ async function respondToIncidentInformation(
   }
 }
 
-function canViewIncident(user, incident) {
-  if (REVIEW_ROLES.has(user.role)) return true;
-  return [
-    incident.reporter_email,
-    incident.reported_employee_email,
-    incident.assigned_head_email
-  ].includes(user.email);
-}
-
 async function getIncidentCase(req, incidentId) {
   const user = await requirePerm(req, 'inbox.read');
   const id = Number(incidentId);
@@ -2599,7 +2604,7 @@ async function getIncidentCase(req, incidentId) {
           [id, user.email]
         ),
         pool.execute(
-          `SELECT id, explanation, source, other_channel AS otherChannel,
+          `SELECT e.id, explanation, source, other_channel AS otherChannel,
                 submitted_by AS submittedBy, submitted_at AS submittedAt
          FROM incident_explanations e JOIN incident_ntes n ON n.id = e.nte_id
          WHERE n.incident_id = ? ORDER BY submitted_at, e.id`,
@@ -2679,7 +2684,7 @@ async function getIncidentCase(req, incidentId) {
     if (decision && !REVIEW_ROLES.has(user.role)) decision.closureReason = null;
   }
   if (nte) {
-    const [[nteEvidence]] = await pool.execute(
+    const [nteEvidence] = await pool.execute(
       `SELECT id, file_name AS fileName, mime_type AS mimeType, byte_size AS byteSize
        FROM incident_nte_evidence WHERE nte_id = ? ORDER BY id`,
       [nte.id]
@@ -2727,6 +2732,14 @@ async function getIncidentCase(req, incidentId) {
   }
   return {
     ...incident,
+    tracking: buildIncidentTracking(
+      incident,
+      signatures,
+      activity,
+      nte,
+      explanations,
+      decision
+    ),
     participants,
     signatures,
     evidence,
@@ -2747,7 +2760,8 @@ async function getIncidentCase(req, incidentId) {
     deadlineExtensions: extensions,
     canReview: REVIEW_ROLES.has(user.role),
     currentUserName: user.full_name || user.email,
-    currentUserEmail: user.email
+    currentUserEmail: user.email,
+    currentUserRole: user.role
   };
 }
 
@@ -2828,7 +2842,10 @@ async function signIncidentCase(req, incidentId, signatoryRole, signatureData) {
     if (!incident) throw httpError('Incident Report not found.', 404);
 
     if (signatoryRole === 'EMPLOYEE') {
-      if (incident.reported_employee_email !== user.email)
+      if (
+        incident.reported_employee_email.toLowerCase() !==
+        user.email.toLowerCase()
+      )
         throw httpError('Only the reported employee can sign this field.', 403);
       if (incident.status !== 'PENDING SIGNATURE')
         throw httpError('This case is no longer awaiting signatures.', 409);
@@ -2843,7 +2860,7 @@ async function signIncidentCase(req, incidentId, signatoryRole, signatureData) {
         throw httpError('Only an assigned Head can sign this field.', 403);
       if (
         !incident.assigned_head_email ||
-        incident.assigned_head_email !== user.email
+        incident.assigned_head_email.toLowerCase() !== user.email.toLowerCase()
       )
         throw httpError('Only the assigned Head can sign this field.', 403);
       if (incident.status !== 'PENDING SIGNATURE')
@@ -2925,19 +2942,15 @@ async function signIncidentCase(req, incidentId, signatoryRole, signatureData) {
 async function getIncidentBadgeCounts(req) {
   const user = await requirePerm(req, 'inbox.read');
   await processOverdueIncidentNtes();
-  const [[track]] = await pool.execute(
-    `SELECT COUNT(*) AS count FROM incident_reports i
-     WHERE (i.status = 'PENDING SIGNATURE' AND (
-       (i.reported_employee_email = ? AND NOT EXISTS (
-         SELECT 1 FROM incident_signatures s
-         WHERE s.incident_id = i.id AND s.signatory_role = 'EMPLOYEE'
-       )) OR
-       (i.assigned_head_email = ? AND NOT EXISTS (
-         SELECT 1 FROM incident_signatures s
-         WHERE s.incident_id = i.id AND s.signatory_role = 'HEAD'
-       )))) OR (i.status = 'NTE ISSUED' AND LOWER(i.reported_employee_email) = LOWER(?))`,
-    [user.email, user.email, user.email]
-  );
+  let track = 0;
+  if (['STAFF', 'HEAD'].includes(user.role)) {
+    const scope = incidentAccessScope(user);
+    const [[row]] = await pool.execute(
+      `SELECT COUNT(*) AS count FROM incident_reports WHERE status <> 'CLOSED' AND ${scope.sql}`,
+      scope.values
+    );
+    track = Number(row.count);
+  }
   let review = 0;
   if (REVIEW_ROLES.has(user.role)) {
     const [[row]] = await pool.execute(
@@ -2945,7 +2958,7 @@ async function getIncidentBadgeCounts(req) {
     );
     review = Number(row.count);
   }
-  return { track: Number(track.count), review };
+  return { track, review };
 }
 
 async function listPendingIncidentNotifications(req) {
@@ -2997,6 +3010,7 @@ module.exports = {
   searchIncidentEmployees,
   submitIncidentReport,
   listIncidentsForTrack,
+  getIncidentTrackingVersion,
   listIncidentsForHistory,
   listIncidentsForReview,
   getIncidentCase,

@@ -1452,6 +1452,163 @@ legend {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+#view-incident-track [hidden] {
+  display: none !important;
+}
+#view-incident-track > .panel {
+  max-width: none;
+  min-width: 0;
+  margin-bottom: 18px;
+}
+.incident-track-selector {
+  max-width: 850px;
+}
+.incident-track-selector > input {
+  width: 100%;
+  min-height: 44px;
+}
+.incident-track-option {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 10px 14px;
+  text-align: left;
+  color: var(--ink);
+  background: var(--card);
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  white-space: normal;
+}
+.incident-track-option:hover,
+.incident-track-option[aria-selected='true'] {
+  background: #f7eef1;
+  color: var(--brand, #722f43);
+}
+.incident-track-scroll {
+  overflow-x: auto;
+  padding: 20px 0 12px;
+  overscroll-behavior-x: contain;
+}
+.incident-track-progress {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(132px, 1fr));
+  min-width: 1056px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  position: relative;
+}
+.incident-track-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  align-items: center;
+  padding: 0 8px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+.incident-track-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 21px;
+  left: calc(50% + 23px);
+  width: calc(100% - 46px);
+  border-top: 3px solid var(--rule);
+}
+.incident-track-marker {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 2px solid var(--rule);
+  border-radius: 50%;
+  background: var(--card);
+  font-size: 18px;
+  font-weight: 700;
+}
+.incident-track-step > strong {
+  min-height: 38px;
+  display: grid;
+  align-items: center;
+  color: var(--ink);
+}
+.incident-track-step.is-completed .incident-track-marker {
+  color: var(--teal);
+  background: #e7f4ef;
+  border-color: var(--teal);
+}
+.incident-track-step.is-completed::after {
+  border-color: var(--teal);
+}
+.incident-track-step.is-current .incident-track-marker {
+  color: white;
+  background: var(--brand, #722f43);
+  border-color: var(--brand, #722f43);
+  box-shadow: 0 0 0 5px #f7e8ed;
+}
+.incident-track-step.is-current .incident-track-state {
+  font-weight: 700;
+  color: var(--brand, #722f43);
+}
+.incident-track-step.is-skipped::after,
+.incident-track-step.is-discontinued::after,
+.incident-track-step.is-closed::after {
+  border-top-style: dashed;
+}
+.incident-track-step.is-skipped .incident-track-marker,
+.incident-track-step.is-discontinued .incident-track-marker {
+  border-style: dashed;
+  background: #f4f5f7;
+}
+.incident-track-step.is-closed .incident-track-marker {
+  color: var(--amber);
+  border-color: var(--amber);
+  background: #fff6e6;
+}
+.incident-track-closure,
+.incident-track-stage-message {
+  padding: 12px 14px;
+  background: var(--paper);
+  border-left: 3px solid var(--brand, #722f43);
+  overflow-wrap: anywhere;
+}
+.incident-track-report {
+  margin: 18px 0;
+}
+.incident-track-report > summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 10px 0;
+}
+.incident-track-content-panel label {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+}
+.incident-track-content-panel textarea {
+  width: 100%;
+}
+.incident-track-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+.incident-track-content-panel .signature-pad {
+  max-width: 100%;
+}
+@media (max-width: 700px) {
+  .incident-track-progress {
+    grid-template-columns: repeat(8, 132px);
+  }
+  .incident-track-actions > button {
+    min-height: 44px;
+  }
+}
 .incident-code-provision-form {
   display: grid;
   gap: 12px;

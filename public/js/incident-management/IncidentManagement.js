@@ -347,17 +347,27 @@ function canSignIncidentAs(incident, role) {
   if (role === 'EMPLOYEE')
     return (
       incident.status === 'PENDING SIGNATURE' &&
-      incident.reportedEmployeeEmail === incident.currentUserEmail
+      incident.reportedEmployeeEmail.toLowerCase() ===
+        incident.currentUserEmail.toLowerCase()
     );
   if (role === 'HEAD')
     return (
       incident.status === 'PENDING SIGNATURE' &&
-      incident.assignedHeadEmail === incident.currentUserEmail
+      ['HEAD', 'HR'].includes(incident.currentUserRole) &&
+      incident.assignedHeadEmail?.toLowerCase() ===
+        incident.currentUserEmail.toLowerCase()
     );
   return role === 'HR' && incident.status === 'SIGNED' && incident.canReview;
 }
 
-function renderIncidentSignature(parent, incident, role, label, padSetup) {
+function renderIncidentSignature(
+  parent,
+  incident,
+  role,
+  label,
+  padSetup,
+  ui = {}
+) {
   const signature = incidentSignatureFor(incident.signatures, role);
   const section = incidentElement('section', 'incident-signature-field');
   section.appendChild(incidentElement('h3', '', label));
@@ -399,14 +409,12 @@ function renderIncidentSignature(parent, incident, role, label, padSetup) {
             .refreshInboxBadge()
             .catch((error) => console.error(error));
           await refreshIncidentBadges().catch((error) => console.error(error));
-          await openIncidentCase(incident.id);
-          if (!document.getElementById('view-incident-track').hidden)
-            await loadIncidentTrack();
+          await (ui.reload || openIncidentCase)(incident.id);
           if (!document.getElementById('view-incident-review').hidden)
             await loadIncidentReview();
         } catch (error) {
           setIncidentFeedback(
-            document.getElementById('ir-case-feedback'),
+            ui.feedback || document.getElementById('ir-case-feedback'),
             error.message || String(error),
             true
           );
@@ -969,7 +977,7 @@ function renderIncidentEvaluation(parent, incident, padSetup) {
   parent.appendChild(section);
 }
 
-function renderIncidentNte(parent, incident, padSetup) {
+function renderIncidentNte(parent, incident, padSetup, ui = {}) {
   if (
     !incident.nte &&
     !(
@@ -1030,7 +1038,7 @@ function renderIncidentNte(parent, incident, padSetup) {
           ? 'Explanation due today'
           : `${days} working day${days === 1 ? '' : 's'} remaining`
     );
-    section.appendChild(countdown);
+    if (incident.status === 'NTE ISSUED') section.appendChild(countdown);
   }
 
   if (
@@ -1158,9 +1166,9 @@ function renderIncidentNte(parent, incident, padSetup) {
       save.disabled = true;
       try {
         await api('saveIncidentNteDraft', incident.id, await values());
-        await openIncidentCase(incident.id);
+        await (ui.reload || openIncidentCase)(incident.id);
         setIncidentFeedback(
-          document.getElementById('ir-case-feedback'),
+          ui.feedback || document.getElementById('ir-case-feedback'),
           'NTE draft saved.'
         );
       } catch (error) {
@@ -1207,9 +1215,9 @@ function renderIncidentNte(parent, incident, padSetup) {
         });
         await window.refreshInboxBadge().catch(() => {});
         await refreshIncidentBadges();
-        await openIncidentCase(incident.id);
+        await (ui.reload || openIncidentCase)(incident.id);
         setIncidentFeedback(
-          document.getElementById('ir-case-feedback'),
+          ui.feedback || document.getElementById('ir-case-feedback'),
           `NTE issued. Deadline: ${result.deadlineDate}.`
         );
       } catch (error) {
@@ -1277,9 +1285,9 @@ function renderIncidentNte(parent, incident, padSetup) {
           explanation.value,
           await readIncidentEvidenceFiles(attachments.files)
         );
-        await openIncidentCase(incident.id);
+        await (ui.reload || openIncidentCase)(incident.id);
         setIncidentFeedback(
-          document.getElementById('ir-case-feedback'),
+          ui.feedback || document.getElementById('ir-case-feedback'),
           'Explanation draft saved.'
         );
       } catch (error) {
@@ -1307,7 +1315,7 @@ function renderIncidentNte(parent, incident, padSetup) {
         );
         await window.refreshInboxBadge().catch(() => {});
         await refreshIncidentBadges();
-        await openIncidentCase(incident.id);
+        await (ui.reload || openIncidentCase)(incident.id);
       } catch (error) {
         setIncidentFeedback(feedback, error.message || String(error), true);
       } finally {
@@ -1430,14 +1438,14 @@ function renderIncidentNte(parent, incident, padSetup) {
           statement.value,
           await readIncidentEvidenceFiles(files.files)
         );
-        await openIncidentCase(incident.id);
+        await (ui.reload || openIncidentCase)(incident.id);
         setIncidentFeedback(
-          document.getElementById('ir-case-feedback'),
+          ui.feedback || document.getElementById('ir-case-feedback'),
           'Additional statement submitted.'
         );
       } catch (error) {
         setIncidentFeedback(
-          document.getElementById('ir-case-feedback'),
+          ui.feedback || document.getElementById('ir-case-feedback'),
           error.message || String(error),
           true
         );
@@ -1473,14 +1481,14 @@ function renderIncidentNte(parent, incident, padSetup) {
           extendDate.value,
           extendReason.value
         );
-        await openIncidentCase(incident.id);
+        await (ui.reload || openIncidentCase)(incident.id);
         setIncidentFeedback(
-          document.getElementById('ir-case-feedback'),
+          ui.feedback || document.getElementById('ir-case-feedback'),
           `Deadline extended to ${result.deadlineDate}.`
         );
       } catch (error) {
         setIncidentFeedback(
-          document.getElementById('ir-case-feedback'),
+          ui.feedback || document.getElementById('ir-case-feedback'),
           error.message || String(error),
           true
         );
@@ -1521,14 +1529,14 @@ function renderIncidentNte(parent, incident, padSetup) {
           await readIncidentEvidenceFiles(outsideFiles.files)
         );
         await window.refreshInboxBadge().catch(() => {});
-        await openIncidentCase(incident.id);
+        await (ui.reload || openIncidentCase)(incident.id);
         setIncidentFeedback(
-          document.getElementById('ir-case-feedback'),
+          ui.feedback || document.getElementById('ir-case-feedback'),
           'Explanation recorded.'
         );
       } catch (error) {
         setIncidentFeedback(
-          document.getElementById('ir-case-feedback'),
+          ui.feedback || document.getElementById('ir-case-feedback'),
           error.message || String(error),
           true
         );
@@ -1549,10 +1557,10 @@ function renderIncidentNte(parent, incident, padSetup) {
       try {
         await api('startIncidentEvaluation', incident.id);
         await loadIncidentReview();
-        await openIncidentCase(incident.id);
+        await (ui.reload || openIncidentCase)(incident.id);
       } catch (error) {
         setIncidentFeedback(
-          document.getElementById('ir-case-feedback'),
+          ui.feedback || document.getElementById('ir-case-feedback'),
           error.message || String(error),
           true
         );
@@ -1563,28 +1571,7 @@ function renderIncidentNte(parent, incident, padSetup) {
   parent.appendChild(section);
 }
 
-async function openIncidentCase(incidentId) {
-  let incident = await api('getIncidentCase', incidentId);
-  if (
-    incident.canReview &&
-    incident.status === 'EXPLANATION SENT' &&
-    incident.explanations.length
-  ) {
-    try {
-      await api('startIncidentEvaluation', incident.id);
-    } catch (error) {
-      const current = await api('getIncidentCase', incident.id);
-      if (current.status !== 'EVALUATION') throw error;
-    }
-    incident = await api('getIncidentCase', incident.id);
-  }
-  if (incident.canReview && incident.status === 'EVALUATION')
-    incidentCodeProvisions = await api('listIncidentCodeProvisions');
-  const body = document.getElementById('ir-case-body');
-  const padSetup = [];
-  body.replaceChildren();
-  document.getElementById('ir-case-title').textContent = incident.caseNumber;
-
+function renderIncidentReport(body, incident) {
   const summary = incidentElement('div', 'incident-case-grid');
   [
     ['Status', incident.status],
@@ -1635,6 +1622,30 @@ async function openIncidentCase(incidentId) {
     evidenceSection.appendChild(list);
   }
   body.appendChild(evidenceSection);
+}
+
+async function openIncidentCase(incidentId) {
+  let incident = await api('getIncidentCase', incidentId);
+  if (
+    incident.canReview &&
+    incident.status === 'EXPLANATION SENT' &&
+    incident.explanations.length
+  ) {
+    try {
+      await api('startIncidentEvaluation', incident.id);
+    } catch (error) {
+      const current = await api('getIncidentCase', incident.id);
+      if (current.status !== 'EVALUATION') throw error;
+    }
+    incident = await api('getIncidentCase', incident.id);
+  }
+  if (incident.canReview && incident.status === 'EVALUATION')
+    incidentCodeProvisions = await api('listIncidentCodeProvisions');
+  const body = document.getElementById('ir-case-body');
+  const padSetup = [];
+  body.replaceChildren();
+  document.getElementById('ir-case-title').textContent = incident.caseNumber;
+  renderIncidentReport(body, incident);
 
   const signatures = incidentElement('section', 'incident-case-section');
   signatures.appendChild(
@@ -2000,23 +2011,6 @@ function renderIncidentRows(rows, targetId, emptyId) {
       incident.incidentDate,
       incident.status
     ].forEach((value) => row.appendChild(incidentElement('td', '', value)));
-    if (targetId === 'ir-track-rows') {
-      let deadlineLabel = '—';
-      if (incident.explanationDeadline) {
-        deadlineLabel = incident.explanationOverdue
-          ? `Overdue · ${incident.explanationDeadline}`
-          : Number(incident.daysRemaining) === 0
-            ? `Due today · ${incident.explanationDeadline}`
-            : `${incident.daysRemaining} working days · ${incident.explanationDeadline}`;
-      }
-      row.appendChild(
-        incidentElement(
-          'td',
-          incident.explanationOverdue ? 'errs' : '',
-          deadlineLabel
-        )
-      );
-    }
     const action = incidentElement('td');
     const open = incidentElement('button', 'ghost', 'Open');
     open.type = 'button';
@@ -2028,13 +2022,9 @@ function renderIncidentRows(rows, targetId, emptyId) {
 }
 
 async function loadIncidentTrack() {
-  const rows = await api('listIncidentsForTrack');
-  renderIncidentRows(rows, 'ir-track-rows', 'ir-track-empty');
-  if (pendingIncidentCaseId) {
-    const id = pendingIncidentCaseId;
-    pendingIncidentCaseId = null;
-    await openIncidentCase(id);
-  }
+  const requested = pendingIncidentCaseId;
+  pendingIncidentCaseId = null;
+  await window.IncidentTrack.load(requested);
 }
 
 async function loadIncidentHistory() {
@@ -2077,8 +2067,11 @@ async function refreshIncidentBadges() {
     if (!badge) return;
     const value = Number(count) || 0;
     badge.textContent = value > 99 ? '99+' : String(value);
-    badge.hidden = value === 0;
-    badge.parentElement.title = `${value} case${value === 1 ? '' : 's'} need attention`;
+    badge.hidden =
+      value === 0 ||
+      (badge.id === 'incident-track-count' &&
+        ['HR', 'ADMIN'].includes(session.role));
+    badge.parentElement.title = `${value} active case${value === 1 ? '' : 's'}`;
   });
 }
 
@@ -2098,6 +2091,15 @@ window.openIncidentCase = openIncidentCase;
 window.openIncidentRoute = openIncidentRoute;
 window.refreshIncidentBadges = refreshIncidentBadges;
 window.selectIncidentCase = (incidentId) => openIncidentCase(incidentId);
+window.IncidentCaseUI = {
+  renderReport: renderIncidentReport,
+  renderSignature: renderIncidentSignature,
+  renderNte: renderIncidentNte,
+  renderDecision: renderIncidentDecision,
+  readEvidenceFiles: readIncidentEvidenceFiles,
+  element: incidentElement,
+  feedback: setIncidentFeedback
+};
 
 async function loadIncidentCodeOfConduct() {
   incidentCodeProvisions = await api('listIncidentCodeProvisions');

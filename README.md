@@ -13,6 +13,9 @@ This version keeps the existing dashboard screens and browser behavior, serves t
 - `public/` contains the browser application: `index.html`, CSS, JavaScript, and HTML view fragments.
 - `public/views/` contains page markup; `public/js/` contains page controllers and shared navigation behavior; `public/css/` contains application styles.
 - `public/views/incident-management/` and `public/js/incident-management/` contain the Incident Management interface and its role-based navigation/controller code.
+- `public/js/incident-management/Track.js` owns the inline case selector, progress tracker, and stage panels. It reuses the case document/signature renderers and checks a small version response before reloading case documents. Viewing Track does not start HR evaluation; management actions open Review.
+- `server/services/incident-management/Tracking.js` builds stage dates and closure paths and defines the involvement scope shared by Track, History, and badge queries. STAFF/HEAD badges count active involved cases until closure; HR/ADMIN badges belong to Review.
+- `tests/IncidentTracking.test.js` covers case access, stage progression, early closure, persistent badges, and unauthorized actions. Run it with the existing suite using `npm.cmd test`.
 - `shared/` contains form templates and status rules used by both the browser and the API.
 - `server/` contains the Node.js API, grouped into `config/`, `db/`, `middleware/`, `services/`, and `utils/`. `config/` separates application settings, employee schema, and role permissions; domain workflows belong in `services/`.
 - `scripts/` contains setup and administrator command-line tools.
