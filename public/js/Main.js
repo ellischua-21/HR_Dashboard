@@ -122,6 +122,27 @@ const PALETTE = [
 ];
 let charts = {},
   session = null;
+let activeIncidentCaseCount = 0;
+
+function positionIncidentNotificationDot() {
+  const dot = document.getElementById('incident-management-count');
+  const summary = dot?.closest('summary');
+  const sidebar = document.getElementById('side');
+  if (!dot || !summary || !sidebar || dot.hidden) return;
+  const summaryRect = summary.getBoundingClientRect();
+  const sidebarRect = sidebar.getBoundingClientRect();
+  dot.style.left = `${sidebarRect.right}px`;
+  dot.style.top = `${summaryRect.top + 7}px`;
+}
+
+window.updateIncidentNotificationDot = (activeCount) => {
+  const dot = document.getElementById('incident-management-count');
+  if (!dot) return;
+  activeIncidentCaseCount = Number(activeCount) || 0;
+  const group = dot.closest('details');
+  dot.hidden = activeIncidentCaseCount === 0 || Boolean(group?.open);
+  if (!dot.hidden) positionIncidentNotificationDot();
+};
 
 async function init() {
   setupBackToTop();
@@ -191,10 +212,13 @@ async function init() {
         group.classList.add('incident-nav-group');
         const count = document.createElement('span');
         count.id = 'incident-management-count';
-        count.className = 'nav-count';
+        count.className = 'nav-count incident-notification-dot';
         count.hidden = true;
         count.setAttribute('aria-label', 'active incident cases');
         summary.appendChild(count);
+        group.addEventListener('toggle', () =>
+          window.updateIncidentNotificationDot(activeIncidentCaseCount)
+        );
       }
       group.appendChild(summary);
       const children = document.createElement('div');
@@ -262,6 +286,10 @@ async function init() {
       );
       visibleNavItems.forEach(addNavLink);
     }
+    $('nav').addEventListener('scroll', positionIncidentNotificationDot, {
+      passive: true
+    });
+    window.addEventListener('resize', positionIncidentNotificationDot);
     $('menuBtn').onclick = () => document.body.classList.toggle('open');
     $('logoutBtn').onclick = async () => {
       try {

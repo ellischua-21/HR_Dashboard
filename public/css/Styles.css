@@ -89,8 +89,21 @@ body {
   float: none;
   margin-left: auto;
 }
-#nav .incident-nav-group > summary::after {
-  margin-left: 8px;
+#nav .incident-nav-group > summary {
+  position: relative;
+}
+#nav .incident-nav-group > summary .incident-notification-dot {
+  position: fixed;
+  z-index: 1000;
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  margin: 0;
+  padding: 0;
+  border-radius: 50%;
+  line-height: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
 }
 #nav .nav-group > summary::after {
   content: '▾';
