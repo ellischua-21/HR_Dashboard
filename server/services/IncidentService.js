@@ -25,6 +25,8 @@ const {
 
 const {
   readCodeProvisions,
+  readMatrix,
+  matrixActionForOccurrence,
   snapshotCasePolicy
 } = require('./incident-management/Conduct');
 const { listIncidentsForHistory } = require('./incident-management/Archive');
@@ -1365,9 +1367,20 @@ async function saveIncidentEvaluation(req, incidentId, input = {}) {
         [incident.reported_employee_email, severity, id]
       );
       previousOffenses = Number(prior.total || 0);
+      const matrix = await readMatrix(connection);
+      const matrixAction = matrixActionForOccurrence(
+        matrix,
+        severity,
+        previousOffenses + 1
+      );
+      if (!matrixAction)
+        throw httpError(
+          `No corrective action is configured for ${severity} occurrence ${previousOffenses + 1}. Update the Code of Conduct matrix.`,
+          409
+        );
       recommendedAction = normalizeText(
-        String(input.recommendedAction || ''),
-        'Recommended corrective action',
+        String(matrixAction.correctiveAction || ''),
+        'Matrix corrective action',
         191
       );
     } else if (input.recommendedAction) {
@@ -1400,7 +1413,7 @@ async function saveIncidentEvaluation(req, incidentId, input = {}) {
         reference,
         severity || null,
         previousOffenses,
-        null,
+        recommendedAction || null,
         recommendedAction || null,
         justification,
         remarks,
@@ -1447,9 +1460,7 @@ async function issueIncidentDecision(req, incidentId, input = {}) {
     'Decision reasons',
     10000
   );
-  const effectiveDate = input.effectiveDate
-    ? normalizeDate(input.effectiveDate, 'effective date')
-    : null;
+  const effectiveDate = null;
   if (!Number.isSafeInteger(id) || id < 1)
     throw httpError('Choose a valid case.', 400);
   if (
@@ -1514,8 +1525,14 @@ async function issueIncidentDecision(req, incidentId, input = {}) {
             400
           );
       }
-      if (['SUSPENSION', 'TERMINATION'].includes(outcome) && !effectiveDate)
-        throw httpError('Enter the effective date for this decision.', 400);
+      if (
+        evaluation.recommended_action &&
+        finalAction !== evaluation.recommended_action
+      )
+        throw httpError(
+          'Use the corrective action recorded in the evaluation.',
+          409
+        );
     }
     const [insert] = await connection.execute(
       `INSERT INTO incident_decisions
@@ -2978,6 +2995,8 @@ async function listPendingIncidentNotifications(req) {
         ))
         OR (n.notification_type = 'INVESTIGATION_STARTED'
           AND LOWER(i.reported_employee_email) = LOWER(?))
+        OR (n.notification_type = 'DECISION_ISSUED'
+          AND LOWER(i.reported_employee_email) = LOWER(?))
         OR (n.notification_type LIKE 'INFO_REQ_%'
           AND information_request.status = 'PENDING'
           AND LOWER(information_request.recipient_email) = LOWER(?)
@@ -2985,6 +3004,7 @@ async function listPendingIncidentNotifications(req) {
       )
       AND ${scope.sql} ORDER BY n.created_at, n.id LIMIT 100`,
     [
+      user.email,
       user.email,
       user.email,
       user.email,

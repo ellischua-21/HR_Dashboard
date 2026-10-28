@@ -21,7 +21,7 @@ function createNteDocumentHtml(incident, nte) {
   <style>@page{size:letter;margin:22mm}body{font:14px Arial,sans-serif;color:#172033;line-height:1.5;max-width:780px;margin:24px auto}h1{text-align:center;font-size:22px}h2{font-size:16px;border-bottom:1px solid #999;padding-bottom:5px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:8px}.label{font-weight:700}pre{font:inherit;white-space:pre-wrap}.signature{max-width:240px;max-height:80px}button{padding:8px 14px}@media print{button{display:none}body{margin:0}}</style></head><body>
   <button onclick="window.print()">Print / Save as PDF</button><h1>NOTICE TO EXPLAIN</h1>
   <div class="meta"><div><span class="label">Case Number:</span> ${escapeIncidentHtml(incident.caseNumber)}</div><div><span class="label">Date Issued:</span> ${escapeIncidentHtml(nte.issuanceDate)}</div>
-  <div><span class="label">Employee:</span> ${escapeIncidentHtml(incident.reportedEmployeeName)}</div><div><span class="label">Employee ID:</span> ${escapeIncidentHtml(incident.reportedEmployeeId)}</div>
+  <div><span class="label">Directed to:</span> ${escapeIncidentHtml(incident.reportedEmployeeName)} (${escapeIncidentHtml(incident.reportedEmployeeEmail)})</div><div><span class="label">Employee ID:</span> ${escapeIncidentHtml(incident.reportedEmployeeId)}</div>
   <div><span class="label">Department:</span> ${escapeIncidentHtml(incident.reportedEmployeeDepartment)}</div><div><span class="label">Position:</span> ${escapeIncidentHtml(incident.reportedEmployeePosition)}</div>
   <div><span class="label">Date of Receipt:</span> ${escapeIncidentHtml(nte.receiptDate)}</div><div><span class="label">Response Period:</span> ${escapeIncidentHtml(nte.responseWorkingDays)} working days</div><div><span class="label">Explanation Deadline:</span> ${escapeIncidentHtml(nte.deadlineDate)}</div></div>
   <h2>Incident Details</h2><div class="meta"><div><span class="label">Subject:</span> ${escapeIncidentHtml(incident.subject)}</div><div><span class="label">Date:</span> ${escapeIncidentHtml(incident.incidentDate)}</div><div><span class="label">Location:</span> ${escapeIncidentHtml(incident.location)}</div><div><span class="label">Time:</span> ${escapeIncidentHtml(String(incident.incidentTime).slice(0, 5))}</div></div><pre>${escapeIncidentHtml(incident.description)}</pre>
@@ -29,10 +29,6 @@ function createNteDocumentHtml(incident, nte) {
   <h2>Supporting Evidence</h2><ul>${evidence || '<li>None attached</li>'}</ul>
   <h2>Authorized HR Signatory</h2><p>${escapeIncidentHtml(nte.signerName)} (${escapeIncidentHtml(nte.signerEmail)})</p>${nte.signature ? `<img class="signature" src="${nte.signature}" alt="HR signature">` : ''}
   <p>Please provide your explanation by the deadline stated above. Issuance of this notice does not establish that an allegation is true.</p></body></html>`;
-}
-
-function downloadIncidentHtml(filename, html) {
-  window.AppUI.download(filename, html, 'text/html;charset=utf-8');
 }
 
 function openNtePreview(incident, nte) {
@@ -106,6 +102,6 @@ function createDecisionDocumentHtml(incident, decision) {
     <p><strong>Case Number:</strong> ${escapeIncidentHtml(incident.caseNumber)}</p><p><strong>Employee:</strong> ${escapeIncidentHtml(incident.reportedEmployeeName)} (${escapeIncidentHtml(incident.reportedEmployeeId)})</p>
     <p><strong>Decision issued:</strong> ${escapeIncidentHtml(decision.issuedAt)}</p><h2>Evaluation Findings</h2><p><strong>Finding:</strong> ${decision.outcome === 'NO_VIOLATION' ? 'No Violation Established' : 'Violation Established'}</p><pre>${escapeIncidentHtml(decision.evaluationFindings || '')}</pre>
     ${decision.outcome !== 'NO_VIOLATION' ? `<p><strong>Violation:</strong> ${escapeIncidentHtml([decision.violationTitle, decision.codeReference, decision.severity].filter(Boolean).join(' · '))}</p>` : ''}
-    <h2>Approved Decision</h2><p><strong>Outcome:</strong> ${escapeIncidentHtml(decision.outcomeLabel || decision.outcome.replaceAll('_', ' '))}</p>${decision.finalAction ? `<p><strong>Corrective action:</strong> ${escapeIncidentHtml(decision.finalAction)}</p>` : ''}${decision.effectiveDate ? `<p><strong>Effective date:</strong> ${escapeIncidentHtml(decision.effectiveDate)}</p>` : ''}<pre>${escapeIncidentHtml(decision.decisionReason)}</pre>
+    <h2>Approved Decision</h2><p><strong>Outcome:</strong> ${escapeIncidentHtml(decision.outcomeLabel || decision.outcome.replaceAll('_', ' '))}</p>${decision.finalAction ? `<p><strong>Corrective action:</strong> ${escapeIncidentHtml(decision.finalAction)}</p>` : ''}<pre>${escapeIncidentHtml(decision.decisionReason)}</pre>
     <h2>Authorized Approval</h2><p>${escapeIncidentHtml(decision.approverName)} (${escapeIncidentHtml(decision.approverEmail)})</p>${signature}<p><strong>Delivered:</strong> ${escapeIncidentHtml(decision.deliveredAt)}</p></body></html>`;
 }

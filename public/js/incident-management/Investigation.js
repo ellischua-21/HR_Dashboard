@@ -200,6 +200,13 @@
         feedbackMessage.hidden = false;
         return;
       }
+      if (
+        !(await window.appConfirm(
+          `Send information requests to ${requests.length} employee${requests.length === 1 ? '' : 's'}?`,
+          { title: 'Send information requests', confirmText: 'Send requests' }
+        ))
+      )
+        return;
       send.disabled = true;
       feedbackMessage.hidden = true;
       try {

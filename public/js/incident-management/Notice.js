@@ -1,5 +1,5 @@
 // NTE drafting, receipt, deadlines, and employee explanations.
-function renderIncidentNte(parent, incident, padSetup, ui = {}) {
+function renderIncidentNte(parent, incident, ui = {}) {
   if (
     !incident.nte &&
     !(
@@ -10,6 +10,13 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
     return;
   const section = incidentElement('section', 'incident-case-section');
   section.appendChild(incidentElement('h3', '', 'Notice to Explain'));
+  section.appendChild(
+    incidentElement(
+      'p',
+      'note',
+      `Directed to: ${incident.reportedEmployeeName} (${incident.reportedEmployeeEmail})`
+    )
+  );
   const employeeCanAccess =
     incident.reportedEmployeeEmail.toLowerCase() ===
     incident.currentUserEmail.toLowerCase();
@@ -26,14 +33,7 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
     const view = incidentElement('button', 'ghost', 'View NTE');
     view.type = 'button';
     view.onclick = () => openNtePreview(incident, nte);
-    const download = incidentElement('button', 'ghost', 'Download NTE');
-    download.type = 'button';
-    download.onclick = () =>
-      downloadIncidentHtml(
-        `${incident.caseNumber}-NTE.html`,
-        createNteDocumentHtml(incident, nte)
-      );
-    section.append(view, download);
+    section.appendChild(view);
     (nte.evidence || []).forEach((file) => {
       const link = incidentElement(
         'a',
@@ -71,6 +71,7 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
       toggleEditor.textContent = editor.hidden
         ? 'Prepare NTE'
         : 'Hide NTE form';
+      if (!editor.hidden) window.requestAnimationFrame(initializeNtePad);
     };
     const allegation = incidentElement('textarea');
     allegation.rows = 5;
@@ -132,6 +133,9 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
       'Authorized HR signatory signature'
     );
     let ntePad = null;
+    const initializeNtePad = () => {
+      if (!ntePad) ntePad = window.createSignaturePad(signatureCanvas, clear);
+    };
     const clear = incidentElement('button', 'ghost', 'Clear signature');
     clear.type = 'button';
     const signatureControls = incidentElement('div', 'actions');
@@ -193,9 +197,17 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
     issue.onclick = async () => {
       issue.disabled = true;
       try {
+        initializeNtePad();
         const signature = ntePad.toDataURL();
         if (!signature)
           throw new Error('Add the authorized HR signature before issuing.');
+        if (
+          !(await window.appConfirm(
+            `Issue this Notice to Explain to ${incident.reportedEmployeeName}?`,
+            { title: 'Issue Notice to Explain', confirmText: 'Issue NTE' }
+          ))
+        )
+          return;
         const result = await api('issueIncidentNte', incident.id, {
           ...(await values()),
           signature
@@ -227,9 +239,6 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
       feedback
     );
     section.append(toggleEditor, editor);
-    padSetup.push(() => {
-      ntePad = window.createSignaturePad(signatureCanvas, clear);
-    });
   }
 
   if (employeeCanAccess && incident.status === 'NTE ISSUED') {
@@ -335,18 +344,6 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
         ),
         incidentElement('p', 'incident-case-text', record.explanation)
       );
-      const download = incidentElement(
-        'button',
-        'ghost',
-        'Download explanation'
-      );
-      download.type = 'button';
-      download.onclick = () =>
-        downloadIncidentHtml(
-          `${incident.caseNumber}-explanation.html`,
-          `<!doctype html><meta charset="utf-8"><title>Employee Explanation</title><h1>Employee Explanation — ${escapeIncidentHtml(incident.caseNumber)}</h1><p>Submitted ${escapeIncidentHtml(record.submittedAt)}</p><pre style="white-space:pre-wrap;font:16px Arial">${escapeIncidentHtml(record.explanation)}</pre>`
-        );
-      records.appendChild(download);
       (record.evidence || []).forEach((file) => {
         const link = incidentElement('a', '', file.fileName);
         link.href = `${API_BASE}/incidents/explanation-evidence/${file.id}`;
@@ -371,14 +368,6 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
         ),
         incidentElement('p', 'incident-case-text', addendum.statement)
       );
-      const download = incidentElement('button', 'ghost', 'Download statement');
-      download.type = 'button';
-      download.onclick = () =>
-        downloadIncidentHtml(
-          `${incident.caseNumber}-additional-statement-${addendum.id}.html`,
-          `<!doctype html><meta charset="utf-8"><title>Additional Statement</title><h1>Additional Statement — ${escapeIncidentHtml(incident.caseNumber)}</h1><p>Submitted ${escapeIncidentHtml(addendum.submittedAt)}</p><pre style="white-space:pre-wrap;font:16px Arial">${escapeIncidentHtml(addendum.statement)}</pre>`
-        );
-      addendaSection.appendChild(download);
       (addendum.evidence || []).forEach((file) => {
         const link = incidentElement('a', '', file.fileName);
         link.href = `${API_BASE}/incidents/explanation-addendum-evidence/${file.id}`;
@@ -444,111 +433,5 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
     section.appendChild(addendumForm);
   }
 
-  if (incident.canReview && incident.status === 'NTE ISSUED') {
-    const hr = incidentElement('section', 'incident-case-section');
-    hr.appendChild(incidentElement('h4', '', 'HR response tracking'));
-    const extendDate = incidentElement('input');
-    extendDate.type = 'date';
-    extendDate.value = incident.nte?.deadlineDate || '';
-    const extendReason = incidentElement('textarea');
-    extendReason.rows = 2;
-    extendReason.maxLength = 2000;
-    extendReason.placeholder = 'Approved extension reason';
-    const extend = incidentElement(
-      'button',
-      'ghost',
-      'Record approved extension'
-    );
-    extend.type = 'button';
-    extend.onclick = async () => {
-      try {
-        const result = await api(
-          'extendIncidentDeadline',
-          incident.id,
-          extendDate.value,
-          extendReason.value
-        );
-        await (ui.reload || openIncidentCase)(incident.id);
-        setIncidentFeedback(
-          ui.feedback || document.getElementById('ir-case-feedback'),
-          `Deadline extended to ${result.deadlineDate}.`
-        );
-      } catch (error) {
-        setIncidentFeedback(
-          ui.feedback || document.getElementById('ir-case-feedback'),
-          error.message || String(error),
-          true
-        );
-      }
-    };
-    hr.append(
-      incidentElement('label', '', 'New explanation deadline'),
-      extendDate,
-      extendReason,
-      extend
-    );
-    const channel = incidentElement('input');
-    channel.maxLength = 191;
-    channel.placeholder = 'Authorized channel';
-    const receivedAt = incidentElement('input');
-    receivedAt.type = 'datetime-local';
-    const outsideText = incidentElement('textarea');
-    outsideText.rows = 3;
-    outsideText.maxLength = 20000;
-    outsideText.placeholder = 'Explanation received through the other channel';
-    const outsideFiles = incidentElement('input');
-    outsideFiles.type = 'file';
-    outsideFiles.multiple = true;
-    const recordOutside = incidentElement(
-      'button',
-      'ghost',
-      'Record external explanation'
-    );
-    recordOutside.type = 'button';
-    recordOutside.onclick = async () => {
-      try {
-        await api(
-          'recordExternalIncidentExplanation',
-          incident.id,
-          outsideText.value,
-          channel.value,
-          receivedAt.value,
-          await readIncidentEvidenceFiles(outsideFiles.files)
-        );
-        await window.refreshInboxBadge().catch(() => {});
-        await (ui.reload || openIncidentCase)(incident.id);
-        setIncidentFeedback(
-          ui.feedback || document.getElementById('ir-case-feedback'),
-          'Explanation recorded.'
-        );
-      } catch (error) {
-        setIncidentFeedback(
-          ui.feedback || document.getElementById('ir-case-feedback'),
-          error.message || String(error),
-          true
-        );
-      }
-    };
-    hr.append(channel, receivedAt, outsideText, outsideFiles, recordOutside);
-    section.appendChild(hr);
-  }
-
-  if (incident.canReview && incident.status === 'EXPLANATION SENT') {
-    const start = incidentElement('button', '', 'Start evaluation');
-    start.type = 'button';
-    start.onclick = async () => {
-      try {
-        await api('startIncidentEvaluation', incident.id);
-        await (ui.reload || openIncidentCase)(incident.id);
-      } catch (error) {
-        setIncidentFeedback(
-          ui.feedback || document.getElementById('ir-case-feedback'),
-          error.message || String(error),
-          true
-        );
-      }
-    };
-    section.appendChild(start);
-  }
   parent.appendChild(section);
 }

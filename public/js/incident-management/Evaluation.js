@@ -48,17 +48,6 @@ function renderIncidentDecision(parent, incident, ui = {}) {
         `Approved corrective action: ${decision.finalAction}`
       )
     );
-  if (decision.effectiveDate)
-    section.appendChild(
-      incidentElement('p', '', `Effective date: ${decision.effectiveDate}`)
-    );
-  const download = incidentElement('button', 'ghost', 'Download decision');
-  download.type = 'button';
-  download.onclick = () =>
-    downloadIncidentHtml(
-      `${incident.caseNumber}-final-decision.html`,
-      createDecisionDocumentHtml(incident, decision)
-    );
   const preview = incidentElement('button', 'ghost', 'View / Print decision');
   preview.type = 'button';
   preview.onclick = () => {
@@ -68,7 +57,7 @@ function renderIncidentDecision(parent, incident, ui = {}) {
     windowRef.document.write(createDecisionDocumentHtml(incident, decision));
     windowRef.document.close();
   };
-  section.append(download, preview);
+  section.appendChild(preview);
   if (incident.canReview && incident.status === 'DECISION ISSUED') {
     const reason = incidentElement('textarea');
     reason.rows = 3;
@@ -216,6 +205,7 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
   recommendation.maxLength = 191;
   recommendation.placeholder = 'Corrective action';
   recommendation.value = incident.evaluation?.recommendedAction || '';
+  recommendation.readOnly = true;
   const remarks = incidentElement('textarea');
   remarks.rows = 3;
   remarks.maxLength = 5000;
@@ -244,26 +234,67 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
     }
     updatePriorOffenseCount();
   };
-  const updatePriorOffenseCount = () => {
+  let matrixRequest;
+  const updatePriorOffenseCount = async () => {
     context.replaceChildren();
-    if (finding.value !== 'SUBSTANTIATED' || !severity.value) return;
+    if (finding.value !== 'SUBSTANTIATED' || !severity.value) {
+      recommendation.value = '';
+      return;
+    }
+    const selectedSeverity = severity.value;
     const relevant = (incident.disciplinaryHistory || []).filter(
-      (item) => item.severity === severity.value
+      (item) => item.severity === selectedSeverity
     );
     context.appendChild(
       incidentElement(
         'p',
         'note',
-        `Finalized prior offenses at this severity: ${relevant.length}.`
+        `Finalized prior offenses at this severity: ${relevant.length}. Applying matrix occurrence ${relevant.length + 1}.`
       )
     );
+    recommendation.value = '';
+    recommendation.placeholder = 'Loading matrix recommendation';
+    try {
+      matrixRequest ||= api('getIncidentCodeGuide').then((data) => data.matrix);
+      const matrix = await matrixRequest;
+      if (
+        finding.value !== 'SUBSTANTIATED' ||
+        severity.value !== selectedSeverity
+      )
+        return;
+      const matchingRows = (matrix || [])
+        .filter((row) => row.severity === selectedSeverity)
+        .sort(
+          (left, right) => Number(left.occurrence) - Number(right.occurrence)
+        );
+      const occurrence = relevant.length + 1;
+      const action =
+        matchingRows.find((row) => Number(row.occurrence) === occurrence) ||
+        matchingRows
+          .filter((row) => Number(row.occurrence) <= occurrence)
+          .at(-1);
+      recommendation.value = action?.correctiveAction || '';
+      recommendation.placeholder = action
+        ? 'Corrective action from the Code of Conduct matrix'
+        : 'No action is configured for this occurrence';
+      if (!action)
+        context.appendChild(
+          incidentElement(
+            'p',
+            'errs',
+            'No corrective action is configured for this occurrence. Update the Code of Conduct matrix.'
+          )
+        );
+    } catch (error) {
+      recommendation.placeholder = 'Unable to load the Code of Conduct matrix';
+      context.appendChild(
+        incidentElement('p', 'errs', error.message || String(error))
+      );
+    }
   };
   finding.addEventListener('change', updateFindingFields);
   severity.addEventListener('change', updatePriorOffenseCount);
   updateFindingFields();
-  const effectiveDate = incidentElement('input');
-  effectiveDate.type = 'date';
-  field('Effective date (for suspension or termination)', effectiveDate);
   const authorized = incidentElement(
     'p',
     'note',
@@ -322,8 +353,8 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
     }
     if (
       !(await window.appConfirm(
-        'Process and issue this evaluation to everyone authorized on the case?',
-        { title: 'Process evaluation', confirmText: 'Process and issue' }
+        'Approve and issue the final decision using this evaluation?',
+        { title: 'Issue final decision', confirmText: 'Issue decision' }
       ))
     )
       return;
@@ -351,7 +382,6 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
       await api('issueIncidentDecision', incident.id, {
         outcome,
         finalAction: action,
-        effectiveDate: effectiveDate.value,
         decisionReason: [findings.value, remarks.value]
           .filter((value) => value.trim())
           .join('\n\n'),

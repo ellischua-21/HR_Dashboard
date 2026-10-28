@@ -61,6 +61,16 @@ async function readMatrix(executor = pool) {
   );
   return parse(row.matrix);
 }
+function matrixActionForOccurrence(matrix, severity, occurrence) {
+  const rows = (Array.isArray(matrix) ? matrix : [])
+    .filter((row) => row.severity === severity)
+    .sort((left, right) => Number(left.occurrence) - Number(right.occurrence));
+  return (
+    rows.find((row) => Number(row.occurrence) === Number(occurrence)) ||
+    rows.filter((row) => Number(row.occurrence) <= Number(occurrence)).at(-1) ||
+    null
+  );
+}
 async function getIncidentCodeGuide(req) {
   const user = await requirePerm(req, 'inbox.read');
   return { matrix: await readMatrix(), canManage: isPolicyManager(user) };
@@ -144,6 +154,8 @@ async function snapshotCasePolicy(
 
 module.exports = {
   readCodeProvisions,
+  readMatrix,
+  matrixActionForOccurrence,
   getIncidentCodeGuide,
   saveIncidentMatrix,
   snapshotCasePolicy

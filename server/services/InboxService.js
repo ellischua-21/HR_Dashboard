@@ -128,11 +128,10 @@ async function getInbox(req) {
   );
   const signatureCases = new Set(
     incidentNotifications
-      .filter(
-        (notification) =>
-          ['EMPLOYEE_SIGNATURE', 'HEAD_SIGNATURE'].includes(
-            notification.notificationType
-          )
+      .filter((notification) =>
+        ['EMPLOYEE_SIGNATURE', 'HEAD_SIGNATURE'].includes(
+          notification.notificationType
+        )
       )
       .map((notification) => Number(notification.incidentId))
   );
@@ -149,8 +148,7 @@ async function getInbox(req) {
     const isEmployeeSignature =
       notification.notificationType === 'EMPLOYEE_SIGNATURE' &&
       isReportedEmployee;
-    const isHeadSignature =
-      notification.notificationType === 'HEAD_SIGNATURE';
+    const isHeadSignature = notification.notificationType === 'HEAD_SIGNATURE';
     items.push({
       id: `incident-${notification.notificationId}`,
       type: 'INCIDENT',

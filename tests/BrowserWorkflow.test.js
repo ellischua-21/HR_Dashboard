@@ -270,6 +270,11 @@ test('review and NTE forms appear only after their action is selected', async ()
   };
   context.refreshInboxBadge = async () => {};
   context.refreshIncidentBadges = async () => {};
+  let signaturePadInitializations = 0;
+  context.createSignaturePad = () => {
+    signaturePadInitializations += 1;
+    return { toDataURL: () => 'data:image/png;base64,aA==' };
+  };
   const incident = {
     id: 19,
     status: 'UNDER_REVIEW',
@@ -315,8 +320,104 @@ test('review and NTE forms appear only after their action is selected', async ()
     .find((button) => button.textContent === 'Prepare NTE');
   const nteEditor = nteRoot.querySelectorAll('.incident-nte-editor')[0];
   assert.equal(nteEditor.hidden, true);
+  assert.equal(signaturePadInitializations, 0);
   await nteToggle.click();
   assert.equal(nteEditor.hidden, false);
+  assert.equal(signaturePadInitializations, 1);
+});
+
+test('issued NTE identifies the recipient and omits HR response tracking', () => {
+  const browser = createBrowser();
+  browser.loadDashboard();
+  const { context, document } = browser;
+  const parent = document.createElement('section');
+  context.IncidentCaseUI.renderNte(
+    parent,
+    {
+      id: 2,
+      caseNumber: 'IR-2',
+      subject: 'Test incident',
+      status: 'NTE ISSUED',
+      canReview: true,
+      currentUserEmail: 'hr@example.com',
+      reportedEmployeeName: 'Reported Employee',
+      reportedEmployeeEmail: 'employee@example.com',
+      nte: {
+        status: 'ISSUED',
+        issuanceDate: '2026-10-28',
+        receiptDate: '2026-10-28',
+        deadlineDate: '2026-11-04',
+        daysRemaining: 5,
+        evidence: []
+      },
+      explanations: [],
+      explanationAddenda: []
+    },
+    [],
+    {}
+  );
+  assert.ok(
+    parent
+      .querySelectorAll('p')
+      .some((paragraph) =>
+        paragraph.textContent.includes(
+          'Directed to: Reported Employee (employee@example.com)'
+        )
+      )
+  );
+  assert.equal(parent.textContent.includes('HR response tracking'), false);
+  assert.equal(
+    parent
+      .querySelectorAll('button')
+      .some((button) => /Download|Start evaluation/.test(button.textContent)),
+    false
+  );
+});
+
+test('evaluation corrective action is filled from severity and prior finalized violations', async () => {
+  const browser = createBrowser();
+  browser.loadDashboard();
+  const { context, document } = browser;
+  context.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      matrix: [
+        {
+          severity: 'Light',
+          occurrence: 1,
+          correctiveAction: 'Written Warning'
+        },
+        {
+          severity: 'Light',
+          occurrence: 2,
+          correctiveAction: '4 days Suspension'
+        }
+      ]
+    })
+  });
+  const parent = document.createElement('section');
+  context.IncidentCaseUI.renderEvaluation(
+    parent,
+    {
+      id: 11,
+      status: 'EVALUATION',
+      canReview: true,
+      currentUserEmail: 'hr@example.com',
+      evaluation: null,
+      disciplinaryHistory: [{ severity: 'Light' }]
+    },
+    [],
+    {}
+  );
+  const [finding, severity] = parent.querySelectorAll('select');
+  const correctiveAction = parent.querySelectorAll('input')[0];
+  finding.value = 'SUBSTANTIATED';
+  await finding.trigger('change');
+  severity.value = 'Light';
+  await severity.trigger('change');
+  for (let index = 0; index < 5; index += 1) await Promise.resolve();
+  assert.equal(correctiveAction.value, '4 days Suspension');
+  assert.equal(correctiveAction.readOnly, true);
 });
 
 test('Track supplies its reload and visible feedback to decision controls', async () => {

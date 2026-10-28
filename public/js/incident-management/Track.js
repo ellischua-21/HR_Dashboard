@@ -220,9 +220,9 @@
         waitingForRequestedInformation
       )
     ) {
-      ui.renderNte(content, view, pads, controls);
+      ui.renderNte(content, view, controls);
     } else if (incident.nte?.status === 'ISSUED') {
-      ui.renderNte(content, view, pads, controls);
+      ui.renderNte(content, view, controls);
     } else if (
       ['NTE ISSUED', 'EXPLANATION SENT', 'EVALUATION'].includes(incident.status)
     ) {

@@ -194,6 +194,50 @@ test('HR cannot issue a decision before evaluation or mutate an archived case', 
   assert.equal(rollbacks, 4);
 });
 
+test('final decision cannot override the matrix action recorded in evaluation', async (t) => {
+  const { pool } = require('../server/db/database');
+  const incidents = require('../server/services/IncidentService');
+  t.mock.method(pool, 'execute', async () => [
+    [{ email: 'hr@example.com', role: 'HR', active: 1 }]
+  ]);
+  t.mock.method(pool, 'getConnection', async () => ({
+    beginTransaction: async () => {},
+    rollback: async () => {},
+    release() {},
+    execute: async (sql) => {
+      if (sql.includes('FROM incident_reports'))
+        return [[{ id: 3, case_number: 'IR-3', status: 'EVALUATION' }]];
+      if (sql.includes('FROM incident_evaluations'))
+        return [
+          [
+            {
+              id: 8,
+              finding: 'SUBSTANTIATED',
+              rule_id: null,
+              recommended_action: '4 days Suspension'
+            }
+          ]
+        ];
+      if (sql.includes('FROM incident_decisions')) return [[]];
+      if (sql.includes('FROM incident_case_subjects')) return [[{ id: 9 }]];
+      throw new Error(`Unexpected query: ${sql}`);
+    }
+  }));
+  await assert.rejects(
+    incidents.issueIncidentDecision(
+      { session: { userEmail: 'hr@example.com' } },
+      3,
+      {
+        signature: 'data:image/png;base64,aA==',
+        outcome: 'WRITTEN_WARNING',
+        finalAction: 'Written Warning',
+        decisionReason: 'Final decision.'
+      }
+    ),
+    { status: 409, message: /corrective action recorded in the evaluation/ }
+  );
+});
+
 test('event links open Track for all roles, including closed cases', () => {
   for (const role of ['HR', 'ADMIN'])
     for (const status of [

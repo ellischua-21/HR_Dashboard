@@ -9,8 +9,25 @@ const {
 } = require('../server/services/IncidentService');
 const {
   getIncidentCodeGuide,
-  saveIncidentMatrix
+  saveIncidentMatrix,
+  matrixActionForOccurrence
 } = require('../server/services/incident-management/Conduct');
+
+test('COC matrix selects the matching offense count and caps at the final configured row', () => {
+  const matrix = [
+    { severity: 'Light', occurrence: 1, correctiveAction: 'Written Warning' },
+    { severity: 'Light', occurrence: 2, correctiveAction: '4 days Suspension' }
+  ];
+  assert.equal(
+    matrixActionForOccurrence(matrix, 'Light', 2).correctiveAction,
+    '4 days Suspension'
+  );
+  assert.equal(
+    matrixActionForOccurrence(matrix, 'Light', 5).correctiveAction,
+    '4 days Suspension'
+  );
+  assert.equal(matrixActionForOccurrence(matrix, 'Grave', 1), null);
+});
 
 test('saving the COC matrix immediately changes the guide for all roles', async (t) => {
   let role = 'HR';
@@ -167,7 +184,26 @@ test('an evaluation saves without removed violation, reference, or justification
           ]
         ];
       if (sql.includes('FROM incident_decisions')) return [[]];
-      if (sql.includes('COUNT(*)')) return [[{ total: 0 }]];
+      if (sql.includes('COUNT(*)')) return [[{ total: 1 }]];
+      if (sql.includes('SELECT matrix FROM incident_code_policy_draft'))
+        return [
+          [
+            {
+              matrix: JSON.stringify([
+                {
+                  severity: 'Light',
+                  occurrence: 1,
+                  correctiveAction: 'Written Warning'
+                },
+                {
+                  severity: 'Light',
+                  occurrence: 2,
+                  correctiveAction: '4 days Suspension'
+                }
+              ])
+            }
+          ]
+        ];
       if (sql.includes('FROM incident_case_subjects')) return [[{ id: 4 }]];
       if (sql.includes('SELECT id FROM incident_evaluations'))
         return [[{ id: 8 }]];
@@ -183,14 +219,16 @@ test('an evaluation saves without removed violation, reference, or justification
       finding: 'SUBSTANTIATED',
       findings: 'Findings reviewed.',
       severity: 'Light',
-      recommendedAction: 'Written Warning'
+      recommendedAction: 'Wrong client suggestion'
     }
   );
   assert.equal(committed, true);
-  assert.equal(result.recommendedAction, 'Written Warning');
+  assert.equal(result.recommendedAction, '4 days Suspension');
   const saved = calls.find((call) =>
     call.sql.includes('INSERT INTO incident_evaluations')
   );
   assert.equal(saved.values[11], '');
   assert.equal(saved.values[5], 'Test incident');
+  assert.equal(saved.values[9], '4 days Suspension');
+  assert.equal(saved.values[10], '4 days Suspension');
 });

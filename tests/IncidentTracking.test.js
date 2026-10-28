@@ -311,6 +311,36 @@ test('tracking versions use the signature table timestamp key', async (t) => {
   assert.equal(result.version, 'PENDING SIGNATURE:2026-10-01:0:');
 });
 
+test('reported employee receives a decision-issued popup notification', async (t) => {
+  const { pool } = require('../server/db/database');
+  const incidents = require('../server/services/IncidentService');
+  t.mock.method(pool, 'execute', async (sql, values) => {
+    if (sql.includes('FROM user_roles WHERE email'))
+      return [[{ email: 'employee@example.com', role: 'STAFF', active: 1 }]];
+    assert.match(sql, /n\.notification_type = 'DECISION_ISSUED'/);
+    assert.match(sql, /LOWER\(i\.reported_employee_email\) = LOWER\(\?\)/);
+    assert.deepEqual(values, Array(10).fill('employee@example.com'));
+    return [
+      [
+        {
+          id: 33,
+          type: 'DECISION_ISSUED',
+          incidentId: 5,
+          caseNumber: 'IR-5',
+          subject: 'Test incident',
+          status: 'DECISION ISSUED'
+        }
+      ]
+    ];
+  });
+  const notifications = await incidents.listPendingIncidentNotifications({
+    session: { userEmail: 'employee@example.com' }
+  });
+  assert.equal(notifications.length, 1);
+  assert.equal(notifications[0].title, 'Incident decision issued');
+  assert.equal(notifications[0].target, 'incident-track');
+});
+
 test('Track actions reject an unrelated signer, employee explanation, or information-request response', async (t) => {
   const { pool } = require('../server/db/database');
   const incidents = require('../server/services/IncidentService');
