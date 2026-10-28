@@ -20,6 +20,7 @@ async function reassignOrRejectPendingHrForms(
        INNER JOIN user_roles submitter ON submitter.email = f.user_email
        SET f.head_reviewer_email = ?
        WHERE f.status = 'PENDING' AND f.review_stage = 'HEAD'
+         AND f.template_key <> 'nexus-accountability'
          AND f.head_reviewer_email = ? AND submitter.role = 'HR'`,
       [newHeadEmail, oldHeadEmail]
     );
@@ -30,6 +31,7 @@ async function reassignOrRejectPendingHrForms(
     `SELECT COUNT(*) AS total FROM user_forms f
      INNER JOIN user_roles submitter ON submitter.email = f.user_email
      WHERE f.status = 'PENDING' AND f.review_stage = 'HEAD'
+       AND f.template_key <> 'nexus-accountability'
        AND f.head_reviewer_email = ? AND submitter.role = 'HR'`,
     [oldHeadEmail]
   );

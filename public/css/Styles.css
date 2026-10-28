@@ -592,6 +592,66 @@ dialog.time-record-dialog {
   border-collapse: collapse;
   table-layout: fixed;
 }
+.property-accountability-editor .time-record-table,
+.property-accountability-print-table {
+  min-width: 1180px;
+}
+.property-accountability-editor .time-record-table th:nth-child(1),
+.property-accountability-editor .time-record-table td:nth-child(1) {
+  width: 38px;
+}
+.property-accountability-editor .time-record-table th:nth-child(2),
+.property-accountability-editor .time-record-table td:nth-child(2) {
+  width: 36%;
+}
+.property-accountability-editor .time-record-table th:nth-child(3),
+.property-accountability-editor .time-record-table td:nth-child(3) {
+  width: 7%;
+}
+.property-accountability-editor .time-record-table th:nth-child(4),
+.property-accountability-editor .time-record-table td:nth-child(4) {
+  width: 12%;
+}
+.property-accountability-editor .time-record-table th:nth-child(5),
+.property-accountability-editor .time-record-table td:nth-child(5),
+.property-accountability-editor .time-record-table th:nth-child(6),
+.property-accountability-editor .time-record-table td:nth-child(6) {
+  width: 14%;
+}
+.property-accountability-editor .time-record-table th:nth-child(7),
+.property-accountability-editor .time-record-table td:nth-child(7) {
+  width: 17%;
+}
+.property-accountability-print-table th:nth-child(1),
+.property-accountability-print-table td:nth-child(1) {
+  width: 38px;
+}
+.property-accountability-print-table th:nth-child(2),
+.property-accountability-print-table td:nth-child(2) {
+  width: 36%;
+}
+.property-accountability-print-table th:nth-child(3),
+.property-accountability-print-table td:nth-child(3) {
+  width: 7%;
+}
+.property-accountability-print-table th:nth-child(4),
+.property-accountability-print-table td:nth-child(4) {
+  width: 12%;
+}
+.property-accountability-print-table th:nth-child(5),
+.property-accountability-print-table td:nth-child(5),
+.property-accountability-print-table th:nth-child(6),
+.property-accountability-print-table td:nth-child(6) {
+  width: 14%;
+}
+.property-accountability-print-table th:nth-child(7),
+.property-accountability-print-table td:nth-child(7) {
+  width: 17%;
+}
+.time-record-row-number {
+  width: 38px;
+  text-align: center !important;
+}
 .time-record-table th,
 .time-record-table td,
 .time-record-print-table th,

@@ -169,10 +169,22 @@ function validateUserForm(templateKey, data = {}) {
       : legacyRecord
         ? [legacyRecord]
         : [];
-    if (submittedRecords.length > 100)
+    const recordsToValidate =
+      submittedRecords.length === 1 &&
+      ['time-in-out', 'nexus-no-in-out'].includes(templateKey)
+        ? [
+            Object.fromEntries(
+              timeRecordField.columns.map((column) => [
+                column.name,
+                submittedRecords[0]?.[column.name] || data[column.name] || ''
+              ])
+            )
+          ]
+        : submittedRecords;
+    if (recordsToValidate.length > 100)
       errors.push('A form can include up to 100 day records.');
     const records = [];
-    submittedRecords.slice(0, 100).forEach((record, index) => {
+    recordsToValidate.slice(0, 100).forEach((record, index) => {
       const cleanRecord = {};
       timeRecordField.columns.forEach((column) => {
         const raw = String(record?.[column.name] ?? '').trim();
@@ -185,16 +197,38 @@ function validateUserForm(templateKey, data = {}) {
           !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)
         )
           errors.push(`Day record ${index + 1}: enter a valid time.`);
-        cleanRecord[column.name] = value;
+        if (column.type === 'number' && value) {
+          const number = Number(value);
+          if (
+            !Number.isFinite(number) ||
+            number < (column.min ?? Number.NEGATIVE_INFINITY) ||
+            number > (column.max ?? Number.POSITIVE_INFINITY)
+          ) {
+            errors.push(
+              `Row ${index + 1}: ${column.label} must be a valid number.`
+            );
+          } else if (column.step) {
+            const position = (number - (column.min || 0)) / column.step;
+            if (Math.abs(position - Math.round(position)) > 1e-8)
+              errors.push(
+                `Row ${index + 1}: ${column.label} has an invalid increment.`
+              );
+          }
+          cleanRecord[column.name] = number;
+        } else {
+          cleanRecord[column.name] = value;
+        }
       });
       if (!timeRecordField.columns.some((column) => cleanRecord[column.name]))
         return;
-      if (!cleanRecord.date)
-        errors.push(`Day record ${index + 1}: date is required.`);
+      timeRecordField.columns.forEach((column) => {
+        if (column.required && !cleanRecord[column.name])
+          errors.push(`Row ${index + 1}: ${column.label} is required.`);
+      });
       records.push(cleanRecord);
     });
     if (!records.length)
-      errors.push('Add at least one dated day record.');
+      errors.push('Add at least one completed row.');
     if (
       templateKey === 'time-in-out' &&
       !records.some((record) =>
@@ -280,8 +314,10 @@ async function searchFormEmployees(req, query) {
 
 function validateApprovalSignature(isHead, decision, signature, templateKey) {
   const template = FORM_TEMPLATES.find((item) => item.key === templateKey);
-  const signatureRequired =
-    isHead || !template || template.hrSignatureRequired !== false;
+  const signatureRequired = !template ||
+    (isHead
+      ? template.headSignatureRequired !== false
+      : template.hrSignatureRequired !== false);
   if (
     decision === 'APPROVED' &&
     signatureRequired &&
@@ -313,8 +349,13 @@ function formatSerialNumber(template, year, sequence) {
 }
 
 function parseForm(row) {
+  const template = FORM_TEMPLATES.find((item) => item.key === row.template_key);
   return {
     ...row,
+    review_stage:
+      template && template.headReviewRequired === false
+        ? 'HR'
+        : row.review_stage,
     form_data:
       typeof row.form_data === 'string'
         ? JSON.parse(row.form_data)
@@ -465,8 +506,11 @@ async function submitUserForm(req, templateKey, data = {}) {
   );
   if (errors.length) throw httpError(errors.join(' '), 400);
 
-  const headEmail = await getSubmissionHead(user.email, user.role);
   const template = FORM_TEMPLATES.find((item) => item.key === templateKey);
+  const headEmail =
+    template.headReviewRequired === false
+      ? null
+      : await getSubmissionHead(user.email, user.role);
   return persistUserForm(
     user.email,
     user.role,
@@ -773,7 +817,12 @@ async function reviewUserForm(
       throw httpError('This form has already been reviewed.', 409);
     if (rows[0].user_email === reviewer.email)
       throw httpError('You cannot review your own form.', 403);
-    const isHead = rows[0].review_stage === 'HEAD';
+    const template = FORM_TEMPLATES.find(
+      (item) => item.key === rows[0].template_key
+    );
+    const isHead =
+      rows[0].review_stage === 'HEAD' &&
+      template?.headReviewRequired !== false;
     if (isHead) {
       await requirePerm(req, 'forms.review');
       const mayReviewAsHead =
@@ -839,7 +888,10 @@ async function reviewUserForm(
         await connection.commit();
         return { ok: true, status: 'PENDING', reviewStage: 'HR' };
       }
-    } else if (rows[0].review_stage !== 'HR') {
+    } else if (
+      rows[0].review_stage !== 'HR' &&
+      template?.headReviewRequired !== false
+    ) {
       throw httpError(
         'This form has not yet been forwarded by its assigned Head.',
         409

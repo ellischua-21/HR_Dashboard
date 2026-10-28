@@ -488,6 +488,7 @@ function getTimeRecordRows(formData, field) {
 function createTimeRecordEditor(field, formData) {
   const section = document.createElement('section');
   section.className = 'time-record-editor';
+  if (field.showRowNumber) section.classList.add('property-accountability-editor');
   section.dataset.timeRecords = field.name;
   const heading = document.createElement('h3');
   heading.textContent = field.label;
@@ -497,6 +498,12 @@ function createTimeRecordEditor(field, formData) {
   table.className = 'time-record-table';
   const thead = document.createElement('thead');
   const header = document.createElement('tr');
+  if (field.showRowNumber) {
+    const cell = document.createElement('th');
+    cell.scope = 'col';
+    cell.textContent = '#';
+    header.appendChild(cell);
+  }
   field.columns.forEach((column) => {
     const cell = document.createElement('th');
     cell.scope = 'col';
@@ -507,11 +514,21 @@ function createTimeRecordEditor(field, formData) {
   const tbody = document.createElement('tbody');
   const addRecord = (record = {}) => {
     const row = document.createElement('tr');
+    if (field.showRowNumber) {
+      const numberCell = document.createElement('td');
+      numberCell.textContent = String(tbody.rows.length + 1);
+      numberCell.className = 'time-record-row-number';
+      row.appendChild(numberCell);
+    }
     field.columns.forEach((column) => {
       const cell = document.createElement('td');
       const input = document.createElement('input');
       input.type = column.type;
       input.value = record[column.name] || '';
+      if (column.required) input.required = true;
+      if (column.min !== undefined) input.min = String(column.min);
+      if (column.max !== undefined) input.max = String(column.max);
+      if (column.step !== undefined) input.step = String(column.step);
       input.dataset.timeRecordField = column.name;
       input.setAttribute(
         'aria-label',
@@ -553,6 +570,7 @@ function openTemplateForm(template, existingForm = null) {
   $('user-template-feedback').hidden = true;
   const fields = $('user-template-fields');
   fields.replaceChildren();
+  const deferredFields = [];
   template.fields.forEach((field) => {
     if (field.type === 'time-records') {
       fields.appendChild(
@@ -561,6 +579,10 @@ function openTemplateForm(template, existingForm = null) {
       return;
     }
     if (field.legacyTimeRecordColumn) return;
+    if (field.afterConfirmation) {
+      deferredFields.push(field);
+      return;
+    }
     const label = document.createElement('label');
     if (field.type === 'checkbox') {
       const input = document.createElement('input');
@@ -613,6 +635,8 @@ function openTemplateForm(template, existingForm = null) {
         existingForm.form_data[field.name] === undefined
           ? ''
           : String(existingForm.form_data[field.name]);
+    } else if (field.defaultToday && field.type === 'date') {
+      input.value = DateUtils.manilaDate();
     } else if (
       Object.prototype.hasOwnProperty.call(
         employeeProfile,
@@ -632,6 +656,20 @@ function openTemplateForm(template, existingForm = null) {
   confirmationInput.type = 'checkbox';
   confirmationInput.className = 'acknowledgment-checkbox';
   fields.appendChild(confirmation);
+  deferredFields.forEach((field) => {
+    const label = document.createElement('label');
+    label.className = 'form-acknowledgment';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.className = 'acknowledgment-checkbox';
+    input.name = field.name;
+    input.required = Boolean(field.required);
+    input.checked = Boolean(existingForm?.form_data?.[field.name]);
+    const text = document.createElement('span');
+    text.textContent = field.label;
+    label.append(input, text);
+    fields.appendChild(label);
+  });
   $('user-template-submit').textContent = existingForm
     ? 'Save changes'
     : 'Submit for review';
@@ -819,9 +857,10 @@ function buildGenericFormSheet(formData, metadata, template) {
   const signatures = document.createElement('div');
   signatures.className = 'leave-sheet-signatures';
   const signatureFields = [
-    ['Employee Signature', formData.signature],
-    ['Head Signature', metadata.headSignature]
+    ['Employee Signature', formData.signature]
   ];
+  if (template.headSignatureRequired !== false)
+    signatureFields.push(['Head Signature', metadata.headSignature]);
   if (template.hrSignatureRequired !== false)
     signatureFields.push(['HR Approval', metadata.hrSignature]);
   signatures.classList.toggle('two-signatures', signatureFields.length === 2);
@@ -863,6 +902,7 @@ function appendTimeRecordsToSheet(sheet, records, field) {
   scroll.className = 'time-record-print-scroll';
   const table = document.createElement('table');
   table.className = 'time-record-print-table';
+  if (field.showRowNumber) table.classList.add('property-accountability-print-table');
   const thead = document.createElement('thead');
   const header = document.createElement('tr');
   field.columns.forEach((column) => {
@@ -870,10 +910,20 @@ function appendTimeRecordsToSheet(sheet, records, field) {
     cell.textContent = column.label.toUpperCase();
     header.appendChild(cell);
   });
+  if (field.showRowNumber) {
+    const cell = document.createElement('th');
+    cell.textContent = '#';
+    header.insertBefore(cell, header.firstChild);
+  }
   thead.appendChild(header);
   const tbody = document.createElement('tbody');
-  records.forEach((record) => {
+  records.forEach((record, index) => {
     const row = document.createElement('tr');
+    if (field.showRowNumber) {
+      const cell = document.createElement('td');
+      cell.textContent = String(index + 1);
+      row.appendChild(cell);
+    }
     field.columns.forEach((column) => {
       const cell = document.createElement('td');
       cell.textContent = record[column.name] || '';
@@ -959,8 +1009,10 @@ function reviewRow(form) {
   view.onclick = () => showFormContents(form);
   actions.appendChild(view);
   const isHead = form.review_stage === 'HEAD';
-  const noHrSignature =
-    !isHead && formTemplate(form.template_key).hrSignatureRequired === false;
+  const activeTemplate = formTemplate(form.template_key);
+  const noReviewerSignature = isHead
+    ? activeTemplate.headSignatureRequired === false
+    : activeTemplate.hrSignatureRequired === false;
   const canReviewStage = isHead
     ? (session.role === 'HEAD' &&
         ['STAFF', 'HEAD'].includes(form.submitter_role)) ||
@@ -976,7 +1028,7 @@ function reviewRow(form) {
       button.type = 'button';
       button.textContent =
         decision === 'APPROVED'
-          ? noHrSignature
+          ? noReviewerSignature
             ? 'Approve'
             : 'Sign'
           : 'Reject';
@@ -987,11 +1039,15 @@ function reviewRow(form) {
           return;
         }
         if (isHead) {
+          if (noReviewerSignature) {
+            await approveWithoutReviewerSignature(form, button);
+            return;
+          }
           openHeadSignature(form);
           return;
         }
-        if (noHrSignature) {
-          await approveWithoutHrSignature(form, button);
+        if (noReviewerSignature) {
+          await approveWithoutReviewerSignature(form, button);
           return;
         }
         openHrSignature(form);
@@ -1026,7 +1082,7 @@ function reviewRow(form) {
   return row;
 }
 
-async function approveWithoutHrSignature(form, button) {
+async function approveWithoutReviewerSignature(form, button) {
   button.disabled = true;
   try {
     await api('reviewUserForm', form.id, 'APPROVED', '', '');
@@ -1277,7 +1333,7 @@ async function submitTemplateForm(event) {
           : values.get(field.name) || '';
     });
     form.querySelectorAll('[data-time-records]').forEach((editor) => {
-      data[editor.dataset.timeRecords] = Array.from(
+      const records = Array.from(
         editor.querySelectorAll('tbody tr'),
         (row) =>
           Object.fromEntries(
@@ -1285,6 +1341,13 @@ async function submitTemplateForm(event) {
               (input) => [input.dataset.timeRecordField, input.value])
           )
       );
+      data[editor.dataset.timeRecords] = records;
+      if (
+        ['time-in-out', 'nexus-no-in-out'].includes(template.key) &&
+        records.length === 1
+      ) {
+        Object.assign(data, records[0]);
+      }
     });
     data.signature = templateSignaturePad.toDataURL();
     if (formBeingEdited) {

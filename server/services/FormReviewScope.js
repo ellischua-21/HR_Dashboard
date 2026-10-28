@@ -10,6 +10,8 @@ function buildReviewScope(reviewer, requestedScope = null) {
       : 'HR';
   const scope = String(requestedScope || defaultScope).toUpperCase();
   const branches = [];
+  const hrQueueStageFilter =
+    "(f.review_stage = 'HR' OR (f.template_key = 'nexus-accountability' AND f.review_stage = 'HEAD'))";
 
   function addBranch(where, values, pendingStage) {
     branches.push({ where, values, pendingStage });
@@ -18,13 +20,13 @@ function buildReviewScope(reviewer, requestedScope = null) {
   if (scope === 'ALL') {
     if (reviewer.role === 'HEAD') {
       addBranch(
-        "f.head_reviewer_email = ? AND f.user_email IN (SELECT email FROM user_roles WHERE role IN ('STAFF', 'HEAD'))",
+        "f.template_key <> 'nexus-accountability' AND f.head_reviewer_email = ? AND f.user_email IN (SELECT email FROM user_roles WHERE role IN ('STAFF', 'HEAD'))",
         [reviewer.email],
         'HEAD'
       );
     } else if (reviewer.role === 'HR' && reviewer.is_hr_head) {
       addBranch(
-        "f.head_reviewer_email = ? AND f.user_email IN (SELECT email FROM user_roles WHERE role = 'HR')",
+        "f.template_key <> 'nexus-accountability' AND f.head_reviewer_email = ? AND f.user_email IN (SELECT email FROM user_roles WHERE role = 'HR')",
         [reviewer.email],
         'HEAD'
       );
@@ -33,19 +35,23 @@ function buildReviewScope(reviewer, requestedScope = null) {
     if (hasReviewPermission && ['HR', 'ADMIN'].includes(reviewer.role)) {
       const excludeOwn = reviewer.role === 'HR';
       addBranch(
-        `f.review_stage = 'HR'${excludeOwn ? ' AND f.user_email <> ?' : ''}`,
+        `${hrQueueStageFilter}${excludeOwn ? ' AND f.user_email <> ?' : ''}`,
         excludeOwn ? [reviewer.email] : [],
-        'HR'
+        'HR_OR_NEXUS'
       );
     }
   } else if (scope === 'HEAD') {
-    addBranch('f.head_reviewer_email = ?', [reviewer.email], 'HEAD');
+    addBranch(
+      "f.template_key <> 'nexus-accountability' AND f.head_reviewer_email = ?",
+      [reviewer.email],
+      'HEAD'
+    );
   } else {
     const excludeOwn = reviewer.role === 'HR';
     addBranch(
-      `f.review_stage = 'HR'${excludeOwn ? ' AND f.user_email <> ?' : ''}`,
+      `${hrQueueStageFilter}${excludeOwn ? ' AND f.user_email <> ?' : ''}`,
       excludeOwn ? [reviewer.email] : [],
-      'HR'
+      'HR_OR_NEXUS'
     );
   }
 
@@ -58,7 +64,11 @@ function buildReviewScope(reviewer, requestedScope = null) {
       ? `(${branches
           .map(
             (branch) =>
-              `((${branch.where}) AND f.status = 'PENDING' AND f.review_stage = '${branch.pendingStage}')`
+              `((${branch.where}) AND f.status = 'PENDING' AND ${
+                branch.pendingStage === 'HR_OR_NEXUS'
+                  ? hrQueueStageFilter
+                  : `f.review_stage = '${branch.pendingStage}'`
+              })`
           )
           .join(' OR ')})`
       : '0',
