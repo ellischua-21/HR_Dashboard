@@ -25,6 +25,48 @@ test('all browser controllers initialize in the declared asset order', () => {
   assert.equal(typeof browser.context.IncidentInvestigation.render, 'function');
 });
 
+test('COC matrix editing adds and saves rows without PDF or publishing controls', async () => {
+  const browser = createBrowser();
+  browser.loadDashboard();
+  const { context, document } = browser;
+  browser.evaluate(
+    "session = { role: 'HR', email: 'hr@example.com', perms: ['emp.read'] }"
+  );
+  let matrix = [
+    { severity: 'Light', occurrence: 1, correctiveAction: 'Written Warning' }
+  ];
+  let saves = 0;
+  context.fetch = async (url, options) => {
+    const method = url.split('/').pop();
+    let result;
+    if (method === 'saveIncidentMatrix') {
+      ++saves;
+      matrix = JSON.parse(options.body).args[0];
+      result = { ok: true };
+    } else if (method === 'getIncidentCodeGuide')
+      result = { matrix, canManage: true };
+    else if (method === 'listIncidentViolations')
+      result = { records: [], total: 0, page: 1, pages: 1 };
+    else throw new Error(`Unexpected API call: ${method}`);
+    return { ok: true, json: async () => result };
+  };
+  await context.IncidentConduct.load();
+  await document.getElementById('ir-coc-matrix-add').click();
+  const row = document.getElementById('ir-coc-matrix-editor').rows[1];
+  row.querySelector('select').value = 'Moderate';
+  row.querySelector('input').value = '1';
+  row.querySelector('textarea').value = 'Written Warning';
+  await document.getElementById('ir-coc-matrix-form').trigger('submit');
+  assert.equal(saves, 1);
+  assert.equal(document.getElementById('ir-coc-matrix').rows.length, 2);
+  assert.equal(
+    document.getElementById('ir-coc-save-feedback').textContent,
+    'Saved successfully.'
+  );
+  assert.equal(document.getElementById('ir-coc-pdf'), null);
+  assert.equal(document.getElementById('ir-coc-publish-form'), null);
+});
+
 test('employee suggestions retain selection, reject stale responses, and reset hidden IDs', async () => {
   const browser = createBrowser();
   browser.load('public/js/EmployeeSearch.js');

@@ -7,6 +7,57 @@ const { assignAccountHead } = require('../server/services/AccountService');
 const {
   saveIncidentEvaluation
 } = require('../server/services/IncidentService');
+const {
+  getIncidentCodeGuide,
+  saveIncidentMatrix
+} = require('../server/services/incident-management/Conduct');
+
+test('saving the COC matrix immediately changes the guide for all roles', async (t) => {
+  let role = 'HR';
+  let matrix = [];
+  t.mock.method(pool, 'execute', async (sql, values) => {
+    if (sql.includes('FROM user_roles'))
+      return [[{ email: 'user@example.com', role, active: 1 }]];
+    if (sql.startsWith('UPDATE incident_code_policy_draft')) {
+      matrix = JSON.parse(values[0]);
+      return [{ affectedRows: 1 }];
+    }
+    if (sql.includes('SELECT matrix FROM incident_code_policy_draft'))
+      return [[{ matrix: JSON.stringify(matrix) }]];
+    throw new Error(`Unexpected query: ${sql}`);
+  });
+  const req = { session: { userEmail: 'user@example.com' } };
+  const rows = [
+    { severity: 'Light', occurrence: 1, correctiveAction: 'Written Warning' }
+  ];
+  await saveIncidentMatrix(req, rows);
+  for (role of ['STAFF', 'HEAD', 'HR', 'ADMIN']) {
+    const guide = await getIncidentCodeGuide(req);
+    assert.deepEqual(guide.matrix, rows);
+    assert.equal(guide.canManage, ['HR', 'ADMIN'].includes(role));
+  }
+});
+
+test('COC matrix saves still reject invalid rows and unauthorized users', async (t) => {
+  let role = 'HR';
+  let writes = 0;
+  t.mock.method(pool, 'execute', async (sql) => {
+    if (sql.includes('FROM user_roles'))
+      return [[{ email: 'user@example.com', role, active: 1 }]];
+    if (sql.startsWith('UPDATE incident_code_policy_draft')) ++writes;
+    return [{ affectedRows: 1 }];
+  });
+  const req = { session: { userEmail: 'user@example.com' } };
+  const row = {
+    severity: 'Light',
+    occurrence: 1,
+    correctiveAction: 'Written Warning'
+  };
+  await assert.rejects(saveIncidentMatrix(req, [row, row]), { status: 400 });
+  role = 'STAFF';
+  await assert.rejects(saveIncidentMatrix(req, [row]), { status: 403 });
+  assert.equal(writes, 0);
+});
 
 test('HR imports share employee cleaning without requiring inaccessible sensitive fields', async (t) => {
   t.mock.method(pool, 'execute', async () => [

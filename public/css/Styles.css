@@ -1814,19 +1814,6 @@ legend {
 #ir-coc-matrix-editor input {
   width: 90px;
 }
-#ir-coc-publish-form > label {
-  margin: 16px 0;
-}
-#view-incident-code-of-conduct .incident-policy-approval {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-.incident-policy-approval input {
-  flex: 0 0 auto;
-  width: auto;
-  margin-top: 3px;
-}
 @media (max-width: 1000px) {
   .incident-coc-columns {
     grid-template-columns: 1fr;

@@ -1,7 +1,6 @@
 const { pool } = require('../../db/database');
 const { requirePerm } = require('../../middleware/Auth');
 const { httpError } = require('../../utils/HttpError');
-const { isValidDate } = require('../../utils/Validation');
 const { manilaDate: today } = require('../../../shared/DateUtils');
 
 function isPolicyManager(user) {
@@ -50,52 +49,21 @@ const parse = (value) =>
 async function currentPolicy(executor = pool) {
   const [[row]] = await executor.execute(
     `SELECT id, version, effective_date AS effectiveDate,
-    snapshot, approved_by AS approvedBy, approved_at AS approvedAt, pdf_name AS pdfName
+    snapshot, approved_by AS approvedBy, approved_at AS approvedAt
     FROM incident_code_policies WHERE effective_date <= ? ORDER BY effective_date DESC, id DESC LIMIT 1`,
     [today()]
   );
   return row ? { ...row, snapshot: parse(row.snapshot) } : null;
 }
-async function draftMatrix(executor = pool) {
+async function readMatrix(executor = pool) {
   const [[row]] = await executor.execute(
     'SELECT matrix FROM incident_code_policy_draft WHERE id = 1'
   );
   return parse(row.matrix);
 }
-async function getIncidentCodeGuide(req, selectedId = null) {
+async function getIncidentCodeGuide(req) {
   const user = await requirePerm(req, 'inbox.read');
-  const canManage = isPolicyManager(user);
-  let policy;
-  if (selectedId) {
-    const id = Number(selectedId);
-    if (!Number.isSafeInteger(id) || id < 1)
-      throw httpError('Choose a valid policy version.', 400);
-    const [[row]] = await pool.execute(
-      `SELECT id, version, effective_date AS effectiveDate, snapshot,
-      approved_by AS approvedBy, approved_at AS approvedAt, pdf_name AS pdfName FROM incident_code_policies
-      WHERE id = ? AND (effective_date <= ? OR ? = 1)`,
-      [id, today(), Number(canManage)]
-    );
-    if (!row) throw httpError('Policy version not found.', 404);
-    policy = { ...row, snapshot: parse(row.snapshot) };
-  } else policy = await currentPolicy();
-  const [versions] = await pool.execute(
-    `SELECT id, version, effective_date AS effectiveDate
-    FROM incident_code_policies WHERE effective_date <= ? OR ? = 1 ORDER BY effective_date DESC, id DESC`,
-    [today(), Number(canManage)]
-  );
-  const draft =
-    canManage || !policy
-      ? { provisions: await readCodeProvisions(), matrix: await draftMatrix() }
-      : null;
-  return {
-    policy: policy ? { ...policy, snapshot: undefined } : null,
-    provisions: policy ? policy.snapshot.provisions : draft.provisions,
-    matrix: policy ? policy.snapshot.matrix : draft.matrix,
-    versions,
-    draft: canManage ? draft : null,
-    canManage
-  };
+  return { matrix: await readMatrix(), canManage: isPolicyManager(user) };
 }
 
 function normalizeMatrix(input) {
@@ -127,7 +95,7 @@ function normalizeMatrix(input) {
   });
   return rows;
 }
-async function saveIncidentPolicyDraft(req, matrix) {
+async function saveIncidentMatrix(req, matrix) {
   const user = await requirePolicyManager(req);
   await pool.execute(
     'UPDATE incident_code_policy_draft SET matrix = ?, updated_by = ? WHERE id = 1',
@@ -135,91 +103,6 @@ async function saveIncidentPolicyDraft(req, matrix) {
   );
   return { ok: true };
 }
-async function publishIncidentPolicy(req, input = {}) {
-  const user = await requirePolicyManager(req);
-  if (!input || typeof input !== 'object' || Array.isArray(input))
-    throw httpError('Enter valid policy details.', 400);
-  const version = String(input.version || '').trim();
-  if (
-    !version ||
-    version.length > 100 ||
-    !isValidDate(input.effectiveDate) ||
-    input.approved !== true
-  )
-    throw httpError(
-      'Enter a version, effective date, and confirm policy approval.',
-      400
-    );
-  const matrix = normalizeMatrix(input.matrix);
-  let pdf = null,
-    pdfName = null;
-  if (input.pdf) {
-    const value = String(input.pdf.dataUrl || '');
-    if (!/^data:application\/pdf;base64,[A-Za-z0-9+/=]+$/.test(value))
-      throw httpError('Upload a PDF document.', 400);
-    pdf = Buffer.from(value.split(',')[1], 'base64');
-    if (
-      !pdf.length ||
-      pdf.length > 4 * 1024 * 1024 ||
-      pdf.subarray(0, 5).toString() !== '%PDF-'
-    )
-      throw httpError('Upload a valid PDF up to 4 MB.', 400);
-    pdfName = String(input.pdf.fileName || 'Code of Conduct.pdf')
-      .replace(/[^a-zA-Z0-9 ._()-]/g, '_')
-      .slice(0, 191);
-  }
-  const connection = await pool.getConnection();
-  try {
-    await connection.beginTransaction();
-    const provisions = await readCodeProvisions(connection);
-    const [result] = await connection.execute(
-      `INSERT INTO incident_code_policies
-      (version, effective_date, snapshot, approved_by, pdf_name, pdf_data) VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        version,
-        input.effectiveDate,
-        JSON.stringify({ provisions, matrix }),
-        user.email,
-        pdfName,
-        pdf
-      ]
-    );
-    await connection.execute(
-      'UPDATE incident_code_policy_draft SET matrix = ?, updated_by = ? WHERE id = 1',
-      [JSON.stringify(matrix), user.email]
-    );
-    await connection.commit();
-    return { ok: true, id: result.insertId };
-  } catch (error) {
-    await connection.rollback();
-    if (error.code === 'ER_DUP_ENTRY')
-      throw httpError(
-        'This policy version already exists. Use a new version.',
-        409
-      );
-    throw error;
-  } finally {
-    connection.release();
-  }
-}
-async function getIncidentPolicyPdf(req, policyId) {
-  const user = await requirePerm(req, 'inbox.read');
-  const id = Number(policyId);
-  if (!Number.isSafeInteger(id) || id < 1)
-    throw httpError('Choose a valid policy version.', 400);
-  const [[row]] = await pool.execute(
-    `SELECT pdf_name AS fileName, pdf_data AS fileData FROM incident_code_policies
-    WHERE id = ? AND (effective_date <= ? OR ? = 1)`,
-    [id, today(), Number(isPolicyManager(user))]
-  );
-  if (!row?.fileData)
-    throw httpError('No approved PDF is attached to this version.', 404);
-  return {
-    fileName: row.fileName,
-    dataUrl: `data:application/pdf;base64,${row.fileData.toString('base64')}`
-  };
-}
-
 // Capture the actual configuration used, even when it is an unpublished revision.
 // Finalized documents cannot call this path: their existing workflow guards reject edits.
 async function snapshotCasePolicy(
@@ -262,8 +145,6 @@ async function snapshotCasePolicy(
 module.exports = {
   readCodeProvisions,
   getIncidentCodeGuide,
-  saveIncidentPolicyDraft,
-  publishIncidentPolicy,
-  getIncidentPolicyPdf,
+  saveIncidentMatrix,
   snapshotCasePolicy
 };

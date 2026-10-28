@@ -380,23 +380,8 @@
     </section>
   </div>
   <section id="ir-coc-management" class="panel" hidden>
-    <h3>Manage COC configuration</h3>
-    <p class="note">
-      Edit and publish the progressive corrective action matrix. Saved case
-      documents keep their captured policy references.
-    </p>
-    <h3>Policy version and progressive matrix</h3>
-    <form id="ir-coc-publish-form">
-      <div class="incident-coc-filters">
-        <label
-          >New policy version<input
-            id="ir-coc-new-version"
-            maxlength="100"
-            required /></label
-        ><label
-          >Effective date<input id="ir-coc-effective" type="date" required
-        /></label>
-      </div>
+    <h3>Edit matrix</h3>
+    <form id="ir-coc-matrix-form">
       <div class="tablewrap">
         <table>
           <thead>
@@ -413,22 +398,10 @@
       <button id="ir-coc-matrix-add" type="button" class="ghost">
         Add matrix row
       </button>
-      <label
-        >Approved COC PDF (optional, up to 4 MB)<input
-          id="ir-coc-pdf"
-          type="file"
-          accept="application/pdf,.pdf"
-      /></label>
-      <label class="incident-policy-approval"
-        ><input id="ir-coc-approved" type="checkbox" required />I confirm this
-        policy version and matrix are approved for publication.</label
-      >
       <div class="actions">
-        <button id="ir-coc-save-draft" type="button" class="ghost">
-          Save matrix draft</button
-        ><button type="submit">Publish approved version</button>
+        <button id="ir-coc-save" type="submit">Save changes</button>
       </div>
-      <p id="ir-coc-publish-feedback" role="status" hidden></p>
+      <p id="ir-coc-save-feedback" role="status" hidden></p>
     </form>
   </section>
 </section>

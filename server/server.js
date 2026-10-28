@@ -178,14 +178,9 @@ const methods = {
     incidents.listIncidentsForHistory(req, filters),
   listIncidentViolations: (req, filters) =>
     incidentArchive.listIncidentViolations(req, filters),
-  getIncidentCodeGuide: (req, id) =>
-    incidentConduct.getIncidentCodeGuide(req, id),
-  saveIncidentPolicyDraft: (req, matrix) =>
-    incidentConduct.saveIncidentPolicyDraft(req, matrix),
-  publishIncidentPolicy: (req, input) =>
-    incidentConduct.publishIncidentPolicy(req, input),
-  getIncidentPolicyPdf: (req, id) =>
-    incidentConduct.getIncidentPolicyPdf(req, id),
+  getIncidentCodeGuide: (req) => incidentConduct.getIncidentCodeGuide(req),
+  saveIncidentMatrix: (req, matrix) =>
+    incidentConduct.saveIncidentMatrix(req, matrix),
   listIncidentsForReview: (req) => incidents.listIncidentsForReview(req),
   getIncidentReviewDashboard: (req, filters) =>
     incidents.getIncidentReviewDashboard(req, filters),

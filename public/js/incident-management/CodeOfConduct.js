@@ -80,13 +80,13 @@
     const ticket = ++guideRequest;
     const owner = session.email;
     try {
-      const data = await api('getIncidentCodeGuide', null);
+      const data = await api('getIncidentCodeGuide');
       if (ticket !== guideRequest || owner !== session?.email) return;
       guide = data;
       byId('ir-coc-management').hidden = !data.canManage;
       if (configure) {
         byId('ir-coc-matrix-editor').replaceChildren();
-        if (data.canManage) (data.draft?.matrix || []).forEach(addMatrixRow);
+        if (data.canManage) (data.matrix || []).forEach(addMatrixRow);
       }
       renderMatrix();
       feedback('ir-coc-feedback', '');
@@ -164,7 +164,7 @@
       byId('ir-violation-rows').replaceChildren();
       byId('ir-violation-options').replaceChildren();
       byId('ir-violation-options').hidden = true;
-      byId('ir-coc-publish-form').reset();
+      byId('ir-coc-matrix-form').reset();
     }
     byId('ir-violation-employee-form').hidden = !canSearchHistory();
     await Promise.all([loadGuide(true), loadHistory()]);
@@ -202,41 +202,17 @@
     ++page;
     loadHistory();
   };
-  byId('ir-coc-save-draft').onclick = async (event) => {
-    const button = event.currentTarget;
-    button.disabled = true;
-    try {
-      await api('saveIncidentPolicyDraft', readMatrix());
-      feedback('ir-coc-publish-feedback', 'Saved successfully.');
-    } catch (error) {
-      feedback('ir-coc-publish-feedback', error.message || String(error), true);
-    } finally {
-      button.disabled = false;
-    }
-  };
-  byId('ir-coc-publish-form').onsubmit = async (event) => {
+  byId('ir-coc-matrix-form').onsubmit = async (event) => {
     event.preventDefault();
-    const form = event.currentTarget;
-    const button = form.querySelector('[type="submit"]');
+    const button = byId('ir-coc-save');
     button.disabled = true;
+    feedback('ir-coc-save-feedback', '');
     try {
-      const file = byId('ir-coc-pdf').files[0];
-      if (file && file.size > 4 * 1024 * 1024)
-        throw new Error('Upload a PDF up to 4 MB.');
-      await api('publishIncidentPolicy', {
-        version: byId('ir-coc-new-version').value,
-        effectiveDate: byId('ir-coc-effective').value,
-        approved: byId('ir-coc-approved').checked,
-        matrix: readMatrix(),
-        pdf: file
-          ? { fileName: file.name, dataUrl: await readIncidentFile(file) }
-          : null
-      });
-      form.reset();
+      await api('saveIncidentMatrix', readMatrix());
       await loadGuide(true);
-      feedback('ir-coc-publish-feedback', 'Published successfully.');
+      feedback('ir-coc-save-feedback', 'Saved successfully.');
     } catch (error) {
-      feedback('ir-coc-publish-feedback', error.message || String(error), true);
+      feedback('ir-coc-save-feedback', error.message || String(error), true);
     } finally {
       button.disabled = false;
     }
