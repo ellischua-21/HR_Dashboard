@@ -3,8 +3,13 @@ const { requirePerm, getCurrentUser } = require('../middleware/Auth');
 const { logAudit } = require('./AuditService');
 const { sanitize, isValidDate } = require('../utils/Validation');
 const FORM_TEMPLATES = require('../../shared/FormTemplates');
+const { canEditForm } = require('../../shared/FormStatus');
 const { httpError } = require('../utils/HttpError');
 const { buildReviewScope } = require('./FormReviewScope');
+
+const { manilaDate } = require('../../shared/DateUtils');
+const currentSerialYear = (date = new Date()) =>
+  Number(manilaDate(date).slice(0, 4));
 
 const LEAVE_TYPES = [
   'Vacation Leave (VL)',
@@ -260,24 +265,6 @@ function formatSerialNumber(template, year, sequence) {
     );
   }
   return `${template.prefix}-${year}-${serialSequence.toString().padStart(width, '0')}`;
-}
-
-function currentSerialYear(date = new Date()) {
-  return Number(
-    new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Manila',
-      year: 'numeric'
-    }).format(date)
-  );
-}
-
-function canEditForm(role, form) {
-  return (
-    ['STAFF', 'HEAD', 'HR'].includes(role) &&
-    form.status === 'PENDING' &&
-    form.review_stage === 'HEAD' &&
-    Boolean(form.head_reviewer_email)
-  );
 }
 
 function parseForm(row) {

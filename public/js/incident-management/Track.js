@@ -26,10 +26,6 @@
       .toLowerCase()
       .replace(/\b\w/g, (letter) => letter.toUpperCase())
       .replace(/\bNte\b/g, 'NTE');
-  const today = () =>
-    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(
-      new Date()
-    );
   const visible = () => !byId('view-incident-track').hidden;
   const isCurrent = (ticket, owner) =>
     ticket === requestId && owner === session?.email;
@@ -116,233 +112,6 @@
 
   function renderProgress(incident) {
     window.IncidentProgress.render(byId('ir-track-progress-panel'), incident);
-  }
-
-  function renderInformationRequests(incident) {
-    const section = el('section', 'incident-case-section');
-    section.appendChild(el('h3', '', 'Information requests'));
-    if (!incident.informationRequests.length)
-      section.appendChild(
-        el(
-          'p',
-          'note',
-          'No information requests are available to your account.'
-        )
-      );
-    incident.informationRequests.forEach((request) => {
-      const card = el('section', 'incident-case-section');
-      card.append(
-        el(
-          'h4',
-          '',
-          request.status === 'PENDING'
-            ? 'Awaiting response'
-            : 'Response received'
-        ),
-        el('p', 'incident-case-text', request.requestText),
-        el('p', 'note', `Requested ${dateTime(request.createdAt)}`)
-      );
-      if (request.responseText)
-        card.appendChild(el('p', 'incident-case-text', request.responseText));
-      if (request.respondedAt)
-        card.appendChild(
-          el('p', 'note', `Responded ${dateTime(request.respondedAt)}`)
-        );
-      if (
-        incident.status === 'UNDER INVESTIGATION' &&
-        request.status === 'PENDING' &&
-        String(request.recipientEmail || '').trim().toLowerCase() ===
-          String(incident.currentUserEmail || session?.email || '')
-            .trim()
-            .toLowerCase()
-      ) {
-        const form = el('form');
-        const text = el('textarea');
-        text.rows = 4;
-        text.maxLength = 4000;
-        const textLabel = el('label', '', 'Your response');
-        textLabel.appendChild(text);
-        const files = el('input');
-        files.type = 'file';
-        files.multiple = true;
-        const fileLabel = el('label', '', 'Requested supporting evidence');
-        fileLabel.appendChild(files);
-        const actions = el('div', 'actions incident-track-actions');
-        const submit = el('button', '', 'Submit information');
-        submit.type = 'submit';
-        actions.appendChild(submit);
-        form.append(textLabel, fileLabel, actions);
-        form.onsubmit = async (event) => {
-          event.preventDefault();
-          submit.disabled = true;
-          try {
-            await api(
-              'respondToIncidentInformation',
-              incident.id,
-              request.id,
-              text.value,
-              await ui.readEvidenceFiles(files.files)
-            );
-            await select(incident.id);
-            ui.feedback(feedback, 'Information submitted.');
-            await window.refreshIncidentBadges();
-          } catch (error) {
-            ui.feedback(feedback, error.message || String(error), true);
-          } finally {
-            submit.disabled = false;
-          }
-        };
-        card.appendChild(form);
-      }
-      section.appendChild(card);
-    });
-    if (incident.canReview && incident.activity.length) {
-      const updates = el('details');
-      updates.appendChild(
-        el('summary', '', 'Authorized investigation updates')
-      );
-      const list = el('ul');
-      incident.activity
-        .filter((entry) =>
-          [
-            'INVESTIGATION_STARTED',
-            'INVESTIGATION_NOTE',
-            'INFORMATION_REQUESTED',
-            'INFORMATION_PROVIDED'
-          ].includes(entry.action)
-        )
-        .forEach((entry) =>
-          list.appendChild(
-            el('li', '', `${dateTime(entry.createdAt)} · ${entry.details}`)
-          )
-        );
-      updates.appendChild(list);
-      section.appendChild(updates);
-    }
-    content.appendChild(section);
-  }
-
-  async function renderInvestigationRequests(incident) {
-    const section = el('section', 'incident-case-section');
-    section.append(
-      el('h3', '', 'Request information from employees'),
-      el(
-        'p',
-        'note',
-        'Create a separate request for each employee. Each request is delivered only to its selected recipient.'
-      )
-    );
-    const rows = el('div', 'incident-investigation-request-list');
-    const feedbackMessage = el('p', 'errs');
-    feedbackMessage.hidden = true;
-    let recipients = [];
-    const requestRows = [];
-
-    function addRequestRow(selectedEmail = '') {
-      const row = el('div', 'incident-case-section');
-      const recipient = el('select');
-      recipient.setAttribute('aria-label', 'Information request recipient');
-      recipient.add(new Option('Select an employee', ''));
-      recipients.forEach((person) =>
-        recipient.add(
-          new Option(`${person.name} (${person.email})`, person.email)
-        )
-      );
-      recipient.value = selectedEmail;
-      const recipientLabel = el('label', '', 'Send to');
-      recipientLabel.appendChild(recipient);
-      const requestText = el('textarea');
-      requestText.rows = 3;
-      requestText.maxLength = 4000;
-      requestText.placeholder = 'What information or explanation is needed?';
-      const requestLabel = el('label', '', 'Request');
-      requestLabel.appendChild(requestText);
-      const remove = el('button', 'ghost', 'Remove request');
-      remove.type = 'button';
-      remove.onclick = () => {
-        requestRows.splice(requestRows.indexOf(entry), 1);
-        row.remove();
-      };
-      const entry = { row, recipient, requestText };
-      requestRows.push(entry);
-      row.append(recipientLabel, requestLabel, remove);
-      rows.appendChild(row);
-      return entry;
-    }
-
-    const add = el('button', 'ghost', 'Add another request');
-    add.type = 'button';
-    add.onclick = () => addRequestRow();
-    const addAll = el('button', 'ghost', 'Add all employees');
-    addAll.type = 'button';
-    addAll.onclick = () => {
-      for (let index = requestRows.length - 1; index >= 0; index -= 1) {
-        const entry = requestRows[index];
-        if (!entry.recipient.value && !entry.requestText.value.trim()) {
-          entry.row.remove();
-          requestRows.splice(index, 1);
-        }
-      }
-      const selected = new Set(
-        requestRows
-          .map((entry) => entry.recipient.value.toLowerCase())
-          .filter(Boolean)
-      );
-      recipients.forEach((person) => {
-        if (!selected.has(person.email.toLowerCase()))
-          addRequestRow(person.email);
-      });
-    };
-    const send = el('button', '', 'Send requests');
-    send.type = 'button';
-    send.onclick = async () => {
-      const requests = requestRows.map((entry) => ({
-        recipientEmail: entry.recipient.value,
-        requestText: entry.requestText.value.trim()
-      }));
-      const invalid = requests.some(
-        (request) => !request.recipientEmail || !request.requestText
-      );
-      if (!requests.length || invalid) {
-        feedbackMessage.textContent =
-          'Select an employee and enter a request in every row.';
-        feedbackMessage.hidden = false;
-        return;
-      }
-      send.disabled = true;
-      feedbackMessage.hidden = true;
-      try {
-        await api('requestIncidentInformationBatch', incident.id, requests);
-        await select(incident.id);
-        ui.feedback(feedback, 'Requests sent.');
-        await window.refreshInboxBadge().catch(() => {});
-      } catch (error) {
-        feedbackMessage.textContent = error.message || String(error);
-        feedbackMessage.hidden = false;
-      } finally {
-        send.disabled = false;
-      }
-    };
-    section.append(rows, feedbackMessage, el('div', 'actions'));
-    const actions = section.lastElementChild;
-    actions.append(add, addAll, send);
-    content.appendChild(section);
-    try {
-      recipients = await api('listIncidentRequestRecipients', incident.id);
-      requestRows.length = 0;
-      rows.replaceChildren();
-      if (!recipients.length) {
-        feedbackMessage.textContent = 'No employees are available for requests.';
-        feedbackMessage.hidden = false;
-        add.disabled = addAll.disabled = send.disabled = true;
-        return;
-      }
-      addRequestRow();
-    } catch (error) {
-      feedbackMessage.textContent = error.message || String(error);
-      feedbackMessage.hidden = false;
-      add.disabled = addAll.disabled = send.disabled = true;
-    }
   }
 
   function renderContent(incident) {
@@ -439,10 +208,7 @@
         )
       );
     }
-    if (incident.status === 'UNDER INVESTIGATION') {
-      renderInformationRequests(incident);
-      if (incident.canReview) renderInvestigationRequests(incident);
-    }
+    window.IncidentInvestigation.render(content, incident, controls);
     if (
       incident.canReview &&
       ['UNDER_REVIEW', 'UNDER INVESTIGATION'].includes(incident.status)
@@ -492,7 +258,7 @@
     if (incident.status === 'EVALUATION' && incident.canReview)
       ui.renderEvaluation(content, view, pads, { feedback, reload: select });
     window.IncidentTimeline.render(content, incident);
-    ui.renderDecision(content, view);
+    ui.renderDecision(content, view, controls);
     if (tracking.currentStage === 'DECISION ISSUED' && !incident.decision)
       content.appendChild(
         el(
@@ -528,7 +294,7 @@
         api('getIncidentCase', selectedId)
       ]);
       if (!isCurrent(ticket, owner)) return;
-      version = `${snapshot.version}:${today()}`;
+      version = `${snapshot.version}:${DateUtils.manilaDate()}`;
       input.value = label(incident);
       renderProgress(incident);
       renderContent(incident);
@@ -583,7 +349,7 @@
     else {
       const snapshot = await api('getIncidentTrackingVersion', id);
       if (owner !== session?.email || Number(id) !== selectedId) return;
-      if (`${snapshot.version}:${today()}` !== version) {
+      if (`${snapshot.version}:${DateUtils.manilaDate()}` !== version) {
         if (dirty)
           ui.feedback(
             byId('ir-track-feedback'),

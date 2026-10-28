@@ -22,5 +22,14 @@
     return titleCase(normalized);
   }
 
-  return { titleCase, formatFormStatus };
+  function canEditForm(role, form) {
+    return (
+      ['STAFF', 'HEAD', 'HR'].includes(role) &&
+      form.status === 'PENDING' &&
+      form.review_stage === 'HEAD' &&
+      Boolean(form.head_reviewer_email)
+    );
+  }
+
+  return { titleCase, formatFormStatus, canEditForm };
 });

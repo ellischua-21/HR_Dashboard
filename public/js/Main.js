@@ -1,3 +1,19 @@
+window.VIEWS = {};
+const can = (permission) => session.perms.includes(permission);
+const guard =
+  (fn) =>
+  async (...a) => {
+    try {
+      showErr('');
+      busy(true);
+      await fn(...a);
+    } catch (e) {
+      showErr(e.message || String(e));
+    } finally {
+      busy(false);
+    }
+  };
+
 const $ = (id) => document.getElementById(id);
 const API_BASE = window.HR_API_BASE || 'http://localhost:3001/api';
 const api = async (fn, ...args) => {
@@ -104,16 +120,6 @@ const PALETTE = [
   '#d9b3be',
   '#5b6678'
 ];
-const _OLD = [
-  '#6b2638',
-  '#f6a53a',
-  '#b45309',
-  '#5b6678',
-  '#2563a8',
-  '#7c3a8a',
-  '#8a8f98',
-  '#3f8f5f'
-];
 let charts = {},
   session = null;
 
@@ -128,7 +134,7 @@ async function init() {
     hideLogin();
     $('uemail').textContent = session.email;
     $('urole').textContent = session.role.replaceAll('_', ' ').toUpperCase();
-    const isFormSubmitter = ['STAFF', 'HEAD', 'USER'].includes(session.role);
+    const isFormSubmitter = ['STAFF', 'HEAD'].includes(session.role);
     const isHead = session.role === 'HEAD';
     const navItems = isFormSubmitter
       ? USER_NAV.filter(

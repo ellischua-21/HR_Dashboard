@@ -26,4 +26,32 @@ function notificationTitle(type) {
     return 'Additional incident evidence received';
   return 'Incident Report updated';
 }
-module.exports = { notificationTitle };
+async function notifyAccount(
+  connection,
+  incidentId,
+  recipient,
+  type,
+  actorEmail
+) {
+  if (
+    !recipient ||
+    (actorEmail && recipient.toLowerCase() === actorEmail.toLowerCase())
+  )
+    return;
+  await connection.execute(
+    `INSERT IGNORE INTO incident_notifications
+     (incident_id, recipient_email, notification_type) VALUES (?, ?, ?)`,
+    [incidentId, recipient, type]
+  );
+}
+
+async function notifyReviewers(connection, incidentId, type, actorEmail) {
+  const excludeActor = actorEmail ? ' AND LOWER(email) <> LOWER(?)' : '';
+  await connection.execute(
+    `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type)
+     SELECT ?, email, ? FROM user_roles WHERE active = 1 AND role IN ('HR', 'ADMIN')${excludeActor}`,
+    [incidentId, type, ...(actorEmail ? [actorEmail] : [])]
+  );
+}
+
+module.exports = { notificationTitle, notifyAccount, notifyReviewers };

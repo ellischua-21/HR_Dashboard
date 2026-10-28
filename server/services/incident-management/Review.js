@@ -1,4 +1,5 @@
 const { httpError } = require('../../utils/HttpError');
+const { normalizePagination } = require('../../utils/Pagination');
 const ACTIVE_CASE_SQL = "incident_reports.status <> 'CLOSED'";
 const HR_SIGNED_SQL = `EXISTS (SELECT 1 FROM incident_signatures hr_signature
   WHERE hr_signature.incident_id = incident_reports.id AND hr_signature.signatory_role = 'HR')`;
@@ -29,17 +30,11 @@ function normalizeReviewFilters(input = {}) {
   const category = input.category || 'ONGOING';
   const stage = input.stage || 'ALL';
   const search = String(input.search || '').trim();
-  const page = Number(input.page ?? 1);
-  const pageSize = Number(input.pageSize ?? 25);
+  const { page, pageSize } = normalizePagination(input, { maxPageSize: 50 });
   if (
     !Object.hasOwn(GROUP_SQL, category) ||
     !STAGES.has(stage) ||
-    search.length > 191 ||
-    !Number.isSafeInteger(page) ||
-    page < 1 ||
-    !Number.isInteger(pageSize) ||
-    pageSize < 1 ||
-    pageSize > 50
+    search.length > 191
   )
     throw httpError('Choose valid case filters and pagination.', 400);
   return { category, stage, search, page, pageSize };

@@ -3,6 +3,7 @@ const { requirePerm } = require('../../middleware/Auth');
 const { httpError } = require('../../utils/HttpError');
 const { isValidDate } = require('../../utils/Validation');
 const { incidentAccessScope } = require('./Tracking');
+const { normalizePagination } = require('../../utils/Pagination');
 
 const CLOSED_AT = `COALESCE((SELECT d.closed_at FROM incident_decisions d
   WHERE d.incident_id = incident_reports.id AND d.status = 'ISSUED'),
@@ -32,12 +33,7 @@ const OUTCOMES = new Set([
 ]);
 
 function pageInput(input = {}) {
-  if (!input || typeof input !== 'object' || Array.isArray(input))
-    throw httpError('Enter valid filters.', 400);
-  const page = Number(input.page || 1);
-  if (!Number.isSafeInteger(page) || page < 1)
-    throw httpError('Choose a valid page.', 400);
-  return page;
+  return normalizePagination(input).page;
 }
 
 async function listIncidentsForHistory(req, input = {}) {
@@ -104,7 +100,10 @@ async function listIncidentViolations(req, input = {}) {
     .trim()
     .toLowerCase();
   if (email !== user.email.toLowerCase() && user.role !== 'HR')
-    throw httpError('Only HR can search another employee’s violation history.', 403);
+    throw httpError(
+      'Only HR can search another employee’s violation history.',
+      403
+    );
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 191)
     throw httpError('Enter a valid account email.', 400);
   if (email !== user.email.toLowerCase()) await requirePerm(req, 'emp.read');

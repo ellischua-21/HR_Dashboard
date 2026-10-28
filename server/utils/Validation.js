@@ -1,3 +1,4 @@
+const { isValidDate } = require('../../shared/DateUtils');
 const { EMP_FIELDS, F } = require('../config/EmployeeSchema');
 
 function sanitize(value) {
@@ -44,15 +45,6 @@ function validateEmployee(data, lists, includeSensitive = true) {
   if (data.church_has === 'Yes' && !data.church_position)
     errors.push('Church position is required when "Yes" is selected');
   return errors;
-}
-
-function isValidDate(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value))
-    return false;
-  const date = new Date(value + 'T00:00:00Z');
-  return (
-    !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
-  );
 }
 
 const JSON_SCHEMA = {

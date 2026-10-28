@@ -120,7 +120,7 @@ async function getInbox(req) {
              (n.notification_type = 'DECISION_PENDING' AND actor_activity.action = 'EVALUATION_SAVED') OR
              (n.notification_type = 'DECISION_ISSUED' AND actor_activity.action = 'DECISION_ISSUED') OR
              (n.notification_type = 'CASE_CLOSED' AND actor_activity.action IN ('CLOSED_FOR_DOCUMENTATION', 'INVESTIGATION_CLOSED', 'DECISION_CASE_CLOSED')) OR
-             (n.notification_type LIKE 'EVIDENCE_%' AND actor_activity.action = 'EVIDENCE_SUBMITTED')
+             (n.notification_type = CONCAT('EVIDENCE_', actor_activity.id) AND actor_activity.action = 'EVIDENCE_SUBMITTED')
            )
        )
      ORDER BY n.created_at DESC, n.id DESC LIMIT 500`,

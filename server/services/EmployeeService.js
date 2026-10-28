@@ -1,16 +1,13 @@
 const { EMP_FIELDS, F } = require('../config/EmployeeSchema');
 const { CFG } = require('../config/Config');
+const { normalizePagination } = require('../utils/Pagination');
 const { pool, getLists, nextSequence, quote } = require('../db/database');
 const { requirePerm } = require('../middleware/Auth');
 const { logAudit } = require('./AuditService');
-const {
-  sanitize,
-  validateEmployee,
-  cleanField,
-  fullName
-} = require('../utils/Validation');
+const { sanitize, validateEmployee } = require('../utils/Validation');
 const { withCalc, normalizeEmployee } = require('./DashboardService');
 const { createEmployeeAccountRequest } = require('./AccountService');
+const { cleanEmployee, dbValue } = require('../utils/EmployeeData');
 
 const LIGHT = [
   'record_id',
@@ -27,6 +24,15 @@ const LIGHT = [
 
 async function listEmployees(req, params = {}) {
   await requirePerm(req, 'emp.read');
+  const {
+    page,
+    pageSize: size,
+    offset
+  } = normalizePagination(params, {
+    defaultPageSize: CFG.PAGE_SIZE,
+    maxPageSize: 100,
+    clampSize: true
+  });
   const conditions = ["record_status <> 'Archived'"];
   const values = [];
   ['company', 'department', 'location', 'rank', 'status'].forEach((key) => {
@@ -50,9 +56,6 @@ async function listEmployees(req, params = {}) {
   );
   const sortKey = LIGHT.includes(params.sortKey) ? params.sortKey : 'name';
   const direction = params.sortDir === 'desc' ? 'DESC' : 'ASC';
-  const size = Math.min(Number(params.pageSize) || CFG.PAGE_SIZE, 100);
-  const page = Math.max(Number(params.page) || 1, 1);
-  const offset = (page - 1) * size;
   const [rows] = await pool.execute(
     `SELECT ${LIGHT.map(quote).join(', ')} FROM employees WHERE ${where} ORDER BY ${quote(sortKey)} ${direction} LIMIT ? OFFSET ?`,
     [...values, size, offset]
@@ -117,28 +120,6 @@ async function getFormMeta(req) {
     lists: await getLists(),
     canSensitive
   };
-}
-
-function cleanEmployee(data, canSensitive) {
-  const clean = {};
-  EMP_FIELDS.forEach((field) => {
-    if (!F.has(field, 'C')) {
-      clean[field[0]] =
-        F.has(field, 'S') && !canSensitive
-          ? ''
-          : cleanField(field, data[field[0]]);
-    }
-  });
-  clean.name = fullName(clean);
-  return clean;
-}
-
-function dbValue(field, value) {
-  if (value === '' || value === undefined || value === null) return null;
-  if (field[2] === 'json')
-    return typeof value === 'string' ? value : JSON.stringify(value);
-  if (field[2] === 'number') return Number(value);
-  return value;
 }
 
 async function saveEmployee(req, data = {}) {

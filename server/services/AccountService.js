@@ -227,54 +227,14 @@ async function getAccountManagement(req) {
   };
 }
 
+// Keep the existing API while using the same validation, transaction and audit path as bulk saves.
 async function assignAccountHead(req, accountEmail, headEmail) {
-  const admin = await requirePerm(req, 'admin.manage');
-  const normalizedEmail = sanitize(accountEmail).toLowerCase();
-  const normalizedHeadEmail = sanitize(headEmail).toLowerCase();
-  if (!EMAIL_PATTERN.test(normalizedEmail)) {
-    throw httpError('Choose a valid account.', 400);
-  }
-
-  const connection = await pool.getConnection();
-  try {
-    await connection.beginTransaction();
-    const [accounts] = await connection.query(
-      'SELECT email, role, active, assigned_head_email FROM user_roles FOR UPDATE'
-    );
-    const account = accounts.find(
-      (item) => item.email.toLowerCase() === normalizedEmail
-    );
-    if (!account) throw httpError('This account no longer exists.', 404);
-    const assignment = validateHeadAssignment(
-      normalizedEmail,
-      account.role,
-      normalizedHeadEmail,
-      accounts
-    );
-    if (assignment.error) throw httpError(assignment.error, 400);
-    await connection.execute(
-      'UPDATE user_roles SET assigned_head_email = ? WHERE email = ?',
-      [assignment.headEmail, normalizedEmail]
-    );
-    await logAudit(
-      admin.email,
-      'HEAD_ASSIGNED',
-      '',
-      `${normalizedEmail} assigned to Head ${assignment.headEmail || 'none'}`,
-      connection
-    );
-    await connection.commit();
-    return {
-      ok: true,
-      email: normalizedEmail,
-      headEmail: assignment.headEmail
-    };
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
+  const email = sanitize(accountEmail).toLowerCase();
+  const assignedHead = sanitize(headEmail).toLowerCase() || null;
+  await saveAccountChanges(req, {
+    headAssignments: [{ email, headEmail: assignedHead }]
+  });
+  return { ok: true, email, headEmail: assignedHead };
 }
 
 async function setHrHeadAccount(req, accountEmail, isHrHead) {
@@ -495,7 +455,6 @@ async function approveAccountRequest(req, requestId) {
       [requestId]
     );
     if (!requests.length) {
-      await connection.rollback();
       throw httpError('This account request no longer exists.', 404);
     }
 
@@ -574,7 +533,6 @@ async function rejectAccountRequest(req, requestId) {
       [requestId]
     );
     if (!requests.length) {
-      await connection.rollback();
       throw httpError('This account request no longer exists.', 404);
     }
     await connection.execute('DELETE FROM account_requests WHERE id = ?', [
@@ -621,7 +579,6 @@ async function changeMyPassword(req, currentPassword, newPassword) {
       !rows.length ||
       !verifyPassword(currentPassword, rows[0].password_hash)
     ) {
-      await connection.rollback();
       throw httpError('Current password is incorrect.', 400);
     }
 

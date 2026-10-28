@@ -1,8 +1,4 @@
-const accountCell = (value) => {
-  const cell = document.createElement('td');
-  cell.textContent = value === null || value === undefined ? '' : String(value);
-  return cell;
-};
+const accountCell = window.AppUI.tableCell;
 
 const pendingHeadAssignments = new Map();
 let pendingHrHeadEmail;
@@ -62,19 +58,8 @@ async function saveAccountChanges() {
   }
 }
 
-function appendEmptyRow(body, columns, message) {
-  const row = document.createElement('tr');
-  const cell = accountCell(message);
-  cell.colSpan = columns;
-  row.appendChild(cell);
-  body.appendChild(row);
-}
-
-function formatAccountDate(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
-}
+const appendEmptyRow = window.AppUI.emptyRow;
+const formatAccountDate = window.AppUI.dateTime;
 
 function renderAccountRequests(requestList) {
   const requests = $('am_requests');
@@ -102,9 +87,15 @@ function renderAccountRequests(requestList) {
     approve.type = 'button';
     approve.textContent = 'Approve';
     approve.onclick = async () => {
-      if (!(await window.appConfirm(`Approve ${request.email} as ${request.assigned_role}?`, {
-        title: 'Approve account request', confirmText: 'Approve'
-      })))
+      if (
+        !(await window.appConfirm(
+          `Approve ${request.email} as ${request.assigned_role}?`,
+          {
+            title: 'Approve account request',
+            confirmText: 'Approve'
+          }
+        ))
+      )
         return;
       approve.disabled = true;
       try {
@@ -122,9 +113,14 @@ function renderAccountRequests(requestList) {
     reject.textContent = 'Reject';
     reject.onclick = async () => {
       if (
-        !(await window.appConfirm(`Reject and remove the account request from ${request.email}?`, {
-          title: 'Reject account request', confirmText: 'Reject', danger: true
-        }))
+        !(await window.appConfirm(
+          `Reject and remove the account request from ${request.email}?`,
+          {
+            title: 'Reject account request',
+            confirmText: 'Reject',
+            danger: true
+          }
+        ))
       )
         return;
       reject.disabled = true;
@@ -149,7 +145,10 @@ async function loadAccountRequests() {
 
 async function loadAccountManagement() {
   const result = await api('getAccountManagement');
+  renderAccountManagement(result);
+}
 
+function renderAccountManagement(result) {
   const headOptions = result.availableHeads || [];
   [
     ['users', 'am_users', true],
@@ -237,9 +236,7 @@ async function loadAccountManagement() {
             pendingHrHeadEmail !==
             (result.accounts.hr.find((item) => item.is_hr_head)?.email || '');
           if (!hrHeadChanged) pendingHrHeadEmail = undefined;
-          loadAccountManagement().catch((error) =>
-            showErr(error.message || String(error))
-          );
+          renderAccountManagement(result);
           updateAccountSaveButton();
         };
         toggleCell.appendChild(toggle);

@@ -1,6 +1,7 @@
 const { httpError } = require('../utils/HttpError');
 const { pool } = require('../db/database');
 const { isValidDate } = require('../utils/Validation');
+const { normalizePagination } = require('../utils/Pagination');
 
 function normalizeAuditDateTime(value, label) {
   if (value === undefined || value === null || value === '') return '';
@@ -60,12 +61,6 @@ async function logAudit(
   detail,
   connection = pool
 ) {
-  if (['CREATE', 'UPDATE', 'ARCHIVE'].includes(action)) {
-    await connection.execute(
-      'UPDATE system_settings SET setting_value = ? WHERE setting_key = ?',
-      [String(Date.now()), 'HRIS_DATA_VER']
-    );
-  }
   await connection.execute(
     'INSERT INTO audit_logs (user_email, action, record_id, detail) VALUES (?, ?, ?, ?)',
     [
@@ -79,7 +74,14 @@ async function logAudit(
 
 async function getAuditLogs(req, limit, filters) {
   await require('../middleware/Auth').requirePerm(req, 'audit.read');
-  const take = Math.min(Math.max(Number(limit) || 200, 1), 1000);
+  const { pageSize: take } = normalizePagination(
+    { pageSize: limit ?? 200 },
+    {
+      defaultPageSize: 200,
+      maxPageSize: 1000,
+      clampSize: true
+    }
+  );
   const normalizedFilters = normalizeAuditFilters(filters);
   const [rows] = await pool.execute(
     `SELECT event_time, user_email, action, record_id, detail

@@ -8,22 +8,13 @@ const {
 const { pool, getLists } = require('../db/database');
 const { requirePerm } = require('../middleware/Auth');
 
-const dims = [
-  'company',
-  'department',
-  'location',
-  'status',
-  'rank',
-  'function_type'
-];
+const { manilaDate: todayInManila } = require('../../shared/DateUtils');
+
+const {
+  EMPLOYEE_FILTER_KEYS: dims,
+  normalizeEmployeeFilters
+} = require('../utils/EmployeeFilters');
 const dateString = (date) => date.toISOString().slice(0, 10);
-const todayInManila = () =>
-  new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Manila',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).format(new Date());
 const parseDate = (value) =>
   value ? new Date(String(value).slice(0, 10) + 'T00:00:00Z') : null;
 const monthStart = (date) =>
@@ -117,6 +108,7 @@ async function getDashboard(req, filters) {
 }
 
 async function compute(filters = {}) {
+  filters = normalizeEmployeeFilters(filters);
   const asOf = filters.dateTo || todayInManila();
   const asOfDate = parseDate(asOf);
   const defaultFrom = plusMonths(monthStart(asOfDate), -11);

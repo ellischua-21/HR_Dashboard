@@ -18,6 +18,7 @@ const incidents = require('./services/IncidentService');
 const incidentArchive = require('./services/incident-management/Archive');
 const incidentConduct = require('./services/incident-management/Conduct');
 const { verifyPassword } = require('./utils/Password');
+const { sendAttachment } = require('./utils/AttachmentResponse');
 
 const app = express();
 const port = Number(process.env.API_PORT || 3001);
@@ -29,15 +30,15 @@ if (!sessionSecret || sessionSecret.length < 32) {
 }
 
 app.disable('x-powered-by');
+const corsOrigins = (
+  process.env.CORS_ORIGINS || 'http://localhost,http://127.0.0.1'
+)
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 app.use((req, res, next) => {
-  const configured = (
-    process.env.CORS_ORIGINS || 'http://localhost,http://127.0.0.1'
-  )
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
   const origin = req.get('Origin');
-  if (origin && configured.includes(origin)) {
+  if (origin && corsOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -279,103 +280,25 @@ app.post('/api/:method', async (req, res, next) => {
   }
 });
 
-app.get('/api/incidents/evidence/:evidenceId', async (req, res, next) => {
-  try {
-    const evidence = await incidents.getIncidentEvidence(
-      req,
-      req.params.evidenceId
-    );
-    const safeName = evidence.fileName.replace(/[\r\n"\\]/g, '_');
-    const fallbackName = safeName.replace(/[^\x20-\x7E]/g, '_');
-    res.setHeader('Content-Type', evidence.mimeType);
-    res.setHeader('Content-Length', evidence.fileData.length);
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${fallbackName}"; filename*=UTF-8''${encodeURIComponent(safeName)}`
-    );
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Cache-Control', 'private, no-store');
-    res.send(evidence.fileData);
-  } catch (error) {
-    next(error);
-  }
-});
-
-async function sendIncidentFile(res, file) {
-  const safeName = file.fileName.replace(/[\r\n"\\]/g, '_');
-  const fallbackName = safeName.replace(/[^\x20-\x7E]/g, '_');
-  res.setHeader('Content-Type', file.mimeType);
-  res.setHeader('Content-Length', file.fileData.length);
-  res.setHeader(
-    'Content-Disposition',
-    `attachment; filename="${fallbackName}"; filename*=UTF-8''${encodeURIComponent(safeName)}`
-  );
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Cache-Control', 'private, no-store');
-  res.send(file.fileData);
+// Access checks and audit logging stay in each evidence service.
+for (const [path, getFile] of [
+  ['evidence', incidents.getIncidentEvidence],
+  ['nte-evidence', incidents.getIncidentNteEvidence],
+  ['explanation-evidence', incidents.getIncidentExplanationEvidence],
+  ['explanation-draft-evidence', incidents.getIncidentExplanationDraftEvidence],
+  [
+    'explanation-addendum-evidence',
+    incidents.getIncidentExplanationAddendumEvidence
+  ]
+]) {
+  app.get(`/api/incidents/${path}/:evidenceId`, async (req, res, next) => {
+    try {
+      sendAttachment(res, await getFile(req, req.params.evidenceId));
+    } catch (error) {
+      next(error);
+    }
+  });
 }
-
-app.get('/api/incidents/nte-evidence/:evidenceId', async (req, res, next) => {
-  try {
-    await sendIncidentFile(
-      res,
-      await incidents.getIncidentNteEvidence(req, req.params.evidenceId)
-    );
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.get(
-  '/api/incidents/explanation-evidence/:evidenceId',
-  async (req, res, next) => {
-    try {
-      await sendIncidentFile(
-        res,
-        await incidents.getIncidentExplanationEvidence(
-          req,
-          req.params.evidenceId
-        )
-      );
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-app.get(
-  '/api/incidents/explanation-draft-evidence/:evidenceId',
-  async (req, res, next) => {
-    try {
-      await sendIncidentFile(
-        res,
-        await incidents.getIncidentExplanationDraftEvidence(
-          req,
-          req.params.evidenceId
-        )
-      );
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-app.get(
-  '/api/incidents/explanation-addendum-evidence/:evidenceId',
-  async (req, res, next) => {
-    try {
-      await sendIncidentFile(
-        res,
-        await incidents.getIncidentExplanationAddendumEvidence(
-          req,
-          req.params.evidenceId
-        )
-      );
-    } catch (error) {
-      next(error);
-    }
-  }
-);
 
 app.use((error, req, res, next) => {
   console.error(error);

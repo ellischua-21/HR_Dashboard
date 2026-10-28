@@ -855,18 +855,6 @@ async function initializeDatabase() {
   }
   await pool.execute(
     'INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VALUES (?, ?, ?)',
-    ['PAGE_SIZE', '25', 'Rows per page']
-  );
-  await pool.execute(
-    'INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VALUES (?, ?, ?)',
-    ['TENURE_RULE', 'FROM_DATE_EMPLOYED', 'Tenure calculation rule']
-  );
-  await pool.execute(
-    'INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VALUES (?, ?, ?)',
-    ['HRIS_DATA_VER', '0', 'Data version used for cache invalidation']
-  );
-  await pool.execute(
-    'INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VALUES (?, ?, ?)',
     [
       'INCIDENT_NTE_REMINDER_DAYS',
       '2',

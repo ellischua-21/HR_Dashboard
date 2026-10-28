@@ -47,7 +47,7 @@ function makeSampleRows(count) {
       function_type: pick(lists.Function_Type_List),
       hmo: pick(lists.HMO_Provider_List),
       fte: random() < 0.9 ? 1 : 0.5,
-      email: 'sample' + number + '@example.com',
+      personal_email: 'sample' + number + '@example.com',
       tin: '000-000-' + number,
       sss: '00-0000' + number + '-0',
       pagibig: '0000-0000-' + number,

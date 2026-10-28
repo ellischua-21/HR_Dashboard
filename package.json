@@ -8,7 +8,8 @@
     "setup": "node scripts/Setup.js",
     "create-user": "node scripts/create-user.js",
     "sample-data": "node scripts/SampleData.js",
-    "test": "node --test tests/Test.js tests/IncidentTracking.test.js tests/IncidentReview.test.js tests/IncidentSecurity.test.js",
+    "test": "node --test tests/Test.js tests/IncidentTracking.test.js tests/IncidentReview.test.js tests/IncidentSecurity.test.js tests/BrowserWorkflow.test.js tests/SharedUtilities.test.js tests/CleanupRegression.test.js",
+    "check": "node scripts/Check.js",
     "format": "prettier --write \"public/**/*.{html,css,js}\" \"server/**/*.js\" \"shared/**/*.js\" \"scripts/**/*.js\" \"tests/**/*.js\""
   },
   "engines": {

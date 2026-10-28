@@ -5,6 +5,9 @@ const {
   AGE_BANDS
 } = require('../config/EmployeeSchema');
 const { CFG } = require('../config/Config');
+const { normalizePagination } = require('../utils/Pagination');
+const { normalizeEmployeeFilters } = require('../utils/EmployeeFilters');
+const { httpError } = require('../utils/HttpError');
 const { requirePerm } = require('../middleware/Auth');
 const { logAudit } = require('./AuditService');
 const {
@@ -90,13 +93,15 @@ async function listReports(req) {
 }
 
 async function buildReport(id, filters, user) {
-  const definition = REPORTS[id];
+  filters = normalizeEmployeeFilters(filters);
+  const definition = Object.hasOwn(REPORTS, id) ? REPORTS[id] : null;
   if (!definition)
-    throw new Error(
+    throw httpError(
       'Unknown report: "' +
         id +
         '". Valid ids: ' +
-        Object.keys(REPORTS).join(', ')
+        Object.keys(REPORTS).join(', '),
+      400
     );
   const asOf = filters.dateTo || todayInManila();
   let rows = filterRows(await readAllEmployees(), filters, asOf)
@@ -247,24 +252,31 @@ async function runReport(req, id, filters, options) {
   const user = await requirePerm(req, 'report.run');
   id = id || 'master';
   options = options || {};
+  const { page, pageSize, offset } = normalizePagination(options, {
+    defaultPageSize: CFG.PAGE_SIZE,
+    maxPageSize: 200,
+    clampSize: true
+  });
   const report = await buildReport(id, filters || {}, user);
   const column = Number(options.sortCol);
-  if (!Number.isNaN(column) && column >= 0 && column < report.columns.length) {
+  if (
+    Number.isInteger(column) &&
+    column >= 0 &&
+    column < report.columns.length
+  ) {
     const direction = options.sortDir === 'desc' ? -1 : 1;
     report.rows.sort(
       (a, b) =>
         (a[column] > b[column] ? 1 : a[column] < b[column] ? -1 : 0) * direction
     );
   }
-  const pageSize = Math.min(Number(options.pageSize) || CFG.PAGE_SIZE, 200);
-  const page = Math.max(Number(options.page) || 1, 1);
   return {
     title: REPORTS[id].t,
     columns: report.columns,
     total: report.rows.length,
     page,
     pageSize,
-    rows: report.rows.slice((page - 1) * pageSize, page * pageSize)
+    rows: report.rows.slice(offset, offset + pageSize)
   };
 }
 
@@ -283,14 +295,7 @@ async function exportReportCsv(req, id, filters) {
     '',
     id + ' rows=' + report.rows.length + ' cols=' + report.columns.length
   );
-  const date = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Manila',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  })
-    .format(new Date())
-    .replace(/-/g, '');
+  const date = todayInManila().replace(/-/g, '');
   return {
     filename: id + '_' + date + '.csv',
     csv: [report.columns]

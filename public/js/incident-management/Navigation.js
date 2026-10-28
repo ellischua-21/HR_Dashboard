@@ -1,4 +1,4 @@
-// Navigation entries only. Page routes and behavior will be added with their specifications.
+// Role-specific sidebar entries; page behavior lives in the matching controllers.
 (function (global) {
   const NAVIGATION_BY_ROLE = {
     STAFF: [

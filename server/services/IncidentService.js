@@ -2,7 +2,14 @@ const { httpError } = require('../utils/HttpError');
 const { pool } = require('../db/database');
 const { requirePerm } = require('../middleware/Auth');
 const { logAudit } = require('./AuditService');
-const { isValidDate } = require('../utils/Validation');
+const {
+  normalizeText,
+  normalizeDate,
+  normalizeTime,
+  normalizeSignature,
+  normalizeEvidence,
+  normalizeNteInput
+} = require('./incident-management/Validation');
 const {
   canViewIncident,
   incidentNotificationTarget,
@@ -26,158 +33,21 @@ const {
   TARGET_STATUS,
   publicTimeline
 } = require('./incident-management/Activity');
-const { notificationTitle } = require('./incident-management/Notifications');
+const {
+  notificationTitle,
+  notifyAccount,
+  notifyReviewers
+} = require('./incident-management/Notifications');
 const crypto = require('crypto');
+const {
+  manilaDate: currentManilaDate,
+  workingDaysBetween
+} = require('../../shared/DateUtils');
 
 const FILING_ROLES = new Set(['HEAD', 'HR', 'ADMIN']);
 const REVIEW_ROLES = new Set(['HR', 'ADMIN']);
-const MAX_EVIDENCE_FILES = 10;
-const MAX_EVIDENCE_FILE_BYTES = 8 * 1024 * 1024;
-const MAX_EVIDENCE_TOTAL_BYTES = 18 * 1024 * 1024;
-const MAX_SIGNATURE_BYTES = 256 * 1024;
-const ALLOWED_EVIDENCE_TYPES = new Set([
-  'application/pdf',
-  'application/msword',
-  'application/rtf',
-  'application/vnd.ms-excel',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-  'text/plain',
-  'text/csv',
-  'audio/mpeg',
-  'audio/wav',
-  'video/mp4',
-  'video/quicktime'
-]);
-
 function requireIncidentRole(user, roles, message) {
   if (!roles.has(user.role)) throw httpError(message, 403);
-}
-
-function manilaDateParts(date = new Date()) {
-  return Object.fromEntries(
-    new Intl.DateTimeFormat('en', {
-      timeZone: 'Asia/Manila',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    })
-      .formatToParts(date)
-      .filter((part) => part.type !== 'literal')
-      .map((part) => [part.type, part.value])
-  );
-}
-
-function currentManilaDate() {
-  const { year, month, day } = manilaDateParts();
-  return `${year}-${month}-${day}`;
-}
-
-function addWorkingDays(dateValue, workingDays) {
-  const [year, month, day] = String(dateValue).split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  let remaining = Number(workingDays);
-  while (remaining > 0) {
-    date.setUTCDate(date.getUTCDate() + 1);
-    if (date.getUTCDay() !== 0 && date.getUTCDay() !== 6) remaining -= 1;
-  }
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
-}
-
-function workingDaysBetween(fromDate, throughDate) {
-  if (!fromDate || !throughDate || throughDate <= fromDate) return 0;
-  const [year, month, day] = String(fromDate).split('-').map(Number);
-  const cursor = new Date(Date.UTC(year, month - 1, day));
-  let days = 0;
-  while (true) {
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-    const value = `${cursor.getUTCFullYear()}-${String(cursor.getUTCMonth() + 1).padStart(2, '0')}-${String(cursor.getUTCDate()).padStart(2, '0')}`;
-    if (value > throughDate) break;
-    if (cursor.getUTCDay() !== 0 && cursor.getUTCDay() !== 6) days += 1;
-  }
-  return days;
-}
-
-function normalizeText(value, label, maxLength, required = true) {
-  if (typeof value !== 'string') {
-    if (!required && (value === undefined || value === null)) return '';
-    throw httpError(`${label} is required.`, 400);
-  }
-  const clean = value.trim().replace(/[<>]/g, '');
-  if (!clean && required) throw httpError(`${label} is required.`, 400);
-  if (clean.length > maxLength)
-    throw httpError(`${label} must be ${maxLength} characters or fewer.`, 400);
-  return clean;
-}
-
-function normalizeDate(value, label) {
-  if (!isValidDate(value)) throw httpError(`Enter a valid ${label}.`, 400);
-  return value;
-}
-
-function normalizeTime(value) {
-  if (typeof value !== 'string' || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)) {
-    throw httpError('Enter a valid incident time.', 400);
-  }
-  return `${value}:00`;
-}
-
-function normalizeSignature(value) {
-  if (typeof value !== 'string') throw httpError('Draw your signature.', 400);
-  const match = /^data:image\/png;base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
-  if (!match) throw httpError('The signature image is invalid.', 400);
-  const bytes = Buffer.from(match[1], 'base64');
-  if (!bytes.length || bytes.length > MAX_SIGNATURE_BYTES) {
-    throw httpError('The signature image is too large.', 400);
-  }
-  return value;
-}
-
-function normalizeEvidence(files = []) {
-  if (!Array.isArray(files) || files.length > MAX_EVIDENCE_FILES) {
-    throw httpError(`Attach no more than ${MAX_EVIDENCE_FILES} files.`, 400);
-  }
-  let totalBytes = 0;
-  return files.map((file) => {
-    if (!file || typeof file !== 'object' || Array.isArray(file)) {
-      throw httpError('An attached file is invalid.', 400);
-    }
-    const mimeType = String(file.mimeType || '').toLowerCase();
-    if (!ALLOWED_EVIDENCE_TYPES.has(mimeType)) {
-      throw httpError(
-        'One or more evidence file types are not supported.',
-        400
-      );
-    }
-    const fileName = String(file.fileName || '')
-      .replace(/[\\/]/g, '_')
-      .replace(/[\u0000-\u001f\u007f]/g, '')
-      .trim()
-      .slice(0, 191);
-    if (!fileName) throw httpError('An attached file needs a file name.', 400);
-    const match = new RegExp(
-      `^data:${mimeType.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')};base64,([A-Za-z0-9+/]+={0,2})$`
-    ).exec(String(file.dataUrl || ''));
-    if (!match) throw httpError('An attached evidence file is invalid.', 400);
-    const fileData = Buffer.from(match[1], 'base64');
-    if (!fileData.length || fileData.length > MAX_EVIDENCE_FILE_BYTES) {
-      throw httpError('Each evidence file must be 8 MB or smaller.', 400);
-    }
-    totalBytes += fileData.length;
-    if (totalBytes > MAX_EVIDENCE_TOTAL_BYTES) {
-      throw httpError(
-        'The combined evidence files must be 18 MB or smaller.',
-        400
-      );
-    }
-    return { fileName, mimeType, fileData };
-  });
 }
 
 async function getEmployeeAccountByRecordId(connection, recordId) {
@@ -568,7 +438,12 @@ async function submitIncidentReport(req, input = {}) {
         'HEAD_SIGNATURE_REQUESTED',
         'Head acknowledgment requested.'
       );
-    await notifyIncidentParties(connection, createdCase, 'IR_SUBMITTED', user.email);
+    await notifyIncidentParties(
+      connection,
+      createdCase,
+      'IR_SUBMITTED',
+      user.email
+    );
     await connection.commit();
     return {
       ok: true,
@@ -794,21 +669,12 @@ async function notifyIncidentParties(connection, incident, type, actorEmail) {
   reviewers.forEach((account) => recipients.add(account.email));
   for (const email of recipients) {
     if (
-      actorEmail &&
-      email.toLowerCase() === actorEmail.toLowerCase()
-    )
-      continue;
-    if (
       type === 'IR_SUBMITTED' &&
       incident.reported_employee_email &&
       email.toLowerCase() === incident.reported_employee_email.toLowerCase()
     )
       continue;
-    await connection.execute(
-      `INSERT IGNORE INTO incident_notifications
-       (incident_id, recipient_email, notification_type) VALUES (?, ?, ?)`,
-      [incident.id, email, type]
-    );
+    await notifyAccount(connection, incident.id, email, type, actorEmail);
   }
 }
 
@@ -867,7 +733,12 @@ async function transitionIncident(req, incidentId, action, details = '') {
       transition.activity,
       cleanDetails
     );
-    await notifyIncidentParties(connection, incident, transition.notification, user.email);
+    await notifyIncidentParties(
+      connection,
+      incident,
+      transition.notification,
+      user.email
+    );
     await connection.commit();
     return {
       ok: true,
@@ -885,253 +756,6 @@ async function transitionIncident(req, incidentId, action, details = '') {
 async function listIncidentCodeProvisions(req) {
   await requirePerm(req, 'inbox.read');
   return readCodeProvisions();
-}
-
-async function saveIncidentCodeProvision(req, input = {}) {
-  const user = await requirePerm(req, 'incidents.coc.manage');
-  requireIncidentRole(
-    user,
-    REVIEW_ROLES,
-    'Only HR and ADMIN can manage Code of Conduct provisions.'
-  );
-  const code = normalizeText(String(input.code || ''), 'Provision code', 100);
-  const title = normalizeText(
-    String(input.title || ''),
-    'Provision title',
-    191
-  );
-  const description = normalizeText(
-    String(input.description || ''),
-    'Provision description',
-    4000
-  );
-  const id = Number(input.id || 0);
-  if (id) {
-    await pool.execute(
-      `UPDATE incident_code_provisions SET provision_code = ?, title = ?, description = ?, active = 1 WHERE id = ?`,
-      [code, title, description, id]
-    );
-    return { ok: true, id };
-  }
-  const [result] = await pool.execute(
-    `INSERT INTO incident_code_provisions (provision_code, title, description, created_by)
-     VALUES (?, ?, ?, ?)`,
-    [code, title, description, user.email]
-  );
-  return { ok: true, id: result.insertId };
-}
-
-async function saveIncidentCodeRule(req, input = {}) {
-  const user = await requirePerm(req, 'incidents.coc.manage');
-  requireIncidentRole(
-    user,
-    REVIEW_ROLES,
-    'Only HR and ADMIN can manage COC rules.'
-  );
-  const provisionId = Number(input.provisionId);
-  const id = Number(input.id || 0);
-  const violationTitle = normalizeText(
-    String(input.violationTitle || ''),
-    'Violation',
-    191
-  );
-  const severity = normalizeText(String(input.severity || ''), 'Severity', 24);
-  const scope = String(input.occurrenceScope || 'SAME_RULE');
-  const windowDays =
-    input.occurrenceWindowDays === '' || input.occurrenceWindowDays == null
-      ? null
-      : Number(input.occurrenceWindowDays);
-  if (!Number.isSafeInteger(provisionId) || provisionId < 1)
-    throw httpError('Choose a Code of Conduct provision.', 400);
-  if (!['Light', 'Moderate', 'Grave', 'Intolerable'].includes(severity))
-    throw httpError('Choose a valid violation severity.', 400);
-  if (!['SAME_RULE', 'SAME_SEVERITY', 'ALL_VIOLATIONS'].includes(scope))
-    throw httpError('Choose a valid occurrence-counting rule.', 400);
-  if (
-    windowDays !== null &&
-    (!Number.isInteger(windowDays) || windowDays < 1 || windowDays > 36500)
-  )
-    throw httpError(
-      'The occurrence window must be 1 to 36,500 days or blank.',
-      400
-    );
-  const [provisions] = await pool.execute(
-    'SELECT id FROM incident_code_provisions WHERE id = ? AND active = 1',
-    [provisionId]
-  );
-  if (!provisions.length)
-    throw httpError('The selected provision is unavailable.', 404);
-  if (id) {
-    const [result] = await pool.execute(
-      `UPDATE incident_code_rules SET provision_id = ?, violation_title = ?, severity = ?,
-       occurrence_scope = ?, occurrence_window_days = ?, active = 1 WHERE id = ?`,
-      [provisionId, violationTitle, severity, scope, windowDays, id]
-    );
-    if (!result.affectedRows) throw httpError('COC rule not found.', 404);
-    return { ok: true, id };
-  }
-  const [result] = await pool.execute(
-    `INSERT INTO incident_code_rules
-       (provision_id, violation_title, severity, occurrence_scope, occurrence_window_days, created_by)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [provisionId, violationTitle, severity, scope, windowDays, user.email]
-  );
-  return { ok: true, id: result.insertId };
-}
-
-async function saveIncidentCodeRuleAction(
-  req,
-  ruleId,
-  priorOffenses,
-  action,
-  decisionType,
-  details = ''
-) {
-  const user = await requirePerm(req, 'incidents.coc.manage');
-  requireIncidentRole(
-    user,
-    REVIEW_ROLES,
-    'Only HR and ADMIN can manage COC actions.'
-  );
-  const id = Number(ruleId);
-  const count = Number(priorOffenses);
-  const actionText = normalizeText(
-    String(action || ''),
-    'Corrective action',
-    191
-  );
-  const actionType = String(decisionType || '');
-  const detailText = normalizeText(
-    String(details || ''),
-    'Action details',
-    2000,
-    false
-  );
-  if (
-    !Number.isSafeInteger(id) ||
-    id < 1 ||
-    !Number.isInteger(count) ||
-    count < 0 ||
-    count > 1000
-  )
-    throw httpError('Enter a valid rule and previous-offense count.', 400);
-  if (
-    ![
-      'WRITTEN_WARNING',
-      'SUSPENSION',
-      'TERMINATION',
-      'OTHER_CORRECTIVE_ACTION'
-    ].includes(actionType)
-  )
-    throw httpError(
-      'Choose a valid final-decision category for this corrective action.',
-      400
-    );
-  const [rules] = await pool.execute(
-    'SELECT id FROM incident_code_rules WHERE id = ? AND active = 1',
-    [id]
-  );
-  if (!rules.length) throw httpError('COC rule not found.', 404);
-  const [result] = await pool.execute(
-    `INSERT INTO incident_code_rule_actions
-     (rule_id, prior_offenses, decision_type, corrective_action, details)
-     VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE decision_type = VALUES(decision_type),
-       corrective_action = VALUES(corrective_action), details = VALUES(details)`,
-    [id, count, actionType, actionText, detailText]
-  );
-  return { ok: true, id: result.insertId || null };
-}
-
-async function deactivateIncidentCodeRule(req, ruleId) {
-  const user = await requirePerm(req, 'incidents.coc.manage');
-  requireIncidentRole(
-    user,
-    REVIEW_ROLES,
-    'Only HR and ADMIN can manage COC rules.'
-  );
-  const id = Number(ruleId);
-  if (!Number.isSafeInteger(id) || id < 1)
-    throw httpError('Choose a valid COC rule.', 400);
-  const [activeEvaluations] = await pool.execute(
-    `SELECT 1 FROM incident_evaluations e JOIN incident_reports i ON i.id = e.incident_id
-     WHERE e.rule_id = ? AND i.status = 'EVALUATION' LIMIT 1`,
-    [id]
-  );
-  if (activeEvaluations.length)
-    throw httpError(
-      'This rule is being used by an active evaluation and cannot be deactivated yet.',
-      409
-    );
-  const [result] = await pool.execute(
-    'UPDATE incident_code_rules SET active = 0 WHERE id = ?',
-    [id]
-  );
-  if (!result.affectedRows) throw httpError('COC rule not found.', 404);
-  return { ok: true };
-}
-
-async function deleteIncidentCodeRuleAction(req, actionId) {
-  const user = await requirePerm(req, 'incidents.coc.manage');
-  requireIncidentRole(
-    user,
-    REVIEW_ROLES,
-    'Only HR and ADMIN can manage COC actions.'
-  );
-  const id = Number(actionId);
-  if (!Number.isSafeInteger(id) || id < 1)
-    throw httpError('Choose a valid corrective-action rule.', 400);
-  const [result] = await pool.execute(
-    'DELETE FROM incident_code_rule_actions WHERE id = ?',
-    [id]
-  );
-  if (!result.affectedRows)
-    throw httpError('Corrective-action rule not found.', 404);
-  return { ok: true };
-}
-
-function normalizeNteInput(input = {}) {
-  if (!input || typeof input !== 'object' || Array.isArray(input))
-    throw httpError('Enter valid NTE details.', 400);
-  const provisionId = input.provisionId ? Number(input.provisionId) : null;
-  const allegation = normalizeText(
-    String(input.allegation || ''),
-    'Allegation details',
-    12000
-  );
-  const issuanceDate = normalizeDate(input.issuanceDate, 'issuance date');
-  const receiptDate = normalizeDate(input.receiptDate, 'receipt date');
-  const workingDays = Number(input.responseWorkingDays);
-  if (!Number.isInteger(workingDays) || workingDays < 1 || workingDays > 60)
-    throw httpError(
-      'The response period must be from 1 to 60 working days.',
-      400
-    );
-  const deadlineDate = input.deadlineDate
-    ? normalizeDate(input.deadlineDate, 'explanation deadline')
-    : addWorkingDays(receiptDate, workingDays);
-  if (receiptDate < issuanceDate)
-    throw httpError(
-      'The receipt date cannot be before the issuance date.',
-      400
-    );
-  if (deadlineDate < receiptDate)
-    throw httpError(
-      'The explanation deadline cannot be before the receipt date.',
-      400
-    );
-  if (
-    provisionId !== null &&
-    (!Number.isSafeInteger(provisionId) || provisionId < 1)
-  )
-    throw httpError('Choose a valid Code of Conduct provision.', 400);
-  return {
-    provisionId,
-    allegation,
-    issuanceDate,
-    receiptDate,
-    workingDays,
-    deadlineDate
-  };
 }
 
 async function getPrimaryIncidentSubjectId(connection, incidentId) {
@@ -1243,7 +867,12 @@ async function upsertIncidentNte(connection, user, incident, input) {
     );
   }
   if (fields.provisionId)
-    await snapshotCasePolicy(connection, incident.id, 'NTE', fields.provisionId);
+    await snapshotCasePolicy(
+      connection,
+      incident.id,
+      'NTE',
+      fields.provisionId
+    );
   return { nteId, ...fields, provision };
 }
 
@@ -1498,11 +1127,7 @@ async function submitIncidentExplanation(
       'Employee submitted an explanation through HRIS.',
       { documentReference: 'EXPLANATION:' + result.insertId }
     );
-    await connection.execute(
-      `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type)
-       SELECT ?, email, 'EXPLANATION_SENT' FROM user_roles WHERE active = 1 AND role IN ('HR', 'ADMIN')`,
-      [id]
-    );
+    await notifyReviewers(connection, id, 'EXPLANATION_SENT', user.email);
     await connection.commit();
     return {
       ok: true,
@@ -1539,7 +1164,10 @@ async function startIncidentEvaluation(req, incidentId) {
       [id]
     );
     if (!submittedExplanation)
-      throw httpError('No submitted employee explanation is available to review.', 409);
+      throw httpError(
+        'No submitted employee explanation is available to review.',
+        409
+      );
     await connection.execute(
       `UPDATE incident_reports SET status = 'EVALUATION' WHERE id = ?`,
       [id]
@@ -1551,7 +1179,12 @@ async function startIncidentEvaluation(req, incidentId) {
       'EVALUATION_STARTED',
       'HR opened the submitted explanation for evaluation.'
     );
-    await notifyIncidentParties(connection, incident, 'EVALUATION_STARTED', user.email);
+    await notifyIncidentParties(
+      connection,
+      incident,
+      'EVALUATION_STARTED',
+      user.email
+    );
     await connection.commit();
     return { ok: true, status: 'EVALUATION' };
   } catch (error) {
@@ -1766,73 +1399,6 @@ async function saveIncidentEvaluation(req, incidentId, input = {}) {
   }
 }
 
-async function getIncidentEvaluationContextForConnection(
-  connection,
-  incidentId,
-  ruleId
-) {
-  if (!Number.isSafeInteger(ruleId) || ruleId < 1)
-    throw httpError('Select an applicable Code of Conduct violation.', 400);
-  const [[incident]] = await connection.execute(
-    'SELECT reported_employee_email AS employeeEmail, status FROM incident_reports WHERE id = ? FOR UPDATE',
-    [incidentId]
-  );
-  if (!incident || incident.status !== 'EVALUATION')
-    throw httpError('This case is not in evaluation.', 409);
-  const [[rule]] = await connection.execute(
-    `SELECT r.id, r.provision_id AS provisionId, r.violation_title AS violationTitle,
-            r.severity, r.occurrence_scope AS occurrenceScope,
-            r.occurrence_window_days AS occurrenceWindowDays,
-            p.provision_code AS provisionCode, p.title AS provisionTitle
-     FROM incident_code_rules r JOIN incident_code_provisions p ON p.id = r.provision_id
-     WHERE r.id = ? AND r.active = 1 AND p.active = 1 FOR UPDATE`,
-    [ruleId]
-  );
-  if (!rule)
-    throw httpError('The selected Code of Conduct rule is unavailable.', 404);
-  const conditions = ['LOWER(employee_email) = LOWER(?)', 'incident_id <> ?'];
-  const params = [incident.employeeEmail, incidentId];
-  if (rule.occurrenceScope === 'SAME_RULE') {
-    conditions.push('rule_id = ?');
-    params.push(rule.id);
-  } else if (rule.occurrenceScope === 'SAME_SEVERITY') {
-    conditions.push('severity = ?');
-    params.push(rule.severity);
-  }
-  if (rule.occurrenceWindowDays)
-    conditions.push(
-      `finalized_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL ${Number(rule.occurrenceWindowDays)} DAY)`
-    );
-  const [history] = await connection.execute(
-    `SELECT incident_id AS incidentId, violation_title AS violationTitle,
-            code_reference AS codeReference, severity, corrective_action AS correctiveAction,
-            effective_date AS effectiveDate, finalized_at AS finalizedAt
-     FROM incident_disciplinary_history WHERE ${conditions.join(' AND ')}
-     ORDER BY finalized_at DESC, id DESC`,
-    params
-  );
-  const [actions] = await connection.execute(
-    'SELECT prior_offenses AS priorOffenses, decision_type AS decisionType, corrective_action AS correctiveAction, details FROM incident_code_rule_actions WHERE rule_id = ? ORDER BY prior_offenses',
-    [rule.id]
-  );
-  const action =
-    actions
-      .filter((row) => Number(row.priorOffenses) <= history.length)
-      .sort((a, b) => Number(b.priorOffenses) - Number(a.priorOffenses))[0] ||
-    null;
-  return {
-    rule,
-    priorOffenses: history.length,
-    history,
-    actions,
-    suggestedAction: action?.correctiveAction || ''
-  };
-}
-
-function normalizeDecisionSignature(value) {
-  return normalizeSignature(value);
-}
-
 async function issueIncidentDecision(req, incidentId, input = {}) {
   const user = await requirePerm(req, 'inbox.read');
   requireIncidentRole(
@@ -1841,7 +1407,7 @@ async function issueIncidentDecision(req, incidentId, input = {}) {
     'Only HR and ADMIN can approve and issue decisions.'
   );
   const id = Number(incidentId);
-  const signature = normalizeDecisionSignature(input.signature);
+  const signature = normalizeSignature(input.signature);
   const outcome = String(input.outcome || '');
   const decisionReason = normalizeText(
     String(input.decisionReason || ''),
@@ -1980,7 +1546,12 @@ async function issueIncidentDecision(req, incidentId, input = {}) {
         ? 'Final decision issued: no violation established.'
         : `Final decision issued: ${finalAction}.`
     );
-    await notifyIncidentParties(connection, incident, 'DECISION_ISSUED', user.email);
+    await notifyIncidentParties(
+      connection,
+      incident,
+      'DECISION_ISSUED',
+      user.email
+    );
     await connection.commit();
     return {
       ok: true,
@@ -2044,7 +1615,12 @@ async function closeIncidentDecision(req, incidentId, reason) {
       'DECISION_CASE_CLOSED',
       closureReason
     );
-    await notifyIncidentParties(connection, incident, 'CASE_CLOSED', user.email);
+    await notifyIncidentParties(
+      connection,
+      incident,
+      'CASE_CLOSED',
+      user.email
+    );
     await connection.commit();
     return { ok: true, status: 'CLOSED', trackingMilestone: 'DECISION ISSUED' };
   } catch (error) {
@@ -2124,11 +1700,11 @@ async function submitIncidentExplanationAddendum(
       'EXPLANATION_ADDENDUM',
       'Employee submitted a separate additional statement.'
     );
-    await connection.execute(
-      `INSERT IGNORE INTO incident_notifications
-       (incident_id, recipient_email, notification_type)
-       SELECT ?, email, ? FROM user_roles WHERE active = 1 AND role IN ('HR', 'ADMIN')`,
-      [id, `EXPLANATION_ADD_${result.insertId}`.slice(0, 32)]
+    await notifyReviewers(
+      connection,
+      id,
+      `EXPLANATION_ADD_${result.insertId}`.slice(0, 32),
+      user.email
     );
     await connection.commit();
     return { ok: true, addendumId: result.insertId };
@@ -2182,10 +1758,12 @@ async function extendIncidentDeadline(req, incidentId, newDeadline, reason) {
       'DEADLINE_EXTENDED',
       `Deadline extended to ${date}: ${details}`
     );
-    await connection.execute(
-      `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type)
-       VALUES (?, ?, ?)`,
-      [id, incident.reported_employee_email, `NTE_EXT_${extension.insertId}`]
+    await notifyAccount(
+      connection,
+      id,
+      incident.reported_employee_email,
+      `NTE_EXT_${extension.insertId}`,
+      user.email
     );
     await connection.commit();
     return { ok: true, deadlineDate: date };
@@ -2269,11 +1847,7 @@ async function recordExternalIncidentExplanation(
       `Explanation received through ${channelText}.`,
       { documentReference: 'EXPLANATION:' + result.insertId }
     );
-    await connection.execute(
-      `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type)
-       SELECT ?, email, 'EXPLANATION_SENT' FROM user_roles WHERE active = 1 AND role IN ('HR', 'ADMIN')`,
-      [id]
-    );
+    await notifyReviewers(connection, id, 'EXPLANATION_SENT', user.email);
     await connection.commit();
     return { ok: true, explanationId: result.insertId };
   } catch (error) {
@@ -2302,15 +1876,12 @@ async function processOverdueIncidentNtes() {
         `UPDATE incident_ntes SET overdue_at = CURRENT_TIMESTAMP WHERE id = ? AND overdue_at IS NULL`,
         [row.nteId]
       );
-      await connection.execute(
-        `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type)
-         SELECT ?, email, ? FROM user_roles WHERE active = 1 AND role IN ('HR', 'ADMIN')`,
-        [
-          row.incidentId,
-          Number(row.extensionCount)
-            ? `NTE_OVERDUE_${row.extensionCount}`
-            : 'NTE_OVERDUE'
-        ]
+      await notifyReviewers(
+        connection,
+        row.incidentId,
+        Number(row.extensionCount)
+          ? `NTE_OVERDUE_${row.extensionCount}`
+          : 'NTE_OVERDUE'
       );
       await recordIncidentActivity(
         connection,
@@ -2343,14 +1914,11 @@ async function processOverdueIncidentNtes() {
     );
     for (const notice of upcoming) {
       if (workingDaysBetween(today, notice.deadlineDate) > threshold) continue;
-      await connection.execute(
-        `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type)
-        VALUES (?, ?, ?)`,
-        [
-          notice.incidentId,
-          notice.employeeEmail,
-          'NTE_DUE_' + notice.deadlineDate.replaceAll('-', '')
-        ]
+      await notifyAccount(
+        connection,
+        notice.incidentId,
+        notice.employeeEmail,
+        'NTE_DUE_' + notice.deadlineDate.replaceAll('-', '')
       );
     }
     await connection.commit();
@@ -2566,11 +2134,7 @@ async function requestIncidentInformationBatch(req, incidentId, requests) {
     'Only HR and ADMIN can manage Incident Reports.'
   );
   const id = Number(incidentId);
-  if (
-    !Array.isArray(requests) ||
-    requests.length < 1 ||
-    requests.length > 50
-  )
+  if (!Array.isArray(requests) || requests.length < 1 || requests.length > 50)
     throw httpError('Add between 1 and 50 information requests.', 400);
   const normalizedRequests = requests.map((request) => ({
     recipient: normalizeText(
@@ -2629,9 +2193,12 @@ async function requestIncidentInformationBatch(req, incidentId, requests) {
         { documentReference: 'INFORMATION_REQUEST:' + result.insertId }
       );
       const notificationType = `INFO_REQ_${result.insertId}`.slice(0, 32);
-      await connection.execute(
-        `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type) VALUES (?, ?, ?)`,
-        [id, request.recipient, notificationType]
+      await notifyAccount(
+        connection,
+        id,
+        request.recipient,
+        notificationType,
+        user.email
       );
     }
     await connection.commit();
@@ -2696,10 +2263,11 @@ async function addIncidentInvestigationNote(
         'EVIDENCE_SUBMITTED',
         'Supporting evidence added to the case.'
       );
-      await connection.execute(
-        `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type)
-        SELECT ?, email, ? FROM user_roles WHERE active = 1 AND role IN ('HR', 'ADMIN')`,
-        [id, 'EVIDENCE_' + activityId]
+      await notifyReviewers(
+        connection,
+        id,
+        'EVIDENCE_' + activityId,
+        user.email
       );
     }
     await connection.commit();
@@ -2777,15 +2345,15 @@ async function respondToIncidentInformation(
       `Response submitted for request ${request}.`,
       { documentReference: 'INFORMATION_REQUEST:' + request }
     );
-    await connection.execute(
-      `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type) VALUES (?, ?, ?)`,
-      [id, requests[0].requested_by, `INFO_DONE_${request}`.slice(0, 32)]
+    const notificationType = `INFO_DONE_${request}`.slice(0, 32);
+    await notifyAccount(
+      connection,
+      id,
+      requests[0].requested_by,
+      notificationType,
+      user.email
     );
-    await connection.execute(
-      `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type)
-      SELECT ?, email, ? FROM user_roles WHERE active = 1 AND role IN ('HR', 'ADMIN')`,
-      [id, 'INFO_DONE_' + request]
-    );
+    await notifyReviewers(connection, id, notificationType, user.email);
     await connection.commit();
     return { ok: true };
   } catch (error) {
@@ -3288,7 +2856,12 @@ async function signIncidentCase(req, incidentId, signatoryRole, signatureData) {
         'SIGNATURES_COMPLETED',
         'Required acknowledgment signatures completed.'
       );
-      await notifyIncidentParties(connection, incident, 'HR_REVIEW_READY', user.email);
+      await notifyIncidentParties(
+        connection,
+        incident,
+        'HR_REVIEW_READY',
+        user.email
+      );
     }
     if (signatoryRole === 'HR') {
       await recordIncidentActivity(
@@ -3298,7 +2871,12 @@ async function signIncidentCase(req, incidentId, signatoryRole, signatureData) {
         'HR_REVIEW_STARTED',
         'HR review started after signature completion.'
       );
-      await notifyIncidentParties(connection, incident, 'HR_REVIEW_STARTED', user.email);
+      await notifyIncidentParties(
+        connection,
+        incident,
+        'HR_REVIEW_STARTED',
+        user.email
+      );
     }
     await connection.commit();
     return { ok: true, caseNumber: incident.case_number, status: nextStatus };
@@ -3363,7 +2941,14 @@ async function listPendingIncidentNotifications(req) {
           AND i.status = 'UNDER INVESTIGATION')
       )
       AND ${scope.sql} ORDER BY n.created_at, n.id LIMIT 100`,
-    [user.email, user.email, user.email, user.email, user.email, ...scope.values]
+    [
+      user.email,
+      user.email,
+      user.email,
+      user.email,
+      user.email,
+      ...scope.values
+    ]
   );
   return rows.map((notification) => ({
     ...notification,
@@ -3420,11 +3005,6 @@ module.exports = {
   signIncidentCase,
   transitionIncident,
   listIncidentCodeProvisions,
-  saveIncidentCodeProvision,
-  saveIncidentCodeRule,
-  saveIncidentCodeRuleAction,
-  deactivateIncidentCodeRule,
-  deleteIncidentCodeRuleAction,
   saveIncidentNteDraft,
   issueIncidentNte,
   saveIncidentExplanationDraft,

@@ -1,4 +1,3 @@
-window.VIEWS = {};
 let META = null,
   EQ = { page: 1, sortKey: 'name', sortDir: 'asc' },
   PENDING = null,
@@ -147,14 +146,7 @@ const COLS = [
   ['status', 'Status', 1],
   ['tenure_years', 'Tenure (yrs)', 0]
 ];
-const el = (t, txt, cls) => {
-  const e = document.createElement(t);
-  if (txt !== undefined) e.textContent = txt;
-  if (cls) e.className = cls;
-  return e;
-};
 const fld = (k) => META.fields.find((f) => f.key === k);
-const can = (p) => session.perms.includes(p);
 function employeeFormSections() {
   return Array.from($('r_form').querySelectorAll('[data-employee-fields]')).map(
     (group) => ({
@@ -168,30 +160,6 @@ function employeeFormSections() {
 async function ensureMeta() {
   if (!META) META = await api('getFormMeta');
 }
-function download(name, text) {
-  const a = el('a');
-  a.href = URL.createObjectURL(
-    new Blob(['\ufeff' + text], { type: 'text/csv' })
-  );
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-}
-const guard =
-  (fn) =>
-  async (...a) => {
-    try {
-      showErr('');
-      busy(true);
-      await fn(...a);
-    } catch (e) {
-      showErr(e.message || String(e));
-    } finally {
-      busy(false);
-    }
-  };
-
 /* ---------- Employee list ---------- */
 VIEWS.employees = guard(async () => {
   $('e_import').hidden = !can('emp.write');
@@ -403,7 +371,6 @@ VIEWS.register = guard(async () => {
   $('r_account_password').disabled = Boolean(rec);
   $('r_account_password_confirm').disabled = Boolean(rec);
   $('r_preview').disabled = false;
-  const box = $('r_form');
   const sections = employeeFormSections();
   sections.forEach(({ group, fieldset }) => {
     group.replaceChildren();
@@ -470,8 +437,31 @@ VIEWS.register = guard(async () => {
         const results = el('div', undefined, 'head-search-results');
         results.id = 'r_assigned_head_results';
         results.hidden = true;
-        inp.oninput = () =>
-          renderAssignableHeadOptions(inp, selectedHead, results);
+        window.createEmployeeSearch({
+          input: inp,
+          suggestions: results,
+          minLength: 1,
+          delay: 0,
+          getOwner: () => session?.email,
+          search: (query) =>
+            HEAD_OPTIONS.filter((head) =>
+              `${head.full_name} ${head.email}`
+                .toLowerCase()
+                .includes(query.toLowerCase())
+            )
+              .slice(0, 8)
+              .map((head) => ({ ...head, name: head.full_name || head.email })),
+          details: (head) => [
+            head.email,
+            head.assignment_status === 'PENDING' ? 'Pending approval' : ''
+          ],
+          onClear: () => {
+            selectedHead.value = '';
+          },
+          onSelect: (head) => {
+            selectedHead.value = head.email;
+          }
+        });
         lab.append(inp, selectedHead, results);
       } else {
         lab.appendChild(inp);
@@ -513,33 +503,6 @@ function updateRegistrationRoleHelp() {
     const results = $('r_assigned_head_results');
     if (results) results.hidden = true;
   }
-}
-function renderAssignableHeadOptions(input, selected, results) {
-  selected.value = '';
-  const term = input.value.trim().toLocaleLowerCase();
-  results.replaceChildren();
-  const matches = term
-    ? HEAD_OPTIONS.filter((head) =>
-        `${head.full_name} ${head.email}`.toLocaleLowerCase().includes(term)
-      ).slice(0, 8)
-    : [];
-  matches.forEach((head) => {
-    const assignmentStatus =
-      head.assignment_status === 'PENDING' ? ' · pending approval' : '';
-    const option = el(
-      'button',
-      `${head.full_name || head.email} (${head.email})${assignmentStatus}`
-    );
-    option.type = 'button';
-    option.setAttribute('role', 'option');
-    option.onclick = () => {
-      input.value = head.full_name || head.email;
-      selected.value = head.email;
-      results.hidden = true;
-    };
-    results.appendChild(option);
-  });
-  results.hidden = matches.length === 0;
 }
 const formData = () => {
   const d = {};
@@ -777,8 +740,14 @@ async function runImport(commit) {
 }
 $('i_validate').onclick = guard(() => runImport(false));
 $('i_commit').onclick = guard(async () => {
-  if (await window.appConfirm('Import all valid rows now? Rows with errors will be skipped.', {
-    title: 'Import employees', confirmText: 'Import'
-  }))
+  if (
+    await window.appConfirm(
+      'Import all valid rows now? Rows with errors will be skipped.',
+      {
+        title: 'Import employees',
+        confirmText: 'Import'
+      }
+    )
+  )
     await runImport(true);
 });

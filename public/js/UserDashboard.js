@@ -27,85 +27,16 @@ function applyApplicantIdentity(input, fieldName) {
 }
 
 function wireFormEmployeeSearch(input, suggestions) {
-  let requestNumber = 0;
-  let timer = null;
-  input.autocomplete = 'off';
-  input.addEventListener('input', () => {
-    const current = ++requestNumber;
-    clearTimeout(timer);
-    suggestions.replaceChildren();
-    if (input.value.trim().length < 2) {
-      suggestions.hidden = true;
-      return;
-    }
-    timer = setTimeout(async () => {
-      try {
-        const matches = await api('searchFormEmployees', input.value.trim());
-        if (current !== requestNumber) return;
-        suggestions.replaceChildren();
-        matches.forEach((employee) => {
-          const option = document.createElement('button');
-          option.type = 'button';
-          option.className = 'incident-suggestion';
-          option.setAttribute('role', 'option');
-          const name = document.createElement('strong');
-          name.textContent = employee.name || '';
-          const details = document.createElement('small');
-          details.textContent = [employee.employeeNo, employee.department]
-            .filter(Boolean)
-            .join(' · ');
-          option.append(name, details);
-          option.addEventListener('click', () => {
-            input.value = employee.name || '';
-            suggestions.hidden = true;
-            suggestions.replaceChildren();
-          });
-          suggestions.appendChild(option);
-        });
-        if (!matches.length) {
-          const empty = document.createElement('p');
-          empty.className = 'incident-no-suggestions';
-          empty.textContent = 'No matching employees.';
-          suggestions.appendChild(empty);
-        }
-        suggestions.hidden = false;
-      } catch (error) {
-        if (current !== requestNumber) return;
-        const message = document.createElement('p');
-        message.className = 'incident-no-suggestions';
-        message.textContent = error.message || String(error);
-        suggestions.replaceChildren(message);
-        suggestions.hidden = false;
-      }
-    }, 250);
-  });
-  input.addEventListener('blur', () => {
-    window.setTimeout(() => {
-      if (!suggestions.contains(document.activeElement))
-        suggestions.hidden = true;
-    }, 150);
-  });
-  suggestions.addEventListener('mousedown', (event) => {
-    if (event.target.closest('.incident-suggestion')) event.preventDefault();
-  });
-  input.addEventListener('focus', () => {
-    if (suggestions.childElementCount) suggestions.hidden = false;
+  return window.createEmployeeSearch({
+    input,
+    suggestions,
+    search: (query) => api('searchFormEmployees', query),
+    getOwner: () => session?.email
   });
 }
 
-const userCell = (value) => {
-  const cell = document.createElement('td');
-  cell.textContent = value === null || value === undefined ? '' : String(value);
-  return cell;
-};
-
-function userEmptyRow(body, columns, message) {
-  const row = document.createElement('tr');
-  const cell = userCell(message);
-  cell.colSpan = columns;
-  row.appendChild(cell);
-  body.appendChild(row);
-}
+const userCell = window.AppUI.tableCell;
+const userEmptyRow = window.AppUI.emptyRow;
 
 function fillFormTypeFilter(select) {
   select.replaceChildren();
@@ -121,11 +52,7 @@ function fillFormTypeFilter(select) {
   });
 }
 
-function userDate(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
-}
+const userDate = window.AppUI.dateTime;
 
 function leaveLabel(form) {
   const data = form.form_data;
@@ -194,12 +121,7 @@ function updateFormSummary(summary) {
 }
 
 function canEditSubmittedForm(form) {
-  return (
-    ['STAFF', 'HEAD', 'HR'].includes(session.role) &&
-    form.status === 'PENDING' &&
-    form.review_stage === 'HEAD' &&
-    Boolean(form.head_reviewer_email)
-  );
+  return FormStatus.canEditForm(session.role, form);
 }
 
 function appendFormField(parent, label, value, className = '') {
@@ -450,7 +372,7 @@ async function loadMyForms() {
     assignedHeadLabel.textContent =
       'Your forms are routed to the designated Head HR.';
     assignedHeadLabel.hidden = false;
-  } else if (session.role === 'STAFF' || session.role === 'USER') {
+  } else if (session.role === 'STAFF') {
     assignedHeadLabel.textContent = 'No assigned Head yet';
     assignedHeadLabel.hidden = false;
   } else {
@@ -1332,14 +1254,13 @@ async function loadPendingAnnouncementsPopup() {
     title.textContent = notification.title;
     const message = document.createElement('p');
     message.className = 'announcement-message';
-    message.textContent =
-      notification.type.startsWith('INFO_REQ_')
-        ? `${notification.caseNumber}: ${notification.requestText}`
-        : notification.type === 'INVESTIGATION_STARTED'
-          ? `A further investigation has started for ${notification.caseNumber}. Review the case in TRACK and respond to any information request addressed to you.`
-          : notification.type === 'NTE_ISSUED'
-        ? `${notification.caseNumber} has advanced. Open HRIS to view information available to your account.`
-        : `${notification.caseNumber}: ${notification.subject} — ${notification.reportedEmployeeName}`;
+    message.textContent = notification.type.startsWith('INFO_REQ_')
+      ? `${notification.caseNumber}: ${notification.requestText}`
+      : notification.type === 'INVESTIGATION_STARTED'
+        ? `A further investigation has started for ${notification.caseNumber}. Review the case in TRACK and respond to any information request addressed to you.`
+        : notification.type === 'NTE_ISSUED'
+          ? `${notification.caseNumber} has advanced. Open HRIS to view information available to your account.`
+          : `${notification.caseNumber}: ${notification.subject} — ${notification.reportedEmployeeName}`;
     const open = document.createElement('button');
     open.type = 'button';
     open.textContent = 'Open Incident Report';

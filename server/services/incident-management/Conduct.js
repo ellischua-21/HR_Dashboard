@@ -2,6 +2,7 @@ const { pool } = require('../../db/database');
 const { requirePerm } = require('../../middleware/Auth');
 const { httpError } = require('../../utils/HttpError');
 const { isValidDate } = require('../../utils/Validation');
+const { manilaDate: today } = require('../../../shared/DateUtils');
 
 function isPolicyManager(user) {
   return (
@@ -46,13 +47,6 @@ async function readCodeProvisions(executor = pool) {
 
 const parse = (value) =>
   typeof value === 'string' ? JSON.parse(value) : value;
-const today = () =>
-  new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Manila',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).format(new Date());
 async function currentPolicy(executor = pool) {
   const [[row]] = await executor.execute(
     `SELECT id, version, effective_date AS effectiveDate,

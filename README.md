@@ -10,27 +10,19 @@ This version keeps the existing dashboard screens and browser behavior, serves t
 
 ## Project layout
 
-- `public/` contains the browser application: `index.html`, CSS, JavaScript, and HTML view fragments.
-- `public/views/` contains page markup; `public/js/` contains page controllers and shared navigation behavior; `public/css/` contains application styles.
-- `public/views/incident-management/` and `public/js/incident-management/` contain the Incident Management interface and its role-based navigation/controller code.
-- `public/js/incident-management/Track.js` owns the inline case selector, progress tracker, and stage panels. It reuses the case document/signature renderers and checks a small version response before reloading case documents. Viewing Track does not start HR evaluation; management actions open Review.
-- `server/services/incident-management/Tracking.js` builds stage dates and closure paths and defines the involvement scope shared by Track, History, and badge queries. STAFF/HEAD badges count active involved cases until closure; HR/ADMIN badges belong to Review.
-- `public/js/incident-management/Review.js` owns the HR/ADMIN dashboard, searchable paginated case list, and inline workspace. Waiting contains active cases without an HR signature; Ongoing contains active cases with one. Summary counts cover the full authorized scope. Closed cases are read-only, and Review badges count all unresolved cases.
-- `server/services/incident-management/Review.js` validates dashboard filters and defines shared case groups. `public/js/incident-management/Progress.js` renders the progression shared by Track and Review. The dashboard reuses existing case actions, permissions, notifications, and database tables.
-- `tests/IncidentReview.test.js` covers dashboard filters, counts, pagination, role restrictions, workflow gates, and notification routing.
-- `public/js/incident-management/History.js` provides paginated, filtered archives for involved STAFF/HEAD accounts. `server/services/incident-management/Archive.js` enforces case scope and serves finalized personal disciplinary records; HR/ADMIN can select employee records with their employee-read permission.
-- `CodeOfConduct.js` owns the employee guide and violation-history panels; `CodeConfiguration.js` owns the existing configuration editor. `server/services/incident-management/Conduct.js` publishes immutable COC versions, serves optional approved PDFs, and captures policy configurations used by new NTEs/evaluations. Only HR/ADMIN with `incidents.coc.manage` can edit or publish policies. The supplied progressive matrix starts as a database draft and does not impose sanctions. Approved versions carry an effective date; rule-specific actions continue to govern existing recommendations.
-- Part 8 adds policy-version, matrix-draft, and document-policy tables through the existing additive database initialization. Restart the Node server after updating. Existing case documents retain their previously saved policy text; no historical version is guessed or backfilled.
-- Part 9 reuses the inbox and announcement dialog for incident updates. Ordinary events stay in the inbox; unresolved signature requests and daily NTE reminders use popups. Notification links select the case in Track for STAFF/HEAD and Review for HR/ADMIN, including closed cases. Badges continue to count unresolved cases independently of read status.
-- `server/services/incident-management/Notifications.js` supplies event titles. `Activity.js` defines the safe employee timeline, displayed by `public/js/incident-management/Timeline.js`. Internal remarks and document references remain restricted to reviewers, with the full audit log kept separately. New activity records include server timestamps and previous/new statuses; older signature entries use their original recorded dates.
-- Daily NTE popup claims are unique per notice, employee, and Manila calendar date. Approaching-deadline inbox notices are unique per deadline; overdue notifications also support approved extensions. `system_settings.INCIDENT_NTE_REMINDER_DAYS` controls the approaching-deadline threshold (default 2 working days). Reminder processing runs during authenticated refreshes; visible sessions check popups every minute. Restart the server to apply the additive activity-column and reminder-index migrations.
-- `tests/IncidentTracking.test.js` covers case access, stage progression, early closure, persistent badges, and unauthorized actions. Run it with the existing suite using `npm.cmd test`.
-- Part 10 adds an additive case-subject relationship and subject-scoped NTE, evaluation, decision, and disciplinary-history records. Existing cases are backfilled with their current reported employee; the filing form remains unchanged. New report signatures store a SHA-256 version of the submitted report and original evidence; older signatures are explicitly marked `LEGACY-UNVERIFIED` because their signed content cannot be reconstructed safely. Case and document reads are audited, and evidence uploaded for an information request is visible only to HR/ADMIN, its recipient, or its requester. Incident Reports can be opened in a print-ready page and saved as PDF through the browser.
-- `tests/IncidentSecurity.test.js` covers request-evidence privacy and audit logging. The focused suite runs with `npm.cmd test`; database migrations should still be verified against the configured MySQL instance before deployment.
-- `shared/` contains form templates and status rules used by both the browser and the API.
-- `server/` contains the Node.js API, grouped into `config/`, `db/`, `middleware/`, `services/`, and `utils/`. `config/` separates application settings, employee schema, and role permissions; domain workflows belong in `services/`.
-- `scripts/` contains setup and administrator command-line tools.
-- `tests/` contains the Node.js test suite.
+- `public/index.html` is the application shell. `public/js/ui-loader.js` loads view fragments and controllers in dependency order, using one asset version.
+- `public/views/` contains page markup; `public/js/` contains page controllers; `public/css/Styles.css` contains the shared design system.
+- `public/js/UI.js`, `AppConfirm.js`, `EmployeeSearch.js`, and `SignaturePad.js` provide reusable browser behavior. `Main.js` owns navigation, route setup, session initialization, and page action guards.
+- `public/js/incident-management/` separates filing/case composition (`IncidentManagement.js`), document layouts (`Documents.js`), NTEs and explanations (`Notice.js`), evaluation and decisions (`Evaluation.js`), investigations (`Investigation.js`), and the Track, Review, History, and Code of Conduct page controllers.
+- Review supplies analytics, filters, and the case list. View buttons and inbox links select the case in Track for every role. Shared renderers provide the authorized actions and documents; History opens completed cases as read-only archives.
+- `CodeOfConduct.js` owns the matrix, its configuration editor, and violation history. HR can search another employee's finalized records; other accounts see their own records. Policy versions and historical document references are retained on the server.
+- `shared/` contains browser/API form templates, status/edit rules, and Manila date/working-day calculations. New shared browser files must be added to the Apache allowlist and the asset loader.
+- `server/server.js` wires API methods and evidence routes. `server/config/` defines employee fields and permissions, `server/middleware/Auth.js` enforces authentication and permissions, and `server/services/` owns domain workflows.
+- `server/services/incident-management/` contains case visibility/tracking, Review filters, archives, COC policy storage, notification writers, safe activity timelines, and incident input validation. `IncidentService.js` coordinates lifecycle transactions.
+- `server/utils/` contains shared sanitization, employee data conversion, pagination/filter validation, attachment responses, password hashing, and HTTP errors.
+- `server/db/database.js` initializes the schema and compatibility migrations. Historical policy, signature, and case-subject records are retained.
+- `scripts/` contains setup, account/sample-data tools, and structural checks. `tests/` contains unit and controller regression tests, with mocked database/network access.
+- [Codebase audit](docs/CodebaseAudit.md) records cleanup changes, verification coverage, and remaining engineering limits.
 - `node_modules/` contains installed dependencies and can be recreated with `npm.cmd install`.
 
 Apache uses the root `.htaccess` file to redirect `http://localhost/HR_Dashboard/` to `public/` and block access to server-side code and dependencies.
@@ -125,9 +117,10 @@ For manual account provisioning, bootstrap or recovery administrators can use `n
 
 ## Checks and sample records
 
-Run the focused JavaScript unit tests with:
+Run the structural checks and JavaScript regression tests with:
 
 ```powershell
+npm.cmd run check
 npm.cmd test
 ```
 

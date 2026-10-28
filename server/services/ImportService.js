@@ -1,5 +1,4 @@
 const { EMP_FIELDS, F } = require('../config/EmployeeSchema');
-const { CFG } = require('../config/Config');
 const {
   pool,
   getLists,
@@ -9,17 +8,14 @@ const {
 } = require('../db/database');
 const { requirePerm } = require('../middleware/Auth');
 const { logAudit } = require('./AuditService');
-const {
-  cleanField,
-  validateEmployee,
-  fullName
-} = require('../utils/Validation');
-const { dbValue } = require('./EmployeeService');
+const { validateEmployee } = require('../utils/Validation');
+const { cleanEmployee, dbValue } = require('../utils/EmployeeData');
+const { httpError } = require('../utils/HttpError');
 
 async function importEmployees(req, records, commit) {
   const user = await requirePerm(req, 'emp.write');
   if (!Array.isArray(records) || records.length > 500)
-    throw new Error('Import at most 500 rows per request.');
+    throw httpError('Import at most 500 rows per request.', 400);
   const canSensitive = user.perms.includes('emp.sensitive');
   const lists = await getLists();
   const connection = await pool.getConnection();
@@ -36,24 +32,24 @@ async function importEmployees(req, records, commit) {
     const errors = [];
 
     records.forEach((record, index) => {
-      const clean = {};
+      if (!record || typeof record !== 'object' || Array.isArray(record)) {
+        errors.push({
+          row: index + 2,
+          errors: ['Enter a valid employee record.']
+        });
+        return;
+      }
+      const clean = cleanEmployee(record, canSensitive);
       EMP_FIELDS.forEach((field) => {
-        if (F.has(field, 'C')) return;
-        if (F.has(field, 'S') && !canSensitive) {
-          clean[field[0]] = '';
-          return;
-        }
-        let value = cleanField(field, record[field[0]]);
+        const value = clean[field[0]];
         if (field[2] === 'list' && value) {
           const match = (lists[field[4]] || []).find(
             (item) => item.toLowerCase() === value.toLowerCase()
           );
-          if (match) value = match;
+          if (match) clean[field[0]] = match;
         }
-        clean[field[0]] = value;
       });
-      clean.name = fullName(clean);
-      const rowErrors = validateEmployee(clean, lists);
+      const rowErrors = validateEmployee(clean, lists, canSensitive);
       const employeeNumber = clean.emp_no.toLowerCase();
       if (employeeNumber && existing.has(employeeNumber))
         rowErrors.push('Employee Number already exists');

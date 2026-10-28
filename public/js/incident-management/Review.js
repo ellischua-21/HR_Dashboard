@@ -2,7 +2,6 @@
   const ui = window.IncidentCaseUI;
   const el = ui.element;
   const byId = (id) => document.getElementById(id);
-  const workspace = byId('ir-review-workspace');
   const state = {
     category: 'ONGOING',
     stage: 'ALL',
@@ -12,9 +11,6 @@
   };
   let actor = '';
   let listRequest = 0;
-  let openRequest = 0;
-  let selectedId = null;
-  let selectedVersion = '';
   let timer;
   let polling = false;
   const visible = () => !byId('view-incident-review').hidden;
@@ -59,7 +55,6 @@
       const row = el('article', 'incident-review-case');
       row.setAttribute('role', 'listitem');
       row.dataset.caseId = incident.id;
-      row.classList.toggle('is-selected', Number(incident.id) === selectedId);
       const details = el('div', 'incident-review-case-details');
       const heading = el('div', 'incident-review-case-heading');
       heading.append(
@@ -143,92 +138,8 @@
     }
   }
 
-  async function caseOpened(incident) {
-    selectedId = Number(incident.id);
-    const category =
-      incident.status === 'CLOSED'
-        ? 'CLOSED'
-        : incident.signatures.some((signature) => signature.role === 'HR')
-          ? 'ONGOING'
-          : 'WAITING';
-    if (state.category !== category) {
-      state.category = category;
-      state.page = 1;
-    }
-    if (state.stage !== 'ALL' && state.stage !== incident.status) {
-      state.stage = 'ALL';
-      state.page = 1;
-    }
-    if (
-      state.search &&
-      !`${incident.caseNumber} ${incident.subject} ${incident.reportedEmployeeName} ${incident.reporterName}`
-        .toLowerCase()
-        .includes(state.search.toLowerCase())
-    ) {
-      state.search = '';
-      state.page = 1;
-    }
-    syncFilters();
-    byId('ir-review-case-status').textContent =
-      `${window.IncidentProgress.label(incident.status)}${incident.status === 'CLOSED' ? ' · Read-only archive' : ''}`;
-    const owner = session?.email;
-    const id = selectedId;
-    const [snapshot] = await Promise.allSettled([
-      api('getIncidentTrackingVersion', incident.id),
-      fetchList()
-    ]);
-    if (
-      owner === session?.email &&
-      selectedId === id &&
-      snapshot.status === 'fulfilled'
-    )
-      selectedVersion = snapshot.value.version;
-  }
-
-  async function open(id) {
-    if (!allowed()) return;
-    const ticket = ++openRequest;
-    const owner = session.email;
-    selectedId = Number(id);
-    selectedVersion = '';
-    workspace.hidden = false;
-    byId('ir-review-case-title').textContent = 'Loading case…';
-    byId('ir-review-case-body').replaceChildren();
-    ui.feedback(byId('ir-review-case-feedback'), '');
-    try {
-      await window.openIncidentCase(id);
-      if (
-        ticket === openRequest &&
-        owner === session?.email &&
-        visible() &&
-        !workspace.hidden
-      )
-        workspace.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } catch (error) {
-      if (ticket === openRequest && owner === session?.email)
-        ui.feedback(
-          byId('ir-review-case-feedback'),
-          error.message || String(error),
-          true
-        );
-    }
-  }
-
-  function close() {
-    ++openRequest;
-    ui.cancelOpen();
-    selectedId = null;
-    selectedVersion = '';
-    workspace.hidden = true;
-    byId('ir-review-case-body').replaceChildren();
-    byId('ir-review-list')
-      .querySelectorAll('.is-selected')
-      .forEach((row) => row.classList.remove('is-selected'));
-  }
-
   async function load(requestedId = null) {
     if (!allowed()) {
-      close();
       throw new Error('Only HR and ADMIN can access Review.');
     }
     if (actor !== session.email) {
@@ -285,22 +196,11 @@
     ++state.page;
     fetchList().catch(() => {});
   };
-  byId('ir-review-case-close').onclick = close;
-  byId('ir-review-case-refresh').onclick = () => {
-    if (selectedId) open(selectedId);
-  };
   setInterval(async () => {
     if (!visible() || document.hidden || !allowed() || polling) return;
     polling = true;
-    const id = selectedId;
     try {
       await fetchList();
-      if (id && selectedVersion) {
-        const snapshot = await api('getIncidentTrackingVersion', id);
-        if (selectedId === id && snapshot.version !== selectedVersion)
-          byId('ir-review-case-status').textContent =
-            'This case was updated. Refresh the case to load the latest details.';
-      }
     } catch (error) {
       ui.feedback(
         byId('ir-review-feedback'),
@@ -311,5 +211,5 @@
       polling = false;
     }
   }, 60000);
-  window.IncidentReview = { load, caseOpened, open };
+  window.IncidentReview = { load };
 })();

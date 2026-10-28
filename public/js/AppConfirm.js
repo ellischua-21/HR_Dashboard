@@ -25,8 +25,12 @@
       dialog.close();
       resolve(answer);
     };
-    dialog.querySelector('.app-confirm-cancel').addEventListener('click', () => finish(false));
-    dialog.querySelector('.app-confirm-accept').addEventListener('click', () => finish(true));
+    dialog
+      .querySelector('.app-confirm-cancel')
+      .addEventListener('click', () => finish(false));
+    dialog
+      .querySelector('.app-confirm-accept')
+      .addEventListener('click', () => finish(true));
     dialog.addEventListener('cancel', (event) => {
       event.preventDefault();
       finish(false);
@@ -42,8 +46,11 @@
       modal.close();
       resolvePrevious(false);
     }
-    modal.querySelector('#app-confirm-title').textContent = options.title || 'Please confirm';
-    modal.querySelector('.app-confirm-message').textContent = String(message || '');
+    modal.querySelector('#app-confirm-title').textContent =
+      options.title || 'Please confirm';
+    modal.querySelector('.app-confirm-message').textContent = String(
+      message || ''
+    );
     const cancel = modal.querySelector('.app-confirm-cancel');
     const accept = modal.querySelector('.app-confirm-accept');
     cancel.textContent = options.cancelText || 'Cancel';

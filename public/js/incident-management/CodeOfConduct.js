@@ -7,10 +7,7 @@
   let actor = '';
   let guideRequest = 0;
   let historyRequest = 0;
-  let employeeSearchRequest = 0;
-  let employeeSearchTimer;
   let employeeEmail = '';
-  let employeeName = '';
   let page = 1;
 
   const feedback = (id, message, error = false) =>
@@ -138,73 +135,25 @@
     }
   }
 
-  async function searchEmployees(input) {
-    const options = byId('ir-violation-options');
-    const ticket = ++employeeSearchRequest;
-    clearTimeout(employeeSearchTimer);
-    employeeEmail = '';
-    employeeName = '';
-    input.dataset.selectedEmail = '';
-    input.dataset.selectedName = '';
-    options.replaceChildren();
-    if (input.value.trim().length < 2) {
-      options.hidden = true;
-      return;
+  const employeeSearch = window.createEmployeeSearch({
+    input: byId('ir-violation-employee'),
+    suggestions: byId('ir-violation-options'),
+    search: (query) =>
+      api('searchIncidentEmployees', query, 'violation-history'),
+    getOwner: () => session?.email,
+    onClear: () => {
+      employeeEmail = '';
+    },
+    onSelect: (employee) => {
+      employeeEmail = employee.email;
     }
-    employeeSearchTimer = setTimeout(async () => {
-      try {
-        const matches = await api(
-          'searchIncidentEmployees',
-          input.value.trim(),
-          'violation-history'
-        );
-        if (ticket !== employeeSearchRequest) return;
-        options.replaceChildren();
-        matches.forEach((employee) => {
-          const option = el('button', 'incident-suggestion');
-          option.type = 'button';
-          option.setAttribute('role', 'option');
-          option.append(
-            el('strong', '', employee.name),
-            el(
-              'small',
-              '',
-              [employee.employeeNo, employee.department]
-                .filter(Boolean)
-                .join(' · ')
-            )
-          );
-          const selectEmployee = (event) => {
-            event.preventDefault();
-            input.value = employee.name;
-            employeeEmail = employee.email;
-            employeeName = employee.name;
-            input.dataset.selectedEmail = employee.email;
-            input.dataset.selectedName = employee.name;
-            options.hidden = true;
-            options.replaceChildren();
-          };
-          option.addEventListener('pointerdown', selectEmployee);
-          option.addEventListener('click', selectEmployee);
-          options.appendChild(option);
-        });
-        if (!matches.length)
-          options.appendChild(
-            el('p', 'incident-no-suggestions', 'No employees found.')
-          );
-        options.hidden = false;
-      } catch (error) {
-        if (ticket === employeeSearchRequest)
-          feedback('ir-violation-feedback', error.message || String(error), true);
-      }
-    }, 200);
-  }
+  });
 
   async function load() {
     if (actor !== session.email) {
       actor = session.email;
+      employeeSearch.reset();
       employeeEmail = session.email;
-      employeeName = '';
       page = 1;
       ++guideRequest;
       ++historyRequest;
@@ -216,34 +165,30 @@
       byId('ir-violation-options').replaceChildren();
       byId('ir-violation-options').hidden = true;
       byId('ir-coc-publish-form').reset();
-      byId('ir-violation-employee').dataset.selectedEmail = '';
-      byId('ir-violation-employee').dataset.selectedName = '';
     }
     byId('ir-violation-employee-form').hidden = !canSearchHistory();
     await Promise.all([loadGuide(true), loadHistory()]);
   }
 
   byId('ir-coc-matrix-add').onclick = () => addMatrixRow();
-  byId('ir-violation-employee').oninput = (event) =>
-    searchEmployees(event.currentTarget);
   byId('ir-violation-employee-form').onsubmit = (event) => {
     event.preventDefault();
-    const input = byId('ir-violation-employee');
-    employeeEmail = input.dataset.selectedEmail || '';
-    employeeName = input.dataset.selectedName || '';
+    employeeEmail = employeeSearch.getSelection()?.email || '';
     if (!employeeEmail) {
-      feedback('ir-violation-feedback', 'Select an employee from the suggestions.', true);
+      feedback(
+        'ir-violation-feedback',
+        'Select an employee from the suggestions.',
+        true
+      );
       return;
     }
     page = 1;
     loadHistory();
   };
   byId('ir-violation-own').onclick = () => {
+    employeeSearch.reset();
     employeeEmail = session.email;
-    employeeName = '';
     byId('ir-violation-employee').value = '';
-    byId('ir-violation-employee').dataset.selectedEmail = '';
-    byId('ir-violation-employee').dataset.selectedName = '';
     byId('ir-violation-options').replaceChildren();
     byId('ir-violation-options').hidden = true;
     page = 1;

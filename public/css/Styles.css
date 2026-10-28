@@ -1488,14 +1488,12 @@ legend {
   font-weight: 600;
   padding: 10px 0;
 }
-.incident-review-filters label,
-.incident-review-workspace label {
+.incident-review-filters label {
   display: grid;
   gap: 6px;
 }
 .incident-review-filters input,
-.incident-review-filters select,
-.incident-review-workspace textarea {
+.incident-review-filters select {
   width: 100%;
 }
 .incident-review-categories {
@@ -1532,10 +1530,6 @@ legend {
   border: 1px solid var(--rule);
   border-radius: 6px;
   background: var(--card);
-}
-.incident-review-case.is-selected {
-  border-color: var(--brand, #722f43);
-  box-shadow: inset 3px 0 var(--brand, #722f43);
 }
 .incident-review-case-details {
   flex: 1;
@@ -1584,19 +1578,10 @@ legend {
   gap: 14px;
   margin-top: 20px;
 }
-.incident-review-workspace {
-  scroll-margin-top: 20px;
-}
-.incident-review-workspace .signature-pad {
-  max-width: 100%;
-}
 .incident-review-progress {
   min-width: 0;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--rule);
-}
-.incident-review-workspace .account-heading .actions {
-  margin: 0;
 }
 @media (max-width: 700px) {
   .incident-review-case {
@@ -1606,10 +1591,6 @@ legend {
   }
   .incident-review-case-meta {
     grid-template-columns: 1fr;
-  }
-  .incident-review-workspace .account-heading {
-    align-items: flex-start;
-    flex-wrap: wrap;
   }
 }
 #view-incident-track [hidden] {
