@@ -263,7 +263,9 @@
     ui.renderReport(report, incident);
     content.appendChild(report);
     const pads = [];
-    const view = { ...incident, canReview: false };
+    // HR reviewers need the HR signature control here once employee and head
+    // signatures are complete. Review-only actions remain on the Review page.
+    const view = incident;
     const controls = { reload: select, feedback };
     const signatories = el('details', 'incident-track-report');
     signatories.open = ['PENDING SIGNATURE', 'SIGNED'].includes(
