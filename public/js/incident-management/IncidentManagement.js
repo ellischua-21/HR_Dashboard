@@ -733,6 +733,19 @@ async function loadIncidentReview() {
 
 async function refreshIncidentBadges() {
   const counts = await api('getIncidentBadgeCounts');
+  const incidentManagementCount = document.getElementById(
+    'incident-management-count'
+  );
+  if (incidentManagementCount) {
+    const activeCount =
+      Number(
+        ['HR', 'ADMIN'].includes(session.role) ? counts.review : counts.track
+      ) || 0;
+    incidentManagementCount.textContent =
+      activeCount > 99 ? '99+' : String(activeCount);
+    incidentManagementCount.hidden = activeCount === 0;
+    incidentManagementCount.parentElement.title = `${activeCount} active case${activeCount === 1 ? '' : 's'}`;
+  }
   [
     [document.getElementById('incident-track-count'), counts.track],
     [document.getElementById('incident-review-count'), counts.review]

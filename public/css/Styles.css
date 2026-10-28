@@ -74,19 +74,27 @@ body {
   line-height: 18px;
 }
 #nav .nav-group > summary {
-  display: block;
+  display: flex;
+  align-items: center;
   padding: 9px 20px;
   border-left: 3px solid transparent;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 400;
   list-style: none;
 }
 #nav .nav-group > summary::-webkit-details-marker {
   display: none;
 }
+#nav .nav-group > summary .nav-count {
+  float: none;
+  margin-left: auto;
+}
+#nav .incident-nav-group > summary::after {
+  margin-left: 8px;
+}
 #nav .nav-group > summary::after {
   content: '▾';
-  float: right;
+  margin-left: auto;
   color: var(--muted);
 }
 #nav .nav-group:not([open]) > summary::after {
@@ -1466,7 +1474,7 @@ legend {
 }
 .incident-review-counters {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin: 18px 0;
 }
@@ -1584,6 +1592,9 @@ legend {
   border-bottom: 1px solid var(--rule);
 }
 @media (max-width: 700px) {
+  .incident-review-counters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .incident-review-case {
     align-items: stretch;
     flex-direction: column;

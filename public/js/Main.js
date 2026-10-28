@@ -184,7 +184,18 @@ async function init() {
       const group = document.createElement('details');
       group.className = isForms ? 'nav-group form-nav-group' : 'nav-group';
       const summary = document.createElement('summary');
-      summary.textContent = label;
+      const title = document.createElement('span');
+      title.textContent = label;
+      summary.appendChild(title);
+      if (label === 'Incident Management') {
+        group.classList.add('incident-nav-group');
+        const count = document.createElement('span');
+        count.id = 'incident-management-count';
+        count.className = 'nav-count';
+        count.hidden = true;
+        count.setAttribute('aria-label', 'active incident cases');
+        summary.appendChild(count);
+      }
       group.appendChild(summary);
       const children = document.createElement('div');
       children.className = 'nav-group-children';
@@ -206,7 +217,6 @@ async function init() {
     const isHrAdmin = ['HR', 'ADMIN'].includes(session.role);
     if (isHrAdmin) {
       visibleNavItems.filter((n) => n[0] === 'dashboard').forEach(addNavLink);
-      visibleNavItems.filter((n) => n[0] === 'inbox').forEach(addNavLink);
       addNavGroup('Forms', formItems, true);
 
       const groupedItems = new Set([
@@ -231,6 +241,7 @@ async function init() {
         'Incident Management',
         window.INCIDENT_MANAGEMENT_NAVIGATION.forRole(session.role)
       );
+      visibleNavItems.filter((n) => n[0] === 'inbox').forEach(addNavLink);
       if (session.role === 'ADMIN') {
         addNavGroup(
           'Manage Accounts',
