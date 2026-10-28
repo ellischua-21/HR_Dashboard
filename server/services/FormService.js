@@ -95,6 +95,7 @@ function validateUserForm(templateKey, data = {}) {
     errors.push('Draw your electronic signature before submitting.');
 
   template.fields.forEach((field) => {
+    if (field.type === 'time-records' || field.legacyTimeRecordColumn) return;
     if (field.type === 'checkbox') {
       const checked =
         data[field.name] === true ||
@@ -147,20 +148,64 @@ function validateUserForm(templateKey, data = {}) {
     clean[field.name] = value;
   });
 
-  if (
-    templateKey === 'time-in-out' &&
-    ![
-      'inStart',
-      'amBreakOut',
-      'amBreakIn',
-      'lunchBreakOut',
-      'lunchBreakIn',
-      'pmBreakOut',
-      'pmBreakIn',
-      'outEnd'
-    ].some((key) => clean[key])
-  ) {
-    errors.push('Enter at least one time-in, break, or time-out value.');
+  const timeRecordField = template.fields.find(
+    (field) => field.type === 'time-records'
+  );
+  if (timeRecordField) {
+    const legacyRecord =
+      Array.isArray(data[timeRecordField.name]) ||
+      !timeRecordField.columns.some((column) =>
+        Object.prototype.hasOwnProperty.call(data, column.name)
+      )
+        ? null
+        : Object.fromEntries(
+            timeRecordField.columns.map((column) => [
+              column.name,
+              data[column.name]
+            ])
+          );
+    const submittedRecords = Array.isArray(data[timeRecordField.name])
+      ? data[timeRecordField.name]
+      : legacyRecord
+        ? [legacyRecord]
+        : [];
+    if (submittedRecords.length > 100)
+      errors.push('A form can include up to 100 day records.');
+    const records = [];
+    submittedRecords.slice(0, 100).forEach((record, index) => {
+      const cleanRecord = {};
+      timeRecordField.columns.forEach((column) => {
+        const raw = String(record?.[column.name] ?? '').trim();
+        const value = sanitize(raw);
+        if (column.type === 'date' && value && !isValidDate(value))
+          errors.push(`Day record ${index + 1}: enter a valid date.`);
+        if (
+          column.type === 'time' &&
+          value &&
+          !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)
+        )
+          errors.push(`Day record ${index + 1}: enter a valid time.`);
+        cleanRecord[column.name] = value;
+      });
+      if (!timeRecordField.columns.some((column) => cleanRecord[column.name]))
+        return;
+      if (!cleanRecord.date)
+        errors.push(`Day record ${index + 1}: date is required.`);
+      records.push(cleanRecord);
+    });
+    if (!records.length)
+      errors.push('Add at least one dated day record.');
+    if (
+      templateKey === 'time-in-out' &&
+      !records.some((record) =>
+        timeRecordField.columns
+          .filter((column) => column.type === 'time')
+          .some((column) => record[column.name])
+      )
+    ) {
+      errors.push('Enter at least one time-in, break, or time-out value.');
+    }
+    clean[timeRecordField.name] = records;
   }
   if (
     templateKey === 'official-business-trip' &&

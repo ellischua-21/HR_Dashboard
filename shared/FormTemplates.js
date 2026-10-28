@@ -3,6 +3,21 @@
   if (typeof module === 'object' && module.exports) module.exports = templates;
   if (root) root.FORM_TEMPLATES = templates;
 })(typeof window === 'undefined' ? globalThis : window, function () {
+  const timeRecordColumns = [
+    { name: 'date', label: 'Date', type: 'date' },
+    { name: 'inStart', label: 'Time in', type: 'time' },
+    { name: 'amBreakOut', label: 'AM break out', type: 'time' },
+    { name: 'amBreakIn', label: 'AM break in', type: 'time' },
+    { name: 'lunchBreakOut', label: 'Lunch break out', type: 'time' },
+    { name: 'lunchBreakIn', label: 'Lunch break in', type: 'time' },
+    { name: 'pmBreakOut', label: 'PM break out', type: 'time' },
+    { name: 'pmBreakIn', label: 'PM break in', type: 'time' },
+    { name: 'outEnd', label: 'Time out', type: 'time' }
+  ];
+  const legacyTimeRecordFields = timeRecordColumns.map((column) => ({
+    ...column,
+    legacyTimeRecordColumn: true
+  }));
   return [
     {
       key: 'leave-2026',
@@ -87,7 +102,6 @@
           required: true,
           maxLength: 191
         },
-        { name: 'date', label: 'Date', type: 'date', required: true },
         {
           name: 'department',
           label: 'Department',
@@ -109,19 +123,18 @@
           required: true,
           maxLength: 500
         },
-        { name: 'inStart', label: 'Time in / start', type: 'time' },
-        { name: 'amBreakOut', label: 'AM break out', type: 'time' },
-        { name: 'amBreakIn', label: 'AM break in', type: 'time' },
-        { name: 'lunchBreakOut', label: 'Lunch break out', type: 'time' },
-        { name: 'lunchBreakIn', label: 'Lunch break in', type: 'time' },
-        { name: 'pmBreakOut', label: 'PM break out', type: 'time' },
-        { name: 'pmBreakIn', label: 'PM break in', type: 'time' },
-        { name: 'outEnd', label: 'Time out / end', type: 'time' },
+        ...legacyTimeRecordFields,
         {
           name: 'witnessName',
           label: 'Witness name',
           type: 'text',
           maxLength: 191
+        },
+        {
+          name: 'timeRecords',
+          label: 'Daily time records',
+          type: 'time-records',
+          columns: timeRecordColumns
         }
       ]
     },
@@ -294,15 +307,13 @@
           required: true,
           maxLength: 191
         },
-        { name: 'date', label: 'Date', type: 'date', required: true },
-        { name: 'inStart', label: 'Time in / start', type: 'time' },
-        { name: 'amBreakOut', label: 'AM break out', type: 'time' },
-        { name: 'amBreakIn', label: 'AM break in', type: 'time' },
-        { name: 'lunchBreakOut', label: 'Lunch break out', type: 'time' },
-        { name: 'lunchBreakIn', label: 'Lunch break in', type: 'time' },
-        { name: 'pmBreakOut', label: 'PM break out', type: 'time' },
-        { name: 'pmBreakIn', label: 'PM break in', type: 'time' },
-        { name: 'outEnd', label: 'Time out / end', type: 'time' }
+        ...legacyTimeRecordFields,
+        {
+          name: 'timeRecords',
+          label: 'Daily time records',
+          type: 'time-records',
+          columns: timeRecordColumns
+        }
       ],
       hrSignatureRequired: false
     }

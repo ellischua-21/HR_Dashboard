@@ -470,6 +470,73 @@ function buildFormCatalog() {
   });
 }
 
+function getTimeRecordRows(formData, field) {
+  if (Array.isArray(formData?.[field.name])) return formData[field.name];
+  const hasLegacyRow = field.columns.some((column) =>
+    Object.prototype.hasOwnProperty.call(formData || {}, column.name)
+  );
+  if (hasLegacyRow) {
+    return [
+      Object.fromEntries(
+        field.columns.map((column) => [column.name, formData[column.name] || ''])
+      )
+    ];
+  }
+  return [{}];
+}
+
+function createTimeRecordEditor(field, formData) {
+  const section = document.createElement('section');
+  section.className = 'time-record-editor';
+  section.dataset.timeRecords = field.name;
+  const heading = document.createElement('h3');
+  heading.textContent = field.label;
+  const scroll = document.createElement('div');
+  scroll.className = 'time-record-scroll';
+  const table = document.createElement('table');
+  table.className = 'time-record-table';
+  const thead = document.createElement('thead');
+  const header = document.createElement('tr');
+  field.columns.forEach((column) => {
+    const cell = document.createElement('th');
+    cell.scope = 'col';
+    cell.textContent = column.label;
+    header.appendChild(cell);
+  });
+  thead.appendChild(header);
+  const tbody = document.createElement('tbody');
+  const addRecord = (record = {}) => {
+    const row = document.createElement('tr');
+    field.columns.forEach((column) => {
+      const cell = document.createElement('td');
+      const input = document.createElement('input');
+      input.type = column.type;
+      input.value = record[column.name] || '';
+      input.dataset.timeRecordField = column.name;
+      input.setAttribute(
+        'aria-label',
+        `${column.label}, day record ${tbody.rows.length + 1}`
+      );
+      cell.appendChild(input);
+      row.appendChild(cell);
+    });
+    tbody.appendChild(row);
+  };
+  getTimeRecordRows(formData, field).forEach(addRecord);
+  table.append(thead, tbody);
+  scroll.appendChild(table);
+  const addButton = document.createElement('button');
+  addButton.type = 'button';
+  addButton.className = 'ghost';
+  addButton.textContent = 'Add row';
+  addButton.onclick = () => {
+    if (tbody.rows.length >= 100) return;
+    addRecord();
+  };
+  section.append(heading, scroll, addButton);
+  return section;
+}
+
 function openTemplateForm(template, existingForm = null) {
   const form = $('user-template-form');
   const confirmation = $('user-template-confirmation');
@@ -479,10 +546,21 @@ function openTemplateForm(template, existingForm = null) {
   $('user-template-title').textContent = existingForm
     ? `Edit ${template.title}`
     : template.title;
+  $('user-template-dialog').classList.toggle(
+    'time-record-dialog',
+    template.fields.some((field) => field.type === 'time-records')
+  );
   $('user-template-feedback').hidden = true;
   const fields = $('user-template-fields');
   fields.replaceChildren();
   template.fields.forEach((field) => {
+    if (field.type === 'time-records') {
+      fields.appendChild(
+        createTimeRecordEditor(field, existingForm?.form_data || {})
+      );
+      return;
+    }
+    if (field.legacyTimeRecordColumn) return;
     const label = document.createElement('label');
     if (field.type === 'checkbox') {
       const input = document.createElement('input');
@@ -708,6 +786,7 @@ function buildGenericFormSheet(formData, metadata, template) {
   );
   template.fields.forEach((field) => {
     if (field.name === 'name') return;
+    if (field.type === 'time-records' || field.legacyTimeRecordColumn) return;
     const value =
       field.type === 'checkbox'
         ? formData[field.name]
@@ -722,6 +801,15 @@ function buildGenericFormSheet(formData, metadata, template) {
     );
   });
   sheet.appendChild(fields);
+  const timeRecordField = template.fields.find(
+    (field) => field.type === 'time-records'
+  );
+  if (timeRecordField)
+    appendTimeRecordsToSheet(
+      sheet,
+      getTimeRecordRows(formData, timeRecordField),
+      timeRecordField
+    );
 
   const status = document.createElement('p');
   status.className = 'leave-sheet-status';
@@ -766,6 +854,36 @@ function buildGenericFormSheet(formData, metadata, template) {
     sheet.appendChild(reason);
   }
   return sheet;
+}
+
+function appendTimeRecordsToSheet(sheet, records, field) {
+  const heading = document.createElement('h2');
+  heading.textContent = field.label.toUpperCase();
+  const scroll = document.createElement('div');
+  scroll.className = 'time-record-print-scroll';
+  const table = document.createElement('table');
+  table.className = 'time-record-print-table';
+  const thead = document.createElement('thead');
+  const header = document.createElement('tr');
+  field.columns.forEach((column) => {
+    const cell = document.createElement('th');
+    cell.textContent = column.label.toUpperCase();
+    header.appendChild(cell);
+  });
+  thead.appendChild(header);
+  const tbody = document.createElement('tbody');
+  records.forEach((record) => {
+    const row = document.createElement('tr');
+    field.columns.forEach((column) => {
+      const cell = document.createElement('td');
+      cell.textContent = record[column.name] || '';
+      row.appendChild(cell);
+    });
+    tbody.appendChild(row);
+  });
+  table.append(thead, tbody);
+  scroll.appendChild(table);
+  sheet.append(heading, scroll);
 }
 
 async function printSavedForm(form) {
@@ -1152,10 +1270,21 @@ async function submitTemplateForm(event) {
     const values = new FormData(form);
     const data = {};
     template.fields.forEach((field) => {
+      if (field.type === 'time-records' || field.legacyTimeRecordColumn) return;
       data[field.name] =
         field.type === 'checkbox'
           ? values.get(field.name) === 'on'
           : values.get(field.name) || '';
+    });
+    form.querySelectorAll('[data-time-records]').forEach((editor) => {
+      data[editor.dataset.timeRecords] = Array.from(
+        editor.querySelectorAll('tbody tr'),
+        (row) =>
+          Object.fromEntries(
+            Array.from(row.querySelectorAll('[data-time-record-field]'),
+              (input) => [input.dataset.timeRecordField, input.value])
+          )
+      );
     });
     data.signature = templateSignaturePad.toDataURL();
     if (formBeingEdited) {

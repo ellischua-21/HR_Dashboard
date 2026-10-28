@@ -568,6 +568,53 @@ dialog {
   max-height: 88vh;
   overflow: auto;
 }
+dialog.time-record-dialog {
+  width: min(98vw, 1440px);
+  max-width: 1440px;
+}
+.time-record-editor {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.time-record-editor h3 {
+  margin: 8px 0;
+  font-size: 16px;
+}
+.time-record-scroll,
+.time-record-print-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.time-record-table,
+.time-record-print-table {
+  width: 100%;
+  min-width: 960px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.time-record-table th,
+.time-record-table td,
+.time-record-print-table th,
+.time-record-print-table td {
+  padding: 5px;
+  border: 1px solid var(--rule);
+  text-align: left;
+  vertical-align: middle;
+}
+.time-record-table th,
+.time-record-print-table th {
+  font-size: 11px;
+  line-height: 1.25;
+}
+.time-record-table input {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 3px;
+  font-size: 12px;
+}
+.time-record-editor > button {
+  margin-top: 8px;
+}
 dialog::backdrop {
   background: rgba(42, 35, 40, 0.45);
 }
@@ -1308,6 +1355,19 @@ legend {
   }
   body.printing-leave-form .leave-sheet-topline {
     white-space: pre-wrap;
+  }
+  body.printing-leave-form .time-record-print-scroll {
+    overflow: visible;
+  }
+  body.printing-leave-form .time-record-print-table {
+    width: 100%;
+    min-width: 0;
+    font-size: 8px;
+  }
+  body.printing-leave-form .time-record-print-table th,
+  body.printing-leave-form .time-record-print-table td {
+    padding: 2px;
+    overflow-wrap: anywhere;
   }
 }
 .account-lists .tablewrap {
