@@ -314,6 +314,15 @@ function appendCaseField(parent, label, value) {
   parent.appendChild(item);
 }
 
+function appendIncidentFieldGroup(parent, title, fields) {
+  const section = incidentElement('section', 'incident-case-section');
+  section.appendChild(incidentElement('h3', '', title));
+  const grid = incidentElement('div', 'incident-case-grid');
+  fields.forEach(([label, value]) => appendCaseField(grid, label, value));
+  section.appendChild(grid);
+  parent.appendChild(section);
+}
+
 function appendIncidentParticipantList(parent, type, participants) {
   const people = participants.filter(
     (person) => person.participantType === type
@@ -401,7 +410,7 @@ function renderIncidentSignature(
     canvas.setAttribute('aria-label', `Sign as ${label}`);
     const controls = incidentElement('div', 'actions');
     const clear = incidentElement('button', 'ghost', 'Clear signature');
-    const sign = incidentElement('button', '', `Sign as ${label}`);
+    const sign = incidentElement('button', '', 'Sign');
     clear.type = sign.type = 'button';
     controls.append(clear, sign);
     section.append(canvas, controls);
@@ -1635,24 +1644,26 @@ function renderIncidentReport(body, incident) {
     }
   });
   body.appendChild(print);
-  const summary = incidentElement('div', 'incident-case-grid');
-  [
-    ['Status', incident.status],
+  appendIncidentFieldGroup(body, 'Reporter Details', [
     ['Reported By', incident.reporterName],
     ['Department', incident.department],
     ['Position', incident.position],
-    ['Date of Report', incident.dateReported],
+    ['Date of Report', incident.dateReported]
+  ]);
+  appendIncidentFieldGroup(body, 'Reported Employee Details', [
     ['Employee Being Reported', incident.reportedEmployeeName],
     ['Employee ID', incident.reportedEmployeeId],
     ['Employee Department', incident.reportedEmployeeDepartment],
     ['Employee Position', incident.reportedEmployeePosition],
-    ['Assigned Head', incident.assignedHeadEmail || 'None assigned'],
+    ['Assigned Head', incident.assignedHeadEmail || 'None assigned']
+  ]);
+  appendIncidentFieldGroup(body, 'Incident Details', [
+    ['Status', incident.status],
     ['Subject', incident.subject],
     ['Date of Incident', incident.incidentDate],
     ['Location', incident.location],
     ['Time', String(incident.incidentTime).slice(0, 5)]
-  ].forEach(([label, value]) => appendCaseField(summary, label, value));
-  body.appendChild(summary);
+  ]);
 
   const narrative = incidentElement('section', 'incident-case-section');
   narrative.appendChild(incidentElement('h3', '', 'Incident Description'));

@@ -211,3 +211,56 @@ test('event links open Track for all roles, including closed cases', () => {
     );
   }
 });
+
+test('reported employees see one combined filing and acknowledgment notification', async (t) => {
+  const { pool } = require('../server/db/database');
+  const { getInbox } = require('../server/services/InboxService');
+  t.mock.method(pool, 'execute', async (sql) => {
+    if (sql.includes('FROM user_roles WHERE email'))
+      return [[{ email: 'employee@example.com', role: 'STAFF', active: 1 }]];
+    if (sql.includes('FROM hr_announcements')) return [[]];
+    if (sql.includes('FROM incident_notifications n'))
+      return [
+        [
+          {
+            notificationId: 12,
+            notificationType: 'IR_SUBMITTED',
+            createdAt: '2026-10-28T08:00:00Z',
+            viewedAt: null,
+            incidentId: 4,
+            caseNumber: 'IR-4',
+            subject: 'Test incident',
+            reportedEmployeeName: 'Employee',
+            reportedEmployeeEmail: 'employee@example.com',
+            status: 'PENDING SIGNATURE',
+            requiresAction: 0
+          },
+          {
+            notificationId: 13,
+            notificationType: 'EMPLOYEE_SIGNATURE',
+            createdAt: '2026-10-28T08:00:00Z',
+            viewedAt: null,
+            incidentId: 4,
+            caseNumber: 'IR-4',
+            subject: 'Test incident',
+            reportedEmployeeName: 'Employee',
+            reportedEmployeeEmail: 'employee@example.com',
+            status: 'PENDING SIGNATURE',
+            requiresAction: 1
+          }
+        ]
+      ];
+    throw new Error(`Unexpected query: ${sql}`);
+  });
+  const items = await getInbox({
+    session: { userEmail: 'employee@example.com' }
+  });
+  const incidentItems = items.filter((item) => item.type === 'INCIDENT');
+  assert.equal(incidentItems.length, 1);
+  assert.equal(
+    incidentItems[0].title,
+    'Incident Report filed — acknowledgment required'
+  );
+  assert.equal(incidentItems[0].status, 'ACTION_REQUIRED');
+  assert.equal(incidentItems[0].unseen, true);
+});

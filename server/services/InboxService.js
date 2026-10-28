@@ -89,7 +89,8 @@ async function getInbox(req) {
     `SELECT n.id AS notificationId, n.notification_type AS notificationType,
             n.created_at AS createdAt, n.viewed_at AS viewedAt,
             i.id AS incidentId, i.case_number AS caseNumber, i.subject,
-            i.reported_employee_name AS reportedEmployeeName, i.status,
+            i.reported_employee_name AS reportedEmployeeName,
+            i.reported_employee_email AS reportedEmployeeEmail, i.status,
             CASE
               WHEN i.status = 'PENDING SIGNATURE' AND n.notification_type = 'EMPLOYEE_SIGNATURE' AND employee_signature.incident_id IS NULL THEN 1
               WHEN i.status = 'PENDING SIGNATURE' AND n.notification_type = 'HEAD_SIGNATURE' AND head_signature.incident_id IS NULL THEN 1
@@ -107,14 +108,39 @@ async function getInbox(req) {
      ORDER BY n.created_at DESC, n.id DESC LIMIT 500`,
     [user.email, ...incidentScope.values]
   );
+  const employeeSignatureCases = new Set(
+    incidentNotifications
+      .filter(
+        (notification) =>
+          notification.notificationType === 'EMPLOYEE_SIGNATURE' &&
+          notification.reportedEmployeeEmail?.toLowerCase() ===
+            user.email.toLowerCase()
+      )
+      .map((notification) => Number(notification.incidentId))
+  );
   incidentNotifications.forEach((notification) => {
+    const isReportedEmployee =
+      notification.reportedEmployeeEmail?.toLowerCase() ===
+      user.email.toLowerCase();
+    if (
+      notification.notificationType === 'IR_SUBMITTED' &&
+      isReportedEmployee &&
+      employeeSignatureCases.has(Number(notification.incidentId))
+    )
+      return;
     const needsSignature = Boolean(notification.requiresAction);
     items.push({
       id: `incident-${notification.notificationId}`,
       type: 'INCIDENT',
       status: needsSignature ? 'ACTION_REQUIRED' : notification.status,
       unseen: !notification.viewedAt,
-      title: notificationTitle(notification.notificationType),
+      title:
+        notification.notificationType === 'EMPLOYEE_SIGNATURE' &&
+        isReportedEmployee
+          ? needsSignature
+            ? 'Incident Report filed — acknowledgment required'
+            : 'Incident Report filed'
+          : notificationTitle(notification.notificationType),
       message:
         notification.notificationType === 'NTE_ISSUED'
           ? `${notification.caseNumber} has advanced. Open HRIS to view information available to your account.`

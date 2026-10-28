@@ -786,6 +786,12 @@ async function notifyIncidentParties(connection, incident, type) {
   );
   reviewers.forEach((account) => recipients.add(account.email));
   for (const email of recipients) {
+    if (
+      type === 'IR_SUBMITTED' &&
+      incident.reported_employee_email &&
+      email.toLowerCase() === incident.reported_employee_email.toLowerCase()
+    )
+      continue;
     await connection.execute(
       `INSERT IGNORE INTO incident_notifications
        (incident_id, recipient_email, notification_type) VALUES (?, ?, ?)`,
@@ -3325,11 +3331,32 @@ async function markIncidentNotificationSeen(req, notificationId) {
   const id = Number(notificationId);
   if (!Number.isSafeInteger(id) || id < 1)
     throw httpError('Choose a valid notification.', 400);
-  await pool.execute(
-    `UPDATE incident_notifications SET viewed_at = COALESCE(viewed_at, CURRENT_TIMESTAMP)
-     WHERE id = ? AND recipient_email = ?`,
+  const [[notification]] = await pool.execute(
+    `SELECT n.incident_id AS incidentId, n.notification_type AS notificationType,
+            i.reported_employee_email AS reportedEmployeeEmail
+     FROM incident_notifications n
+     JOIN incident_reports i ON i.id = n.incident_id
+     WHERE n.id = ? AND n.recipient_email = ? LIMIT 1`,
     [id, user.email]
   );
+  if (
+    notification?.notificationType === 'EMPLOYEE_SIGNATURE' &&
+    notification.reportedEmployeeEmail?.toLowerCase() ===
+      user.email.toLowerCase()
+  ) {
+    await pool.execute(
+      `UPDATE incident_notifications
+       SET viewed_at = COALESCE(viewed_at, CURRENT_TIMESTAMP)
+       WHERE recipient_email = ? AND (id = ? OR (incident_id = ? AND notification_type = 'IR_SUBMITTED'))`,
+      [user.email, id, notification.incidentId]
+    );
+  } else {
+    await pool.execute(
+      `UPDATE incident_notifications SET viewed_at = COALESCE(viewed_at, CURRENT_TIMESTAMP)
+       WHERE id = ? AND recipient_email = ?`,
+      [id, user.email]
+    );
+  }
   return { ok: true };
 }
 

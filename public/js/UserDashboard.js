@@ -938,9 +938,7 @@ function reviewRow(form) {
         decision === 'APPROVED'
           ? noHrSignature
             ? 'Approve'
-            : isHead && !(session.is_hr_head && form.submitter_role === 'HR')
-              ? 'Sign and forward'
-              : 'Sign and approve'
+            : 'Sign'
           : 'Reject';
       if (decision === 'REJECTED') button.className = 'ghost';
       button.onclick = async () => {
@@ -1035,7 +1033,7 @@ function openHeadSignature(form) {
   $('head-signature-pad').previousElementSibling.textContent =
     session.is_hr_head ? 'Head HR signature' : 'Head signature';
   $('head-signature-form').querySelector('[type="submit"]').textContent =
-    hrHeadApproval ? 'Sign and approve' : 'Sign and forward to HR/Admin';
+    'Sign';
   $('head-signature-feedback').hidden = true;
   $('head-signature-dialog').showModal();
   headSignaturePad.clear();

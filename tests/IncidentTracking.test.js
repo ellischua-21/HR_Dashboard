@@ -5,6 +5,9 @@ const {
   incidentAccessScope,
   buildIncidentTracking
 } = require('../server/services/incident-management/Tracking');
+const {
+  publicTimeline
+} = require('../server/services/incident-management/Activity');
 
 const report = {
   id: 12,
@@ -71,6 +74,50 @@ test('pending signatures remain current until both required acknowledgments exis
   assert.equal(stage(result, 'PENDING SIGNATURE').state, 'current');
   assert.equal(stage(result, 'SIGNED').reachedAt, null);
   assert.equal(stage(result, 'SIGNED').state, 'upcoming');
+});
+
+test('signature timeline entries identify the account that signed', () => {
+  const timeline = publicTimeline(
+    report,
+    [
+      {
+        action: 'EMPLOYEE_SIGNED',
+        actorEmail: 'hr@example.com',
+        createdAt: '2026-10-02T08:00:00Z'
+      },
+      {
+        action: 'SIGNATURES_COMPLETED',
+        actorEmail: 'hr@example.com',
+        createdAt: '2026-10-02T09:00:00Z'
+      }
+    ],
+    [
+      {
+        role: 'EMPLOYEE',
+        signerEmail: 'employee@example.com',
+        signedAt: '2026-10-02T08:00:00Z'
+      },
+      {
+        role: 'HEAD',
+        signerEmail: 'head@example.com',
+        signedAt: '2026-10-02T09:00:00Z'
+      },
+      {
+        role: 'HR',
+        signerEmail: 'hr@example.com',
+        signedAt: '2026-10-03T08:00:00Z'
+      }
+    ]
+  );
+  assert.equal(
+    timeline.find((entry) => entry.action === 'EMPLOYEE_SIGNED').performedBy,
+    'employee@example.com'
+  );
+  assert.equal(
+    timeline.find((entry) => entry.action === 'SIGNATURES_COMPLETED')
+      .performedBy,
+    'head@example.com'
+  );
 });
 
 test('signed stage dates use the last required signature and support a case without a Head', () => {

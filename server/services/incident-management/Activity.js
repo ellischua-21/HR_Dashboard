@@ -44,13 +44,29 @@ const TARGET_STATUS = {
 };
 
 function publicTimeline(incident, activity, signatures) {
+  const signatureFor = (role) =>
+    signatures.find((signature) => signature.role === role);
+  const headRequired = Boolean(incident.assignedHeadEmail);
+  const lastRequiredSignature = signatures
+    .filter((signature) =>
+      ['EMPLOYEE', ...(headRequired ? ['HEAD'] : [])].includes(signature.role)
+    )
+    .sort(
+      (left, right) => new Date(right.signedAt) - new Date(left.signedAt)
+    )[0];
+  const signerByAction = {
+    EMPLOYEE_SIGNED: signatureFor('EMPLOYEE')?.signerEmail,
+    HEAD_SIGNED: signatureFor('HEAD')?.signerEmail,
+    HR_SIGNED: signatureFor('HR')?.signerEmail,
+    SIGNATURES_COMPLETED: lastRequiredSignature?.signerEmail
+  };
   // Descriptions come from an allowlist, never from confidential internal remarks.
   const timeline = activity
     .filter((entry) => PUBLIC_ACTIONS[entry.action])
     .map((entry) => ({
       action: entry.action,
       label: PUBLIC_ACTIONS[entry.action],
-      performedBy: entry.actorEmail,
+      performedBy: signerByAction[entry.action] || entry.actorEmail,
       createdAt: entry.createdAt,
       previousStatus: entry.previousStatus || null,
       newStatus: entry.newStatus || null

@@ -366,13 +366,6 @@
       );
     const actions = byId('ir-track-actions');
     actions.replaceChildren();
-    if (incident.canReview) {
-      const review = el('button', '', 'Open in Review');
-      review.type = 'button';
-      review.onclick = () =>
-        window.openIncidentRoute(incident.id, 'incident-review');
-      actions.appendChild(review);
-    }
     const refresh = el('button', 'ghost', 'Refresh status');
     refresh.type = 'button';
     refresh.onclick = () => select(incident.id);
