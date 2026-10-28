@@ -126,13 +126,13 @@ async function getInbox(req) {
      ORDER BY n.created_at DESC, n.id DESC LIMIT 500`,
     [user.email, ...incidentScope.values]
   );
-  const employeeSignatureCases = new Set(
+  const signatureCases = new Set(
     incidentNotifications
       .filter(
         (notification) =>
-          notification.notificationType === 'EMPLOYEE_SIGNATURE' &&
-          notification.reportedEmployeeEmail?.toLowerCase() ===
-            user.email.toLowerCase()
+          ['EMPLOYEE_SIGNATURE', 'HEAD_SIGNATURE'].includes(
+            notification.notificationType
+          )
       )
       .map((notification) => Number(notification.incidentId))
   );
@@ -142,21 +142,26 @@ async function getInbox(req) {
       user.email.toLowerCase();
     if (
       notification.notificationType === 'IR_SUBMITTED' &&
-      isReportedEmployee &&
-      employeeSignatureCases.has(Number(notification.incidentId))
+      signatureCases.has(Number(notification.incidentId))
     )
       return;
     const needsSignature = Boolean(notification.requiresAction);
+    const isEmployeeSignature =
+      notification.notificationType === 'EMPLOYEE_SIGNATURE' &&
+      isReportedEmployee;
+    const isHeadSignature =
+      notification.notificationType === 'HEAD_SIGNATURE';
     items.push({
       id: `incident-${notification.notificationId}`,
       type: 'INCIDENT',
       status: needsSignature ? 'ACTION_REQUIRED' : notification.status,
       unseen: !notification.viewedAt,
       title:
-        notification.notificationType === 'EMPLOYEE_SIGNATURE' &&
-        isReportedEmployee
+        isEmployeeSignature || isHeadSignature
           ? needsSignature
-            ? 'Incident Report filed — acknowledgment required'
+            ? isHeadSignature
+              ? 'Incident Report filed. Requires your review and signature'
+              : 'Incident Report filed. Requires your acknowledgment and signature'
             : 'Incident Report filed'
           : notificationTitle(notification.notificationType),
       message:

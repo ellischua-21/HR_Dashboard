@@ -259,8 +259,59 @@ test('reported employees see one combined filing and acknowledgment notification
   assert.equal(incidentItems.length, 1);
   assert.equal(
     incidentItems[0].title,
-    'Incident Report filed — acknowledgment required'
+    'Incident Report filed. Requires your acknowledgment and signature'
   );
   assert.equal(incidentItems[0].status, 'ACTION_REQUIRED');
   assert.equal(incidentItems[0].unseen, true);
+});
+
+test('assigned Heads receive one combined filing and signature notification', async (t) => {
+  const { pool } = require('../server/db/database');
+  const { getInbox } = require('../server/services/InboxService');
+  t.mock.method(pool, 'execute', async (sql) => {
+    if (sql.includes('FROM user_roles WHERE email'))
+      return [[{ email: 'head@example.com', role: 'HEAD', active: 1 }]];
+    if (sql.includes('FROM hr_announcements')) return [[]];
+    if (sql.includes('FROM user_forms f')) return [[]];
+    if (sql.includes('FROM incident_notifications n'))
+      return [
+        [
+          {
+            notificationId: 22,
+            notificationType: 'IR_SUBMITTED',
+            createdAt: '2026-10-28T08:00:00Z',
+            viewedAt: null,
+            incidentId: 5,
+            caseNumber: 'IR-5',
+            subject: 'Test incident',
+            reportedEmployeeName: 'Employee',
+            reportedEmployeeEmail: 'employee@example.com',
+            status: 'PENDING SIGNATURE',
+            requiresAction: 0
+          },
+          {
+            notificationId: 23,
+            notificationType: 'HEAD_SIGNATURE',
+            createdAt: '2026-10-28T08:00:00Z',
+            viewedAt: null,
+            incidentId: 5,
+            caseNumber: 'IR-5',
+            subject: 'Test incident',
+            reportedEmployeeName: 'Employee',
+            reportedEmployeeEmail: 'employee@example.com',
+            status: 'PENDING SIGNATURE',
+            requiresAction: 1
+          }
+        ]
+      ];
+    throw new Error(`Unexpected query: ${sql}`);
+  });
+  const items = await getInbox({ session: { userEmail: 'head@example.com' } });
+  const incidentItems = items.filter((item) => item.type === 'INCIDENT');
+  assert.equal(incidentItems.length, 1);
+  assert.equal(
+    incidentItems[0].title,
+    'Incident Report filed. Requires your review and signature'
+  );
+  assert.equal(incidentItems[0].status, 'ACTION_REQUIRED');
 });
