@@ -234,6 +234,16 @@
         )
       );
     }
+    if (
+      incident.canReview &&
+      ['UNDER_REVIEW', 'UNDER INVESTIGATION'].includes(incident.status) &&
+      !(
+        incident.status === 'UNDER INVESTIGATION' &&
+        waitingForRequestedInformation
+      )
+    ) {
+      content.appendChild(ui.renderClosureAction(incident, controls));
+    }
     if (incident.status === 'EXPLANATION SENT') {
       const sent = tracking.stages.find(
         (stage) => stage.key === 'EXPLANATION SENT'

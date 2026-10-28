@@ -241,12 +241,8 @@
     const workflow = el('section', 'incident-case-section');
     workflow.appendChild(el('h3', '', 'Investigation findings'));
     const noteFeedback = el('p');
-    const closeFeedback = el('p');
-    [noteFeedback, closeFeedback].forEach((feedback) => {
-      feedback.hidden = true;
-      feedback.setAttribute('role', 'status');
-    });
-    const actionControls = { ...controls, feedback: closeFeedback };
+    noteFeedback.hidden = true;
+    noteFeedback.setAttribute('role', 'status');
     const note = el('textarea');
     note.rows = 4;
     note.maxLength = 4000;
@@ -284,48 +280,13 @@
         saveNote.disabled = false;
       }
     };
-    const closeReason = el('textarea');
-    closeReason.rows = 3;
-    closeReason.maxLength = 4000;
-    closeReason.placeholder =
-      'Investigation findings and reason for closure (required)';
-    const close = el('button', 'ghost', 'Close case');
-    close.type = 'button';
-    close.onclick = async () => {
-      ui.feedback(closeFeedback, '');
-      if (!closeReason.value.trim()) {
-        ui.feedback(
-          closeFeedback,
-          'Enter the investigation findings and reason for closure.',
-          true
-        );
-        closeReason.focus();
-        return;
-      }
-      close.disabled = true;
-      try {
-        await ui.transition(
-          incident,
-          'CLOSE_INVESTIGATION',
-          closeReason.value,
-          actionControls
-        );
-      } finally {
-        close.disabled = false;
-      }
-    };
     workflow.append(
       el('h4', '', 'Record findings and evidence'),
       note,
       files,
       noteFeedback,
-      saveNote,
-      el('h4', '', 'Close without disciplinary proceedings'),
-      closeReason,
-      closeFeedback,
-      close
+      saveNote
     );
-
     parent.appendChild(workflow);
   }
 

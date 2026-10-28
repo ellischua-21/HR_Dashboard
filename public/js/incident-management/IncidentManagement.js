@@ -409,40 +409,79 @@ let incidentOpenRequest = 0;
 function renderIncidentReviewActions(incident, ui = {}) {
   const workflow = incidentElement('section', 'incident-case-section');
   workflow.appendChild(incidentElement('h3', '', 'HR Review'));
+  const actions = incidentElement('div', 'actions');
+  const investigate = incidentElement(
+    'button',
+    '',
+    'Require further investigation'
+  );
+  investigate.type = 'button';
+  investigate.onclick = () =>
+    runIncidentTransition(incident, 'START_INVESTIGATION', '', ui);
+  actions.appendChild(investigate);
+  workflow.append(
+    incidentElement(
+      'p',
+      'note',
+      'Further investigation moves the case to the investigation stage.'
+    ),
+    actions
+  );
+  return workflow;
+}
+
+function renderIncidentClosureAction(incident, ui = {}) {
+  if (
+    !incident.canReview ||
+    !['UNDER_REVIEW', 'UNDER INVESTIGATION'].includes(incident.status)
+  )
+    return null;
+  const isInvestigation = incident.status === 'UNDER INVESTIGATION';
+  const workflow = incidentElement('section', 'incident-case-section');
+  const toggle = incidentElement('button', 'ghost', 'Close for documentation');
+  toggle.type = 'button';
   const reason = incidentElement('textarea');
   reason.rows = 3;
   reason.maxLength = 4000;
-  reason.placeholder = 'Reason or preliminary findings';
+  reason.placeholder = isInvestigation
+    ? 'Investigation findings and reason for closure (required)'
+    : 'Reason for closing the case (required)';
   const reasonFeedback = incidentElement(
     'p',
     'errs',
-    'Enter a reason or preliminary findings.'
+    isInvestigation
+      ? 'Enter the investigation findings and reason for closure.'
+      : 'Enter a reason for closing the case.'
   );
   reasonFeedback.hidden = true;
   reason.addEventListener('input', () => {
     if (reason.value.trim()) reasonFeedback.hidden = true;
   });
-  const actions = incidentElement('div', 'actions');
-  const close = incidentElement('button', 'ghost', 'Close for documentation');
-  const investigate = incidentElement(
-    'button',
-    '',
-    'Further investigation required'
-  );
-  close.type = investigate.type = 'button';
-  const submitReviewAction = (action) => {
+  const panel = incidentElement('div', 'incident-case-section');
+  panel.hidden = true;
+  const confirmClose = incidentElement('button', '', 'Confirm closure');
+  confirmClose.type = 'button';
+  toggle.onclick = () => {
+    panel.hidden = !panel.hidden;
+    toggle.textContent = panel.hidden
+      ? 'Close for documentation'
+      : 'Hide closure form';
+  };
+  confirmClose.onclick = () => {
     if (!reason.value.trim()) {
       reasonFeedback.hidden = false;
       reason.focus();
       return;
     }
     reasonFeedback.hidden = true;
-    runIncidentTransition(incident, action, reason.value, ui);
+    runIncidentTransition(
+      incident,
+      isInvestigation ? 'CLOSE_INVESTIGATION' : 'CLOSE_DOCUMENTATION',
+      reason.value,
+      ui
+    );
   };
-  close.onclick = () => submitReviewAction('CLOSE_DOCUMENTATION');
-  investigate.onclick = () => submitReviewAction('START_INVESTIGATION');
-  actions.append(close, investigate);
-  workflow.append(
+  panel.append(
     incidentElement(
       'p',
       'note',
@@ -450,8 +489,9 @@ function renderIncidentReviewActions(incident, ui = {}) {
     ),
     reason,
     reasonFeedback,
-    actions
+    confirmClose
   );
+  workflow.append(toggle, panel);
   return workflow;
 }
 
@@ -724,6 +764,7 @@ window.IncidentCaseUI = {
   renderNte: renderIncidentNte,
   renderEvaluation: renderIncidentEvaluation,
   renderReviewActions: renderIncidentReviewActions,
+  renderClosureAction: renderIncidentClosureAction,
   renderDecision: renderIncidentDecision,
   readEvidenceFiles: readIncidentEvidenceFiles,
   transition: runIncidentTransition,

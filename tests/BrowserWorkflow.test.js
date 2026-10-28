@@ -221,11 +221,19 @@ test('investigation actions are shared and available only to reviewers on active
       .querySelectorAll('button')
       .some((b) => b.textContent === 'Save investigation note')
   );
-  assert.ok(
+  assert.equal(
     parent
       .querySelectorAll('button')
-      .some((b) => b.textContent === 'Close case')
+      .some((button) => button.textContent === 'Close for documentation'),
+    false
   );
+  const closure = context.IncidentCaseUI.renderClosureAction(incident, {});
+  parent.appendChild(closure);
+  const closeToggle = closure
+    .querySelectorAll('button')
+    .find((button) => button.textContent === 'Close for documentation');
+  await closeToggle.click();
+  assert.equal(closeToggle.textContent, 'Hide closure form');
   const employeeView = document.createElement('section');
   context.IncidentInvestigation.render(
     employeeView,
@@ -240,6 +248,75 @@ test('investigation actions are shared and available only to reviewers on active
     {}
   );
   assert.equal(archived.querySelectorAll('button').length, 0);
+});
+
+test('review and NTE forms appear only after their action is selected', async () => {
+  const browser = createBrowser();
+  browser.loadDashboard();
+  const { context, document } = browser;
+  const root = document.createElement('section');
+  let transitionArgs;
+  context.fetch = async (url, options) => {
+    const method = url.split('/').pop();
+    if (method === 'transitionIncident')
+      transitionArgs = JSON.parse(options.body).args;
+    return {
+      ok: true,
+      json: async () =>
+        method === 'transitionIncident'
+          ? { status: 'UNDER INVESTIGATION' }
+          : { track: 0, review: 0 }
+    };
+  };
+  context.refreshInboxBadge = async () => {};
+  context.refreshIncidentBadges = async () => {};
+  const incident = {
+    id: 19,
+    status: 'UNDER_REVIEW',
+    canReview: true
+  };
+  const review = context.IncidentCaseUI.renderReviewActions(incident, {
+    reload: async () => {}
+  });
+  root.appendChild(review);
+  const closure = context.IncidentCaseUI.renderClosureAction(incident, {
+    reload: async () => {}
+  });
+  root.appendChild(closure);
+  const closeToggle = closure
+    .querySelectorAll('button')
+    .find((button) => button.textContent === 'Close for documentation');
+  const closePanel = closure.querySelectorAll('div').at(-1);
+  assert.equal(closePanel.hidden, true);
+  await closeToggle.click();
+  assert.equal(closePanel.hidden, false);
+  const investigate = review
+    .querySelectorAll('button')
+    .find((button) => button.textContent === 'Require further investigation');
+  await investigate.click();
+  assert.deepEqual(transitionArgs, [19, 'START_INVESTIGATION', '']);
+
+  const nteRoot = document.createElement('section');
+  context.IncidentCaseUI.renderNte(
+    nteRoot,
+    {
+      ...incident,
+      reportedEmployeeEmail: 'employee@example.com',
+      currentUserEmail: 'hr@example.com',
+      nte: null,
+      explanations: [],
+      explanationAddenda: []
+    },
+    [],
+    {}
+  );
+  const nteToggle = nteRoot
+    .querySelectorAll('button')
+    .find((button) => button.textContent === 'Prepare NTE');
+  const nteEditor = nteRoot.querySelectorAll('.incident-nte-editor')[0];
+  assert.equal(nteEditor.hidden, true);
+  await nteToggle.click();
+  assert.equal(nteEditor.hidden, false);
 });
 
 test('Track supplies its reload and visible feedback to decision controls', async () => {

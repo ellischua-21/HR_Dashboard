@@ -62,8 +62,16 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
     ['UNDER_REVIEW', 'UNDER INVESTIGATION'].includes(incident.status) &&
     (!incident.nte || incident.nte.status === 'DRAFT')
   ) {
+    const toggleEditor = incidentElement('button', 'ghost', 'Prepare NTE');
+    toggleEditor.type = 'button';
     const editor = incidentElement('div', 'incident-nte-editor');
-    editor.appendChild(incidentElement('h4', '', 'Prepare and issue an NTE'));
+    editor.hidden = true;
+    toggleEditor.onclick = () => {
+      editor.hidden = !editor.hidden;
+      toggleEditor.textContent = editor.hidden
+        ? 'Prepare NTE'
+        : 'Hide NTE form';
+    };
     const allegation = incidentElement('textarea');
     allegation.rows = 5;
     allegation.maxLength = 12000;
@@ -218,7 +226,7 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
       signatureControls,
       feedback
     );
-    section.appendChild(editor);
+    section.append(toggleEditor, editor);
     padSetup.push(() => {
       ntePad = window.createSignaturePad(signatureCanvas, clear);
     });
