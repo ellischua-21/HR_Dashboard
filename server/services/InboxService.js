@@ -27,8 +27,9 @@ async function getInbox(req) {
        LEFT JOIN user_roles u ON u.email = a.created_by
        LEFT JOIN announcement_views v
          ON v.announcement_id = a.id AND v.user_email = ?
+       WHERE LOWER(a.created_by) <> LOWER(?)
        ORDER BY a.created_at DESC, a.id DESC LIMIT 500`,
-      [user.email]
+      [user.email, user.email]
     );
     announcements.forEach((announcement) => {
       items.push({
@@ -63,9 +64,9 @@ async function getInbox(req) {
        LEFT JOIN user_roles u ON u.email = f.user_email
        LEFT JOIN inbox_views v
          ON v.user_email = ? AND v.item_type = 'FORM' AND v.item_id = f.id
-       WHERE ${reviewScope.whereSql}
+       WHERE ${reviewScope.whereSql} AND LOWER(f.user_email) <> LOWER(?)
        ORDER BY f.submitted_at DESC, f.id DESC LIMIT 500`,
-      [user.email, ...reviewScope.whereValues]
+      [user.email, ...reviewScope.whereValues, user.email]
     );
     forms.forEach((form) => {
       items.push({
@@ -105,6 +106,13 @@ async function getInbox(req) {
        ON head_signature.incident_id = i.id
        AND head_signature.signatory_role = 'HEAD'
      WHERE n.recipient_email = ? AND ${incidentScope.sql}
+       AND NOT EXISTS (
+         SELECT 1 FROM incident_activity actor_activity
+         WHERE actor_activity.incident_id = i.id
+           AND LOWER(actor_activity.actor_email) = LOWER(n.recipient_email)
+           AND actor_activity.created_at <= n.created_at
+           AND TIMESTAMPDIFF(SECOND, actor_activity.created_at, n.created_at) <= 120
+       )
      ORDER BY n.created_at DESC, n.id DESC LIMIT 500`,
     [user.email, ...incidentScope.values]
   );

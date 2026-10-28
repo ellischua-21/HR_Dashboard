@@ -561,7 +561,7 @@ async function submitIncidentReport(req, input = {}) {
         'HEAD_SIGNATURE_REQUESTED',
         'Head acknowledgment requested.'
       );
-    await notifyIncidentParties(connection, createdCase, 'IR_SUBMITTED');
+    await notifyIncidentParties(connection, createdCase, 'IR_SUBMITTED', user.email);
     await connection.commit();
     return {
       ok: true,
@@ -765,7 +765,7 @@ async function recordIncidentActivity(
   return result.insertId;
 }
 
-async function notifyIncidentParties(connection, incident, type) {
+async function notifyIncidentParties(connection, incident, type, actorEmail) {
   const recipients = new Set(
     [
       incident.reporter_email,
@@ -786,6 +786,11 @@ async function notifyIncidentParties(connection, incident, type) {
   );
   reviewers.forEach((account) => recipients.add(account.email));
   for (const email of recipients) {
+    if (
+      actorEmail &&
+      email.toLowerCase() === actorEmail.toLowerCase()
+    )
+      continue;
     if (
       type === 'IR_SUBMITTED' &&
       incident.reported_employee_email &&
@@ -855,7 +860,7 @@ async function transitionIncident(req, incidentId, action, details = '') {
       transition.activity,
       cleanDetails
     );
-    await notifyIncidentParties(connection, incident, transition.notification);
+    await notifyIncidentParties(connection, incident, transition.notification, user.email);
     await connection.commit();
     return {
       ok: true,
@@ -1315,7 +1320,7 @@ async function issueIncidentNte(req, incidentId, input = {}) {
         documentReference: 'NTE:' + nte.nteId
       }
     );
-    await notifyIncidentParties(connection, incident, 'NTE_ISSUED');
+    await notifyIncidentParties(connection, incident, 'NTE_ISSUED', user.email);
     await connection.commit();
     return {
       ok: true,
@@ -1522,7 +1527,7 @@ async function startIncidentEvaluation(req, incidentId) {
       'EVALUATION_STARTED',
       'HR opened the submitted explanation for evaluation.'
     );
-    await notifyIncidentParties(connection, incident, 'EVALUATION_STARTED');
+    await notifyIncidentParties(connection, incident, 'EVALUATION_STARTED', user.email);
     await connection.commit();
     return { ok: true, status: 'EVALUATION' };
   } catch (error) {
@@ -1970,7 +1975,7 @@ async function issueIncidentDecision(req, incidentId, input = {}) {
         ? 'Final decision issued: no violation established.'
         : `Final decision issued: ${finalAction}.`
     );
-    await notifyIncidentParties(connection, incident, 'DECISION_ISSUED');
+    await notifyIncidentParties(connection, incident, 'DECISION_ISSUED', user.email);
     await connection.commit();
     return {
       ok: true,
@@ -2034,7 +2039,7 @@ async function closeIncidentDecision(req, incidentId, reason) {
       'DECISION_CASE_CLOSED',
       closureReason
     );
-    await notifyIncidentParties(connection, incident, 'CASE_CLOSED');
+    await notifyIncidentParties(connection, incident, 'CASE_CLOSED', user.email);
     await connection.commit();
     return { ok: true, status: 'CLOSED', trackingMilestone: 'DECISION ISSUED' };
   } catch (error) {
@@ -3256,7 +3261,7 @@ async function signIncidentCase(req, incidentId, signatoryRole, signatureData) {
         'SIGNATURES_COMPLETED',
         'Required acknowledgment signatures completed.'
       );
-      await notifyIncidentParties(connection, incident, 'HR_REVIEW_READY');
+      await notifyIncidentParties(connection, incident, 'HR_REVIEW_READY', user.email);
     }
     if (signatoryRole === 'HR') {
       await recordIncidentActivity(
@@ -3266,7 +3271,7 @@ async function signIncidentCase(req, incidentId, signatoryRole, signatureData) {
         'HR_REVIEW_STARTED',
         'HR review started after signature completion.'
       );
-      await notifyIncidentParties(connection, incident, 'HR_REVIEW_STARTED');
+      await notifyIncidentParties(connection, incident, 'HR_REVIEW_STARTED', user.email);
     }
     await connection.commit();
     return { ok: true, caseNumber: incident.case_number, status: nextStatus };
