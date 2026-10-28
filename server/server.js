@@ -268,6 +268,8 @@ const methods = {
     incidents.listIncidentRequestRecipients(req, incidentId),
   requestIncidentInformation: (req, incidentId, recipient, text) =>
     incidents.requestIncidentInformation(req, incidentId, recipient, text),
+  requestIncidentInformationBatch: (req, incidentId, requests) =>
+    incidents.requestIncidentInformationBatch(req, incidentId, requests),
   addIncidentInvestigationNote: (req, incidentId, text, files) =>
     incidents.addIncidentInvestigationNote(req, incidentId, text, files),
   respondToIncidentInformation: (req, incidentId, requestId, text, files) =>

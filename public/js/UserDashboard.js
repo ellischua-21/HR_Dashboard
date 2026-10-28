@@ -1333,7 +1333,11 @@ async function loadPendingAnnouncementsPopup() {
     const message = document.createElement('p');
     message.className = 'announcement-message';
     message.textContent =
-      notification.type === 'NTE_ISSUED'
+      notification.type.startsWith('INFO_REQ_')
+        ? `${notification.caseNumber}: ${notification.requestText}`
+        : notification.type === 'INVESTIGATION_STARTED'
+          ? `A further investigation has started for ${notification.caseNumber}. Review the case in TRACK and respond to any information request addressed to you.`
+          : notification.type === 'NTE_ISSUED'
         ? `${notification.caseNumber} has advanced. Open HRIS to view information available to your account.`
         : `${notification.caseNumber}: ${notification.subject} — ${notification.reportedEmployeeName}`;
     const open = document.createElement('button');

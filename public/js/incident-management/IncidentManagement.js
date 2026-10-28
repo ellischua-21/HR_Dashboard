@@ -1701,6 +1701,55 @@ function renderIncidentReport(body, incident) {
 }
 
 let incidentOpenRequest = 0;
+function renderIncidentReviewActions(incident, ui = {}) {
+  const workflow = incidentElement('section', 'incident-case-section');
+  workflow.appendChild(incidentElement('h3', '', 'HR Review'));
+  const reason = incidentElement('textarea');
+  reason.rows = 3;
+  reason.maxLength = 4000;
+  reason.placeholder = 'Reason or preliminary findings';
+  const reasonFeedback = incidentElement(
+    'p',
+    'errs',
+    'Enter a reason or preliminary findings.'
+  );
+  reasonFeedback.hidden = true;
+  reason.addEventListener('input', () => {
+    if (reason.value.trim()) reasonFeedback.hidden = true;
+  });
+  const actions = incidentElement('div', 'actions');
+  const close = incidentElement('button', 'ghost', 'Close for documentation');
+  const investigate = incidentElement(
+    'button',
+    '',
+    'Further investigation required'
+  );
+  close.type = investigate.type = 'button';
+  const submitReviewAction = (action) => {
+    if (!reason.value.trim()) {
+      reasonFeedback.hidden = false;
+      reason.focus();
+      return;
+    }
+    reasonFeedback.hidden = true;
+    runIncidentTransition(incident, action, reason.value, ui);
+  };
+  close.onclick = () => submitReviewAction('CLOSE_DOCUMENTATION');
+  investigate.onclick = () => submitReviewAction('START_INVESTIGATION');
+  actions.append(close, investigate);
+  workflow.append(
+    incidentElement(
+      'p',
+      'note',
+      'Closing for documentation requires a reason. It does not record a disciplinary violation.'
+    ),
+    reason,
+    reasonFeedback,
+    actions
+  );
+  return workflow;
+}
+
 async function openIncidentCase(incidentId, options = {}) {
   const ticket = ++incidentOpenRequest;
   const reviewView = !document.getElementById('view-incident-review').hidden;
@@ -1831,56 +1880,11 @@ async function openIncidentCase(incidentId, options = {}) {
     incident.canReview &&
     ['UNDER_REVIEW', 'UNDER INVESTIGATION'].includes(incident.status)
   ) {
-    const workflow = incidentElement('section', 'incident-case-section');
-    workflow.appendChild(
-      incidentElement(
-        'h3',
-        '',
-        incident.status === 'UNDER_REVIEW' ? 'HR Review' : 'Investigation'
-      )
-    );
     if (incident.status === 'UNDER_REVIEW') {
-      const reason = incidentElement('textarea');
-      reason.rows = 3;
-      reason.maxLength = 4000;
-      reason.placeholder = 'Reason or preliminary findings';
-      const actions = incidentElement('div', 'actions');
-      const close = incidentElement(
-        'button',
-        'ghost',
-        'Close for documentation'
-      );
-      const investigate = incidentElement(
-        'button',
-        '',
-        'Further investigation required'
-      );
-      close.type = investigate.type = 'button';
-      close.onclick = () =>
-        runIncidentTransition(
-          incident,
-          'CLOSE_DOCUMENTATION',
-          reason.value,
-          ui
-        );
-      investigate.onclick = () =>
-        runIncidentTransition(
-          incident,
-          'START_INVESTIGATION',
-          reason.value,
-          ui
-        );
-      actions.append(close, investigate);
-      workflow.append(
-        incidentElement(
-          'p',
-          'note',
-          'Closing for documentation requires a reason. It does not record a disciplinary violation.'
-        ),
-        reason,
-        actions
-      );
+      body.appendChild(renderIncidentReviewActions(incident, ui));
     } else {
+      const workflow = incidentElement('section', 'incident-case-section');
+      workflow.appendChild(incidentElement('h3', '', 'Investigation'));
       const note = incidentElement('textarea');
       note.rows = 4;
       note.maxLength = 4000;
@@ -1975,8 +1979,8 @@ async function openIncidentCase(incidentId, options = {}) {
             new Option(error.message || 'Participants unavailable', '')
           );
         });
+      body.appendChild(workflow);
     }
-    body.appendChild(workflow);
   }
 
   if (incident.status === 'UNDER INVESTIGATION') {
@@ -2202,6 +2206,7 @@ window.IncidentCaseUI = {
   renderReport: renderIncidentReport,
   renderSignature: renderIncidentSignature,
   renderNte: renderIncidentNte,
+  renderReviewActions: renderIncidentReviewActions,
   renderDecision: renderIncidentDecision,
   readEvidenceFiles: readIncidentEvidenceFiles,
   element: incidentElement,

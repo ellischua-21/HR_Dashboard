@@ -2547,6 +2547,13 @@ async function requestIncidentInformation(
   recipientEmail,
   requestText
 ) {
+  const result = await requestIncidentInformationBatch(req, incidentId, [
+    { recipientEmail, requestText }
+  ]);
+  return { ...result, requestId: result.requestIds[0] };
+}
+
+async function requestIncidentInformationBatch(req, incidentId, requests) {
   const user = await requirePerm(req, 'inbox.read');
   requireIncidentRole(
     user,
@@ -2554,16 +2561,24 @@ async function requestIncidentInformation(
     'Only HR and ADMIN can manage Incident Reports.'
   );
   const id = Number(incidentId);
-  const recipient = normalizeText(
-    String(recipientEmail || ''),
-    'Recipient',
-    191
-  );
-  const text = normalizeText(
-    String(requestText || ''),
-    'Information requested',
-    4000
-  );
+  if (
+    !Array.isArray(requests) ||
+    requests.length < 1 ||
+    requests.length > 50
+  )
+    throw httpError('Add between 1 and 50 information requests.', 400);
+  const normalizedRequests = requests.map((request) => ({
+    recipient: normalizeText(
+      String(request?.recipientEmail || ''),
+      'Recipient',
+      191
+    ),
+    text: normalizeText(
+      String(request?.requestText || ''),
+      'Information requested',
+      4000
+    )
+  }));
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -2573,42 +2588,49 @@ async function requestIncidentInformation(
         'Information can only be requested during investigation.',
         409
       );
-    const [allowed] = await connection.execute(
-      `SELECT 1 FROM user_roles u LEFT JOIN employees e ON LOWER(e.personal_email) = LOWER(u.email) AND e.record_status <> 'Archived'
-       WHERE LOWER(u.email) = LOWER(?) AND u.active = 1 AND (
-         LOWER(u.email) IN (LOWER(?), LOWER(?), LOWER(COALESCE(?, '')))
-         OR e.record_id IN (SELECT employee_record_id FROM incident_participants WHERE incident_id = ? AND employee_record_id IS NOT NULL)
-       ) LIMIT 1`,
-      [
-        recipient,
-        incident.reporter_email,
-        incident.reported_employee_email,
-        incident.assigned_head_email,
-        id
-      ]
-    );
-    if (!allowed.length)
-      throw httpError('Choose an authorized case participant.', 400);
-    const [result] = await connection.execute(
-      `INSERT INTO incident_information_requests (incident_id, requested_by, recipient_email, request_text)
-       VALUES (?, ?, ?, ?)`,
-      [id, user.email, recipient, text]
-    );
-    await recordIncidentActivity(
-      connection,
-      user,
-      incident,
-      'INFORMATION_REQUESTED',
-      `${recipient}: ${text}`,
-      { documentReference: 'INFORMATION_REQUEST:' + result.insertId }
-    );
-    const notificationType = `INFO_REQ_${result.insertId}`.slice(0, 32);
-    await connection.execute(
-      `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type) VALUES (?, ?, ?)`,
-      [id, recipient, notificationType]
-    );
+    const requestIds = [];
+    for (const request of normalizedRequests) {
+      const [allowed] = await connection.execute(
+        `SELECT 1 FROM user_roles u LEFT JOIN employees e ON LOWER(e.personal_email) = LOWER(u.email) AND e.record_status <> 'Archived'
+         WHERE LOWER(u.email) = LOWER(?) AND u.active = 1 AND (
+           LOWER(u.email) IN (LOWER(?), LOWER(?), LOWER(COALESCE(?, '')))
+           OR e.record_id IN (SELECT employee_record_id FROM incident_participants WHERE incident_id = ? AND employee_record_id IS NOT NULL)
+         ) LIMIT 1`,
+        [
+          request.recipient,
+          incident.reporter_email,
+          incident.reported_employee_email,
+          incident.assigned_head_email,
+          id
+        ]
+      );
+      if (!allowed.length)
+        throw httpError(
+          `Choose an authorized case participant for ${request.recipient}.`,
+          400
+        );
+      const [result] = await connection.execute(
+        `INSERT INTO incident_information_requests (incident_id, requested_by, recipient_email, request_text)
+         VALUES (?, ?, ?, ?)`,
+        [id, user.email, request.recipient, request.text]
+      );
+      requestIds.push(result.insertId);
+      await recordIncidentActivity(
+        connection,
+        user,
+        incident,
+        'INFORMATION_REQUESTED',
+        `${request.recipient}: ${request.text}`,
+        { documentReference: 'INFORMATION_REQUEST:' + result.insertId }
+      );
+      const notificationType = `INFO_REQ_${result.insertId}`.slice(0, 32);
+      await connection.execute(
+        `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type) VALUES (?, ?, ?)`,
+        [id, request.recipient, notificationType]
+      );
+    }
     await connection.commit();
-    return { ok: true, requestId: result.insertId };
+    return { ok: true, requestIds };
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -3314,15 +3336,29 @@ async function listPendingIncidentNotifications(req) {
   const [rows] = await pool.execute(
     `SELECT n.id, n.notification_type AS type, n.created_at AS createdAt,
     i.id AS incidentId, i.case_number AS caseNumber, i.subject, i.status,
-    i.reported_employee_name AS reportedEmployeeName FROM incident_notifications n
+    i.reported_employee_name AS reportedEmployeeName,
+    information_request.request_text AS requestText FROM incident_notifications n
     JOIN incident_reports i ON i.id = n.incident_id
-    WHERE n.recipient_email = ? AND n.viewed_at IS NULL AND i.status = 'PENDING SIGNATURE'
-      AND ((n.notification_type = 'EMPLOYEE_SIGNATURE' AND LOWER(i.reported_employee_email) = LOWER(?)
+    LEFT JOIN incident_information_requests information_request
+      ON n.notification_type LIKE 'INFO_REQ_%'
+      AND information_request.id = CAST(SUBSTRING(n.notification_type, 10) AS UNSIGNED)
+    WHERE n.recipient_email = ? AND n.viewed_at IS NULL
+      AND (
+        (i.status = 'PENDING SIGNATURE' AND (
+          (n.notification_type = 'EMPLOYEE_SIGNATURE' AND LOWER(i.reported_employee_email) = LOWER(?)
         AND NOT EXISTS (SELECT 1 FROM incident_signatures s WHERE s.incident_id = i.id AND s.signatory_role = 'EMPLOYEE'))
-      OR (n.notification_type = 'HEAD_SIGNATURE' AND LOWER(i.assigned_head_email) = LOWER(?)
-        AND NOT EXISTS (SELECT 1 FROM incident_signatures s WHERE s.incident_id = i.id AND s.signatory_role = 'HEAD')))
+          OR (n.notification_type = 'HEAD_SIGNATURE' AND LOWER(i.assigned_head_email) = LOWER(?)
+        AND NOT EXISTS (SELECT 1 FROM incident_signatures s WHERE s.incident_id = i.id AND s.signatory_role = 'HEAD'))
+        ))
+        OR (n.notification_type = 'INVESTIGATION_STARTED'
+          AND LOWER(i.reported_employee_email) = LOWER(?))
+        OR (n.notification_type LIKE 'INFO_REQ_%'
+          AND information_request.status = 'PENDING'
+          AND LOWER(information_request.recipient_email) = LOWER(?)
+          AND i.status = 'UNDER INVESTIGATION')
+      )
       AND ${scope.sql} ORDER BY n.created_at, n.id LIMIT 100`,
-    [user.email, user.email, user.email, ...scope.values]
+    [user.email, user.email, user.email, user.email, user.email, ...scope.values]
   );
   return rows.map((notification) => ({
     ...notification,
@@ -3404,6 +3440,7 @@ module.exports = {
   getIncidentExplanationAddendumEvidence,
   listIncidentRequestRecipients,
   requestIncidentInformation,
+  requestIncidentInformationBatch,
   addIncidentInvestigationNote,
   respondToIncidentInformation,
   getIncidentBadgeCounts,

@@ -151,8 +151,10 @@
       if (
         incident.status === 'UNDER INVESTIGATION' &&
         request.status === 'PENDING' &&
-        request.recipientEmail.toLowerCase() ===
-          incident.currentUserEmail.toLowerCase()
+        String(request.recipientEmail || '').trim().toLowerCase() ===
+          String(incident.currentUserEmail || session?.email || '')
+            .trim()
+            .toLowerCase()
       ) {
         const form = el('form');
         const text = el('textarea');
@@ -218,6 +220,129 @@
       section.appendChild(updates);
     }
     content.appendChild(section);
+  }
+
+  async function renderInvestigationRequests(incident) {
+    const section = el('section', 'incident-case-section');
+    section.append(
+      el('h3', '', 'Request information from employees'),
+      el(
+        'p',
+        'note',
+        'Create a separate request for each employee. Each request is delivered only to its selected recipient.'
+      )
+    );
+    const rows = el('div', 'incident-investigation-request-list');
+    const feedbackMessage = el('p', 'errs');
+    feedbackMessage.hidden = true;
+    let recipients = [];
+    const requestRows = [];
+
+    function addRequestRow(selectedEmail = '') {
+      const row = el('div', 'incident-case-section');
+      const recipient = el('select');
+      recipient.setAttribute('aria-label', 'Information request recipient');
+      recipient.add(new Option('Select an employee', ''));
+      recipients.forEach((person) =>
+        recipient.add(
+          new Option(`${person.name} (${person.email})`, person.email)
+        )
+      );
+      recipient.value = selectedEmail;
+      const recipientLabel = el('label', '', 'Send to');
+      recipientLabel.appendChild(recipient);
+      const requestText = el('textarea');
+      requestText.rows = 3;
+      requestText.maxLength = 4000;
+      requestText.placeholder = 'What information or explanation is needed?';
+      const requestLabel = el('label', '', 'Request');
+      requestLabel.appendChild(requestText);
+      const remove = el('button', 'ghost', 'Remove request');
+      remove.type = 'button';
+      remove.onclick = () => {
+        requestRows.splice(requestRows.indexOf(entry), 1);
+        row.remove();
+      };
+      const entry = { row, recipient, requestText };
+      requestRows.push(entry);
+      row.append(recipientLabel, requestLabel, remove);
+      rows.appendChild(row);
+      return entry;
+    }
+
+    const add = el('button', 'ghost', 'Add another request');
+    add.type = 'button';
+    add.onclick = () => addRequestRow();
+    const addAll = el('button', 'ghost', 'Add all employees');
+    addAll.type = 'button';
+    addAll.onclick = () => {
+      for (let index = requestRows.length - 1; index >= 0; index -= 1) {
+        const entry = requestRows[index];
+        if (!entry.recipient.value && !entry.requestText.value.trim()) {
+          entry.row.remove();
+          requestRows.splice(index, 1);
+        }
+      }
+      const selected = new Set(
+        requestRows
+          .map((entry) => entry.recipient.value.toLowerCase())
+          .filter(Boolean)
+      );
+      recipients.forEach((person) => {
+        if (!selected.has(person.email.toLowerCase()))
+          addRequestRow(person.email);
+      });
+    };
+    const send = el('button', '', 'Send requests');
+    send.type = 'button';
+    send.onclick = async () => {
+      const requests = requestRows.map((entry) => ({
+        recipientEmail: entry.recipient.value,
+        requestText: entry.requestText.value.trim()
+      }));
+      const invalid = requests.some(
+        (request) => !request.recipientEmail || !request.requestText
+      );
+      if (!requests.length || invalid) {
+        feedbackMessage.textContent =
+          'Select an employee and enter a request in every row.';
+        feedbackMessage.hidden = false;
+        return;
+      }
+      send.disabled = true;
+      feedbackMessage.hidden = true;
+      try {
+        await api('requestIncidentInformationBatch', incident.id, requests);
+        await select(incident.id);
+        ui.feedback(feedback, 'Requests sent.');
+        await window.refreshInboxBadge().catch(() => {});
+      } catch (error) {
+        feedbackMessage.textContent = error.message || String(error);
+        feedbackMessage.hidden = false;
+      } finally {
+        send.disabled = false;
+      }
+    };
+    section.append(rows, feedbackMessage, el('div', 'actions'));
+    const actions = section.lastElementChild;
+    actions.append(add, addAll, send);
+    content.appendChild(section);
+    try {
+      recipients = await api('listIncidentRequestRecipients', incident.id);
+      requestRows.length = 0;
+      rows.replaceChildren();
+      if (!recipients.length) {
+        feedbackMessage.textContent = 'No employees are available for requests.';
+        feedbackMessage.hidden = false;
+        add.disabled = addAll.disabled = send.disabled = true;
+        return;
+      }
+      addRequestRow();
+    } catch (error) {
+      feedbackMessage.textContent = error.message || String(error);
+      feedbackMessage.hidden = false;
+      add.disabled = addAll.disabled = send.disabled = true;
+    }
   }
 
   function renderContent(incident) {
@@ -300,6 +425,8 @@
     });
     signatories.insertBefore(completion, signatories.children[2] || null);
     content.appendChild(signatories);
+    if (incident.canReview && incident.status === 'UNDER_REVIEW')
+      content.appendChild(ui.renderReviewActions(incident, controls));
     if (incident.status === 'UNDER_REVIEW') {
       const hrSignature = incident.signatures.find(
         (item) => item.role === 'HR'
@@ -312,9 +439,16 @@
         )
       );
     }
-    if (incident.status === 'UNDER INVESTIGATION')
+    if (incident.status === 'UNDER INVESTIGATION') {
       renderInformationRequests(incident);
-    if (incident.nte?.status === 'ISSUED') {
+      if (incident.canReview) renderInvestigationRequests(incident);
+    }
+    if (
+      incident.canReview &&
+      ['UNDER_REVIEW', 'UNDER INVESTIGATION'].includes(incident.status)
+    ) {
+      ui.renderNte(content, view, pads, controls);
+    } else if (incident.nte?.status === 'ISSUED') {
       ui.renderNte(content, view, pads, controls);
     } else if (
       ['NTE ISSUED', 'EXPLANATION SENT', 'EVALUATION'].includes(incident.status)

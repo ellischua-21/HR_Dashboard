@@ -110,8 +110,18 @@ async function getInbox(req) {
          SELECT 1 FROM incident_activity actor_activity
          WHERE actor_activity.incident_id = i.id
            AND LOWER(actor_activity.actor_email) = LOWER(n.recipient_email)
-           AND actor_activity.created_at <= n.created_at
-           AND TIMESTAMPDIFF(SECOND, actor_activity.created_at, n.created_at) <= 120
+           AND (
+             (n.notification_type = 'INVESTIGATION_STARTED' AND actor_activity.action = 'INVESTIGATION_STARTED') OR
+             (n.notification_type = 'HR_REVIEW_STARTED' AND actor_activity.action = 'HR_REVIEW_STARTED') OR
+             (n.notification_type = 'HR_REVIEW_READY' AND actor_activity.action = 'SIGNATURES_COMPLETED') OR
+             (n.notification_type = 'NTE_ISSUED' AND actor_activity.action = 'NTE_ISSUED') OR
+             (n.notification_type = 'EXPLANATION_SENT' AND actor_activity.action IN ('EXPLANATION_SENT', 'EXPLANATION_RECEIVED_EXTERNALLY')) OR
+             (n.notification_type = 'EVALUATION_STARTED' AND actor_activity.action = 'EVALUATION_STARTED') OR
+             (n.notification_type = 'DECISION_PENDING' AND actor_activity.action = 'EVALUATION_SAVED') OR
+             (n.notification_type = 'DECISION_ISSUED' AND actor_activity.action = 'DECISION_ISSUED') OR
+             (n.notification_type = 'CASE_CLOSED' AND actor_activity.action IN ('CLOSED_FOR_DOCUMENTATION', 'INVESTIGATION_CLOSED', 'DECISION_CASE_CLOSED')) OR
+             (n.notification_type LIKE 'EVIDENCE_%' AND actor_activity.action = 'EVIDENCE_SUBMITTED')
+           )
        )
      ORDER BY n.created_at DESC, n.id DESC LIMIT 500`,
     [user.email, ...incidentScope.values]
