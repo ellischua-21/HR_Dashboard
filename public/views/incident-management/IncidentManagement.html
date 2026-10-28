@@ -10,8 +10,8 @@
         <label
           >Date of Report<input id="ir-date-reported" type="date" readonly
         /></label>
-        <label class="incident-search-field">
-          Employee Being Reported
+        <div class="incident-search-field">
+          <label for="ir-reported-employee">Employee Being Reported</label>
           <input
             id="ir-reported-employee"
             type="search"
@@ -25,7 +25,7 @@
             role="listbox"
             hidden
           ></div>
-        </label>
+        </div>
       </div>
     </fieldset>
 
@@ -219,7 +219,10 @@
         <span>Total Cases</span><strong id="ir-review-total">0</strong>
       </article>
       <article>
-        <span>Under Review</span><strong id="ir-review-under-review">0</strong>
+        <span>Ongoing</span><strong id="ir-review-ongoing">0</strong>
+      </article>
+      <article>
+        <span>Waiting</span><strong id="ir-review-waiting">0</strong>
       </article>
       <article title="NTE Issued, Explanation Sent, and Evaluation">
         <span>NTE</span><strong id="ir-review-nte">0</strong>
@@ -260,6 +263,13 @@
         role="group"
         aria-label="Case grouping"
       >
+        <button
+          type="button"
+          data-review-category="ALL"
+          aria-pressed="false"
+        >
+          All
+        </button>
         <button
           type="button"
           data-review-category="ONGOING"

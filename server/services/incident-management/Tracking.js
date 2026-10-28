@@ -43,7 +43,6 @@ function incidentAccessScope(user, alias = '') {
 }
 
 function incidentNotificationTarget(role) {
-  if (['HR', 'ADMIN'].includes(role)) return 'incident-review';
   return 'incident-track';
 }
 

@@ -3,6 +3,7 @@ const ACTIVE_CASE_SQL = "incident_reports.status <> 'CLOSED'";
 const HR_SIGNED_SQL = `EXISTS (SELECT 1 FROM incident_signatures hr_signature
   WHERE hr_signature.incident_id = incident_reports.id AND hr_signature.signatory_role = 'HR')`;
 const GROUP_SQL = {
+  ALL: '1 = 1',
   ONGOING: `(${ACTIVE_CASE_SQL} AND ${HR_SIGNED_SQL})`,
   WAITING: `(${ACTIVE_CASE_SQL} AND NOT ${HR_SIGNED_SQL})`,
   CLOSED: "incident_reports.status = 'CLOSED'"

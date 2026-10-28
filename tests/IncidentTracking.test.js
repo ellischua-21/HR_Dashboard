@@ -246,6 +246,24 @@ test('knowing a case ID cannot bypass the tracking endpoint or case-document per
   await assert.rejects(incidents.getIncidentCase(req, 12), { status: 403 });
 });
 
+test('tracking versions use the signature table timestamp key', async (t) => {
+  const { pool } = require('../server/db/database');
+  const incidents = require('../server/services/IncidentService');
+  t.mock.method(pool, 'execute', async (sql) => {
+    if (sql.includes('FROM user_roles WHERE email'))
+      return [[{ email: 'head@example.com', role: 'HEAD', active: 1 }]];
+    if (sql.includes('AS version')) {
+      assert.match(sql, /MAX\(s\.signed_at\)/);
+      assert.doesNotMatch(sql, /MAX\(s\.id\)/);
+      return [[{ version: 'PENDING SIGNATURE:2026-10-01:0:' }]];
+    }
+    throw new Error(`Unexpected query: ${sql}`);
+  });
+  const req = { session: { userEmail: 'head@example.com' } };
+  const result = await incidents.getIncidentTrackingVersion(req, 12);
+  assert.equal(result.version, 'PENDING SIGNATURE:2026-10-01:0:');
+});
+
 test('Track actions reject an unrelated signer, employee explanation, or information-request response', async (t) => {
   const { pool } = require('../server/db/database');
   const incidents = require('../server/services/IncidentService');

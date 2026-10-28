@@ -169,6 +169,65 @@ function validateUserForm(templateKey, data = {}) {
   return { errors, data: clean };
 }
 
+async function getApplicantIdentity(user, connection = pool) {
+  const [[employee]] = await connection.execute(
+    `SELECT name, position, department, emp_no
+     FROM employees
+     WHERE LOWER(personal_email) = LOWER(?) AND record_status <> 'Archived'
+     ORDER BY record_id DESC LIMIT 1`,
+    [user.email]
+  );
+  return {
+    name: employee?.name || user.full_name || user.email,
+    employeeNo: employee?.emp_no || '',
+    position: employee?.position || '',
+    department: employee?.department || ''
+  };
+}
+
+function applyApplicantIdentity(data, identity) {
+  const result = { ...data };
+  for (const field of ['name', 'employeeNo', 'position', 'department']) {
+    result[field] = sanitize(identity[field]);
+  }
+  return result;
+}
+
+function preserveApplicantIdentity(data, savedData, identity) {
+  const result = { ...data };
+  for (const field of ['name', 'employeeNo', 'position', 'department']) {
+    if (Object.prototype.hasOwnProperty.call(result, field)) {
+      const savedValue = savedData?.[field];
+      result[field] = sanitize(
+        savedValue === undefined || savedValue === null
+          ? identity[field]
+          : savedValue
+      );
+    }
+  }
+  return result;
+}
+
+async function searchFormEmployees(req, query) {
+  await requirePerm(req, 'forms.self');
+  const term = String(query || '')
+    .trim()
+    .slice(0, 100)
+    .toLowerCase()
+    .replace(/[!%_]/g, '!$&');
+  if (term.length < 2) return [];
+  const like = `%${term}%`;
+  const [rows] = await pool.execute(
+    `SELECT name, emp_no AS employeeNo, department
+     FROM employees
+     WHERE record_status <> 'Archived'
+       AND (LOWER(name) LIKE ? ESCAPE '!' OR LOWER(emp_no) LIKE ? ESCAPE '!')
+     ORDER BY name, record_id LIMIT 12`,
+    [like, like]
+  );
+  return rows;
+}
+
 function validateApprovalSignature(isHead, decision, signature, templateKey) {
   const template = FORM_TEMPLATES.find((item) => item.key === templateKey);
   const signatureRequired =
@@ -332,28 +391,26 @@ async function getSubmissionHead(email, role) {
 
 async function submitLeaveForm(req, data = {}) {
   const user = await requirePerm(req, 'forms.self');
-  const errors = validateLeaveForm(data);
+  const identity = await getApplicantIdentity(user);
+  const formData = applyApplicantIdentity(data, identity);
+  const errors = validateLeaveForm(formData);
   if (errors.length) throw httpError(errors.join(' '), 400);
 
   const headEmail = await getSubmissionHead(user.email, user.role);
-  const [accounts] = await pool.execute(
-    'SELECT full_name FROM user_roles WHERE email = ? AND active = 1 LIMIT 1',
-    [user.email]
-  );
-
-  const formData = {
-    name: sanitize(data.name) || sanitize(accounts[0].full_name),
-    position: sanitize(data.position),
-    department: sanitize(data.department),
-    employeeNo: sanitize(data.employeeNo),
-    leaveType: sanitize(data.leaveType),
-    otherLeaveType: sanitize(data.otherLeaveType),
-    dateFrom: data.dateFrom,
-    dateTo: data.dateTo,
-    days: Number(data.days),
-    reason: sanitize(data.reason),
-    payType: data.payType,
-    signature: data.signature
+  const cleanData = {
+    ...formData,
+    name: sanitize(formData.name),
+    position: sanitize(formData.position),
+    department: sanitize(formData.department),
+    employeeNo: sanitize(formData.employeeNo),
+    leaveType: sanitize(formData.leaveType),
+    otherLeaveType: sanitize(formData.otherLeaveType),
+    dateFrom: formData.dateFrom,
+    dateTo: formData.dateTo,
+    days: Number(formData.days),
+    reason: sanitize(formData.reason),
+    payType: formData.payType,
+    signature: formData.signature
   };
 
   return persistUserForm(
@@ -361,23 +418,22 @@ async function submitLeaveForm(req, data = {}) {
     user.role,
     headEmail,
     'leave-2026',
-    formData,
+    cleanData,
     'Leave Application'
   );
 }
 
 async function submitUserForm(req, templateKey, data = {}) {
   const user = await requirePerm(req, 'forms.self');
-  const { errors, data: cleanData } = validateUserForm(templateKey, data);
+  const identity = await getApplicantIdentity(user);
+  const normalizedData = applyApplicantIdentity(data, identity);
+  const { errors, data: cleanData } = validateUserForm(
+    templateKey,
+    normalizedData
+  );
   if (errors.length) throw httpError(errors.join(' '), 400);
 
   const headEmail = await getSubmissionHead(user.email, user.role);
-  const [accounts] = await pool.execute(
-    'SELECT full_name FROM user_roles WHERE email = ? AND active = 1 LIMIT 1',
-    [user.email]
-  );
-
-  cleanData.name = sanitize(cleanData.name) || sanitize(accounts[0].full_name);
   const template = FORM_TEMPLATES.find((item) => item.key === templateKey);
   return persistUserForm(
     user.email,
@@ -391,45 +447,40 @@ async function submitUserForm(req, templateKey, data = {}) {
 
 async function updateMyForm(req, formId, templateKey, data = {}) {
   const user = await requirePerm(req, 'forms.self');
+  const identity = await getApplicantIdentity(user);
+  const normalizedData = applyApplicantIdentity(data, identity);
 
   const template = FORM_TEMPLATES.find((item) => item.key === templateKey);
   if (!template) throw httpError('Choose a valid form template.', 400);
   let cleanData;
   if (templateKey === 'leave-2026') {
-    const errors = validateLeaveForm(data);
+    const errors = validateLeaveForm(normalizedData);
     if (errors.length) throw httpError(errors.join(' '), 400);
     cleanData = {
-      name: sanitize(data.name),
-      position: sanitize(data.position),
-      department: sanitize(data.department),
-      employeeNo: sanitize(data.employeeNo),
-      leaveType: sanitize(data.leaveType),
-      otherLeaveType: sanitize(data.otherLeaveType),
-      dateFrom: data.dateFrom,
-      dateTo: data.dateTo,
-      days: Number(data.days),
-      reason: sanitize(data.reason),
-      payType: data.payType,
-      signature: data.signature
+      name: sanitize(normalizedData.name),
+      position: sanitize(normalizedData.position),
+      department: sanitize(normalizedData.department),
+      employeeNo: sanitize(normalizedData.employeeNo),
+      leaveType: sanitize(normalizedData.leaveType),
+      otherLeaveType: sanitize(normalizedData.otherLeaveType),
+      dateFrom: normalizedData.dateFrom,
+      dateTo: normalizedData.dateTo,
+      days: Number(normalizedData.days),
+      reason: sanitize(normalizedData.reason),
+      payType: normalizedData.payType,
+      signature: normalizedData.signature
     };
   } else {
-    const result = validateUserForm(templateKey, data);
+    const result = validateUserForm(templateKey, normalizedData);
     if (result.errors.length) throw httpError(result.errors.join(' '), 400);
     cleanData = result.data;
   }
-
-  const [[account]] = await pool.execute(
-    'SELECT full_name FROM user_roles WHERE email = ? AND active = 1 LIMIT 1',
-    [user.email]
-  );
-  if (!account) throw httpError('Your account is not active.', 401);
-  cleanData.name = sanitize(cleanData.name) || sanitize(account.full_name);
 
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
     const [rows] = await connection.execute(
-      `SELECT id, control_no, template_key, status, review_stage, head_reviewer_email
+      `SELECT id, control_no, template_key, form_data, status, review_stage, head_reviewer_email
        FROM user_forms WHERE id = ? AND user_email = ? FOR UPDATE`,
       [formId, user.email]
     );
@@ -446,9 +497,19 @@ async function updateMyForm(req, formId, templateKey, data = {}) {
       );
     }
 
+    const savedData =
+      typeof existingForm.form_data === 'string'
+        ? JSON.parse(existingForm.form_data)
+        : existingForm.form_data;
+    const preservedData = preserveApplicantIdentity(
+      cleanData,
+      savedData,
+      identity
+    );
+
     await connection.execute(
       'UPDATE user_forms SET form_data = ? WHERE id = ?',
-      [JSON.stringify(cleanData), existingForm.id]
+      [JSON.stringify(preservedData), existingForm.id]
     );
     await logAudit(
       user.email,
@@ -867,6 +928,7 @@ module.exports = {
   currentSerialYear,
   canEditForm,
   listMyForms,
+  searchFormEmployees,
   submitLeaveForm,
   submitUserForm,
   updateMyForm,

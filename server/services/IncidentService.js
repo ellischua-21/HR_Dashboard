@@ -633,7 +633,7 @@ async function getIncidentTrackingVersion(req, incidentId) {
   const [[row]] = await pool.execute(
     `SELECT CONCAT_WS(':', status, updated_at,
        (SELECT COALESCE(MAX(a.id), 0) FROM incident_activity a WHERE a.incident_id = incident_reports.id),
-       (SELECT COALESCE(MAX(s.id), 0) FROM incident_signatures s WHERE s.incident_id = incident_reports.id)) AS version
+       (SELECT COALESCE(MAX(s.signed_at), '') FROM incident_signatures s WHERE s.incident_id = incident_reports.id)) AS version
      FROM incident_reports WHERE id = ? AND ${scope.sql}`,
     [id, ...scope.values]
   );
@@ -672,7 +672,8 @@ async function getIncidentReviewDashboard(req, input = {}) {
     await connection.beginTransaction();
     const [[counts]] = await connection.execute(
       `SELECT COUNT(*) AS totalCases,
-         COALESCE(SUM(incident_reports.status = 'UNDER_REVIEW'), 0) AS underReview,
+         COALESCE(SUM(${ACTIVE_CASE_SQL} AND ${HR_SIGNED_SQL}), 0) AS ongoing,
+         COALESCE(SUM(${ACTIVE_CASE_SQL} AND NOT ${HR_SIGNED_SQL}), 0) AS waiting,
          COALESCE(SUM(${NTE_CASE_SQL}), 0) AS nte,
          COALESCE(SUM(incident_reports.status = 'CLOSED'), 0) AS closed,
          COALESCE(SUM(${filter.sql}), 0) AS filteredCount
@@ -701,7 +702,8 @@ async function getIncidentReviewDashboard(req, input = {}) {
     return {
       summary: {
         totalCases: Number(counts.totalCases),
-        underReview: Number(counts.underReview),
+        ongoing: Number(counts.ongoing),
+        waiting: Number(counts.waiting),
         nte: Number(counts.nte),
         closed: Number(counts.closed)
       },
@@ -2887,7 +2889,7 @@ async function getIncidentCase(req, incidentId) {
           ? pool.execute(
               `SELECT previous_deadline AS previousDeadline,
                     extended_deadline AS extendedDeadline, reason,
-                    approved_by AS approvedBy, created_at AS createdAt
+                    approved_by AS approvedBy, x.created_at AS createdAt
              FROM incident_deadline_extensions x JOIN incident_ntes n ON n.id = x.nte_id
              WHERE n.incident_id = ? ORDER BY x.created_at, x.id`,
               [id]

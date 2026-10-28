@@ -89,7 +89,13 @@ function wireIncidentSearch(input, employeeId, suggestions, purpose) {
     }, 250);
   });
   input.addEventListener('blur', () => {
-    window.setTimeout(() => (suggestions.hidden = true), 150);
+    window.setTimeout(() => {
+      if (!suggestions.contains(document.activeElement))
+        suggestions.hidden = true;
+    }, 150);
+  });
+  suggestions.addEventListener('mousedown', (event) => {
+    if (event.target.closest('.incident-suggestion')) event.preventDefault();
   });
   input.addEventListener('focus', () => {
     if (suggestions.childElementCount) suggestions.hidden = false;
@@ -101,18 +107,20 @@ function buildParticipantInputs(containerId, title) {
   container.replaceChildren();
   const fields = [];
   for (let number = 1; number <= 3; number += 1) {
-    const label = incidentElement('label', 'incident-search-field');
-    label.append(document.createTextNode(`${number}. ${title}`));
+    const field = incidentElement('div', 'incident-search-field');
+    const label = incidentElement('label', '', `${number}. ${title}`);
     const input = incidentElement('input');
     input.type = 'search';
+    input.id = `${containerId}-${number}`;
+    label.htmlFor = input.id;
     const employeeId = incidentElement('input');
     employeeId.type = 'hidden';
     const suggestions = incidentElement('div', 'incident-suggestions');
     suggestions.setAttribute('role', 'listbox');
     suggestions.hidden = true;
-    label.append(input, employeeId, suggestions);
+    field.append(label, input, employeeId, suggestions);
     wireIncidentSearch(input, employeeId, suggestions, 'participant');
-    container.appendChild(label);
+    container.appendChild(field);
     fields.push({ input, employeeId });
   }
   return fields;
@@ -2169,15 +2177,7 @@ async function openIncidentRoute(incidentId, target, notificationId = null) {
   if (notificationId)
     await api('markIncidentNotificationSeen', notificationId).catch(() => {});
   pendingIncidentCaseId = Number(incidentId);
-  target = ['HR', 'ADMIN'].includes(session.role)
-    ? 'incident-review'
-    : 'incident-track';
-  const destination = {
-    'incident-review': ['incident-review', 'Review'],
-    'incident-history': ['incident-history', 'History'],
-    'incident-track': ['incident-track', 'Track']
-  }[target] || ['incident-track', 'Track'];
-  go(destination);
+  go(['incident-track', 'Track']);
 }
 
 window.openIncidentCase = openIncidentCase;

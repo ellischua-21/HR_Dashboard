@@ -1356,6 +1356,10 @@ legend {
 .incident-form input[readonly] {
   background: #f5f6f8;
 }
+#leave-form input[readonly],
+#user-template-fields input[readonly] {
+  background: #f5f6f8;
+}
 .incident-search-field {
   position: relative;
   display: grid;

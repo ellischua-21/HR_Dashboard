@@ -34,14 +34,23 @@
   }
 
   function renderCases(data) {
+    const summary = data.summary || {};
+    let summaryReady = true;
     for (const [name, key] of [
       ['total', 'totalCases'],
-      ['under-review', 'underReview'],
+      ['ongoing', 'ongoing'],
+      ['waiting', 'waiting'],
       ['nte', 'nte'],
       ['closed', 'closed']
-    ])
-      byId(`ir-review-${name}`).textContent =
-        data.summary[key].toLocaleString();
+    ]) {
+      const value = Number(summary[key]);
+      if (summary[key] == null || !Number.isFinite(value)) {
+        byId(`ir-review-${name}`).textContent = '—';
+        summaryReady = false;
+      } else {
+        byId(`ir-review-${name}`).textContent = value.toLocaleString();
+      }
+    }
     state.page = data.page;
     state.pages = data.pages;
     const list = byId('ir-review-list');
@@ -78,17 +87,14 @@
         details.appendChild(
           el('p', 'note', 'Evaluation saved · Final decision pending')
         );
-      const button = el(
-        'button',
-        'ghost',
-        incident.status === 'CLOSED' ? 'View' : 'Open'
-      );
+      const button = el('button', 'ghost', 'View');
       button.type = 'button';
       button.setAttribute(
         'aria-label',
         `${button.textContent} ${incident.caseNumber}`
       );
-      button.onclick = () => open(incident.id);
+      button.onclick = () =>
+        window.openIncidentRoute(incident.id, 'incident-track');
       row.append(details, button);
       list.appendChild(row);
     });
@@ -98,6 +104,7 @@
     byId('ir-review-page').textContent = `Page ${data.page} of ${data.pages}`;
     byId('ir-review-previous').disabled = data.page <= 1;
     byId('ir-review-next').disabled = data.page >= data.pages;
+    return summaryReady;
   }
 
   async function fetchList() {
@@ -114,8 +121,14 @@
         pageSize: 25
       });
       if (ticket !== listRequest || owner !== session?.email) return;
-      renderCases(data);
-      ui.feedback(byId('ir-review-feedback'), '');
+      const summaryReady = renderCases(data);
+      ui.feedback(
+        byId('ir-review-feedback'),
+        summaryReady
+          ? ''
+          : 'Review analytics are outdated. Restart the Node.js server to load the latest counts.',
+        !summaryReady
+      );
     } catch (error) {
       if (ticket === listRequest && owner === session?.email)
         ui.feedback(
@@ -232,7 +245,7 @@
     }
     syncFilters();
     await fetchList();
-    if (requestedId) await open(requestedId);
+    if (requestedId) window.openIncidentRoute(requestedId, 'incident-track');
   }
 
   const applyFilters = () => {

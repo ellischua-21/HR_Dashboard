@@ -6,6 +6,93 @@ let formBeingEdited = null;
 let activeReviewScope = 'HR';
 let employeeProfile = {};
 
+const APPLICANT_IDENTITY_FIELDS = new Set([
+  'name',
+  'employeeNo',
+  'position',
+  'department'
+]);
+
+function applyApplicantIdentity(input, fieldName) {
+  if (!APPLICANT_IDENTITY_FIELDS.has(fieldName)) return;
+  const profileKey = fieldName === 'employeeNo' ? 'emp_no' : fieldName;
+  if (!formBeingEdited) {
+    if (fieldName === 'name') {
+      input.value = employeeProfile.name || session.full_name || session.email;
+    } else {
+      input.value = employeeProfile[profileKey] || '';
+    }
+  }
+  input.readOnly = true;
+}
+
+function wireFormEmployeeSearch(input, suggestions) {
+  let requestNumber = 0;
+  let timer = null;
+  input.autocomplete = 'off';
+  input.addEventListener('input', () => {
+    const current = ++requestNumber;
+    clearTimeout(timer);
+    suggestions.replaceChildren();
+    if (input.value.trim().length < 2) {
+      suggestions.hidden = true;
+      return;
+    }
+    timer = setTimeout(async () => {
+      try {
+        const matches = await api('searchFormEmployees', input.value.trim());
+        if (current !== requestNumber) return;
+        suggestions.replaceChildren();
+        matches.forEach((employee) => {
+          const option = document.createElement('button');
+          option.type = 'button';
+          option.className = 'incident-suggestion';
+          option.setAttribute('role', 'option');
+          const name = document.createElement('strong');
+          name.textContent = employee.name || '';
+          const details = document.createElement('small');
+          details.textContent = [employee.employeeNo, employee.department]
+            .filter(Boolean)
+            .join(' · ');
+          option.append(name, details);
+          option.addEventListener('click', () => {
+            input.value = employee.name || '';
+            suggestions.hidden = true;
+            suggestions.replaceChildren();
+          });
+          suggestions.appendChild(option);
+        });
+        if (!matches.length) {
+          const empty = document.createElement('p');
+          empty.className = 'incident-no-suggestions';
+          empty.textContent = 'No matching employees.';
+          suggestions.appendChild(empty);
+        }
+        suggestions.hidden = false;
+      } catch (error) {
+        if (current !== requestNumber) return;
+        const message = document.createElement('p');
+        message.className = 'incident-no-suggestions';
+        message.textContent = error.message || String(error);
+        suggestions.replaceChildren(message);
+        suggestions.hidden = false;
+      }
+    }, 250);
+  });
+  input.addEventListener('blur', () => {
+    window.setTimeout(() => {
+      if (!suggestions.contains(document.activeElement))
+        suggestions.hidden = true;
+    }, 150);
+  });
+  suggestions.addEventListener('mousedown', (event) => {
+    if (event.target.closest('.incident-suggestion')) event.preventDefault();
+  });
+  input.addEventListener('focus', () => {
+    if (suggestions.childElementCount) suggestions.hidden = false;
+  });
+}
+
 const userCell = (value) => {
   const cell = document.createElement('td');
   cell.textContent = value === null || value === undefined ? '' : String(value);
@@ -491,19 +578,36 @@ function openTemplateForm(template, existingForm = null) {
       fields.appendChild(label);
       return;
     }
-    label.textContent = field.label;
     const input = document.createElement(
       field.type === 'textarea' ? 'textarea' : 'input'
     );
     if (field.type !== 'textarea') input.type = field.type;
     input.name = field.name;
+    if (field.name === 'witnessName') {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'incident-search-field';
+      const inputId = 'user-template-witness-name';
+      label.textContent = field.label;
+      label.htmlFor = inputId;
+      input.id = inputId;
+      input.type = 'search';
+      const suggestions = document.createElement('div');
+      suggestions.className = 'incident-suggestions';
+      suggestions.setAttribute('role', 'listbox');
+      suggestions.hidden = true;
+      wrapper.append(label, input, suggestions);
+      fields.appendChild(wrapper);
+      wireFormEmployeeSearch(input, suggestions);
+    } else {
+      label.textContent = field.label;
+      label.appendChild(input);
+      fields.appendChild(label);
+    }
     input.required = Boolean(field.required);
     if (field.maxLength) input.maxLength = field.maxLength;
     if (field.min !== undefined) input.min = String(field.min);
     if (field.max !== undefined) input.max = String(field.max);
     if (field.step !== undefined) input.step = String(field.step);
-    label.appendChild(input);
-    fields.appendChild(label);
     if (existingForm) {
       input.value =
         existingForm.form_data[field.name] === undefined
@@ -521,6 +625,7 @@ function openTemplateForm(template, existingForm = null) {
     } else if (field.name === 'name') {
       input.value = session.full_name || session.email;
     }
+    applyApplicantIdentity(input, field.name);
   });
   confirmation.className = 'form-acknowledgment';
   const confirmationInput = confirmation.querySelector('input');
@@ -576,6 +681,9 @@ function openLeaveForm(existingForm = null) {
       option.checked = option.value === data.payType;
     });
   }
+  ['name', 'employeeNo', 'position', 'department'].forEach((name) => {
+    form.elements[name].readOnly = true;
+  });
   setOtherLeaveVisibility();
   $('uf_submit_feedback').hidden = true;
   $('leave-form-dialog').showModal();

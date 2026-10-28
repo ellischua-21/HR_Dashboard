@@ -12,6 +12,7 @@ const {
 test('Review groups use the HR signature for waiting and processing, and formal closure for archives', () => {
   const waiting = buildReviewFilter({ category: 'WAITING' });
   const ongoing = buildReviewFilter({ category: 'ONGOING' });
+  const all = buildReviewFilter({ category: 'ALL' });
   assert.match(waiting.sql, /NOT EXISTS/);
   assert.match(waiting.sql, /signatory_role = 'HR'/);
   assert.match(ongoing.sql, /AND EXISTS/);
@@ -21,6 +22,7 @@ test('Review groups use the HR signature for waiting and processing, and formal 
     buildReviewFilter({ category: 'CLOSED' }).sql,
     "incident_reports.status = 'CLOSED'"
   );
+  assert.equal(all.sql, '1 = 1');
   assert.equal(ACTIVE_CASE_SQL, "incident_reports.status <> 'CLOSED'");
   assert.match(NTE_CASE_SQL, /'NTE ISSUED', 'EXPLANATION SENT', 'EVALUATION'/);
 });
@@ -69,14 +71,16 @@ test('Review counters and paginated results are read from one database snapshot'
       if (sql.includes('FROM system_settings')) return [[]];
       if (sql.includes('FROM incident_ntes n')) return [[]]; // overdue sweep
       if (sql.includes('AS totalCases')) {
-        assert.match(sql, /SUM\(incident_reports.status = 'UNDER_REVIEW'\)/);
+        assert.match(sql, /AS ongoing/);
+        assert.match(sql, /AS waiting/);
         assert.match(sql, /AS filteredCount/);
         assert.deepEqual(values, Array(4).fill('%Employee%'));
         return [
           [
             {
               totalCases: '52',
-              underReview: '8',
+              ongoing: '18',
+              waiting: '12',
               nte: '12',
               closed: '16',
               filteredCount: '26'
@@ -107,7 +111,8 @@ test('Review counters and paginated results are read from one database snapshot'
   );
   assert.deepEqual(result.summary, {
     totalCases: 52,
-    underReview: 8,
+    ongoing: 18,
+    waiting: 12,
     nte: 12,
     closed: 16
   });
@@ -189,7 +194,7 @@ test('HR cannot issue a decision before evaluation or mutate an archived case', 
   assert.equal(rollbacks, 4);
 });
 
-test('event links open Review for HR/ADMIN and Track for STAFF/HEAD, including closed cases', () => {
+test('event links open Track for all roles, including closed cases', () => {
   for (const role of ['HR', 'ADMIN'])
     for (const status of [
       'PENDING SIGNATURE',
@@ -197,7 +202,7 @@ test('event links open Review for HR/ADMIN and Track for STAFF/HEAD, including c
       'EXPLANATION SENT',
       'CLOSED'
     ])
-      assert.equal(incidentNotificationTarget(role, status), 'incident-review');
+      assert.equal(incidentNotificationTarget(role, status), 'incident-track');
   for (const role of ['STAFF', 'HEAD']) {
     assert.equal(incidentNotificationTarget(role, 'CLOSED'), 'incident-track');
     assert.equal(

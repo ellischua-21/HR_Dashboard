@@ -153,6 +153,8 @@ const methods = {
   changeMyPassword: (req, currentPassword, newPassword) =>
     accounts.changeMyPassword(req, currentPassword, newPassword),
   listMyForms: (req) => userForms.listMyForms(req),
+  searchFormEmployees: (req, query) =>
+    userForms.searchFormEmployees(req, query),
   submitLeaveForm: (req, data) => userForms.submitLeaveForm(req, data),
   submitUserForm: (req, templateKey, data) =>
     userForms.submitUserForm(req, templateKey, data),
