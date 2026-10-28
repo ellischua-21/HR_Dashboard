@@ -103,11 +103,8 @@ async function listIncidentViolations(req, input = {}) {
   const email = String(input.employeeEmail || user.email)
     .trim()
     .toLowerCase();
-  if (
-    email !== user.email.toLowerCase() &&
-    !['HR', 'ADMIN'].includes(user.role)
-  )
-    throw httpError('You can only view your own violation history.', 403);
+  if (email !== user.email.toLowerCase() && user.role !== 'HR')
+    throw httpError('Only HR can search another employee’s violation history.', 403);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 191)
     throw httpError('Enter a valid account email.', 400);
   if (email !== user.email.toLowerCase()) await requirePerm(req, 'emp.read');

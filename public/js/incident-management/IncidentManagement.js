@@ -1,7 +1,6 @@
 const INCIDENT_API_BASE = window.HR_API_BASE || 'http://localhost:3001/api';
 let pendingIncidentCaseId = null;
 let incidentFileContext = null;
-let incidentCodeProvisions = [];
 
 function incidentElement(tag, className = '', text = undefined) {
   const element = document.createElement(tag);
@@ -497,7 +496,7 @@ function createNteDocumentHtml(incident, nte) {
   <div><span class="label">Department:</span> ${escapeIncidentHtml(incident.reportedEmployeeDepartment)}</div><div><span class="label">Position:</span> ${escapeIncidentHtml(incident.reportedEmployeePosition)}</div>
   <div><span class="label">Date of Receipt:</span> ${escapeIncidentHtml(nte.receiptDate)}</div><div><span class="label">Response Period:</span> ${escapeIncidentHtml(nte.responseWorkingDays)} working days</div><div><span class="label">Explanation Deadline:</span> ${escapeIncidentHtml(nte.deadlineDate)}</div></div>
   <h2>Incident Details</h2><div class="meta"><div><span class="label">Subject:</span> ${escapeIncidentHtml(incident.subject)}</div><div><span class="label">Date:</span> ${escapeIncidentHtml(incident.incidentDate)}</div><div><span class="label">Location:</span> ${escapeIncidentHtml(incident.location)}</div><div><span class="label">Time:</span> ${escapeIncidentHtml(String(incident.incidentTime).slice(0, 5))}</div></div><pre>${escapeIncidentHtml(incident.description)}</pre>
-  <h2>Alleged Violation</h2><p><strong>${escapeIncidentHtml(nte.provisionCode)} — ${escapeIncidentHtml(nte.provisionTitle)}</strong></p><pre>${escapeIncidentHtml(nte.provisionText)}</pre><h2>Explanation of the Allegation</h2><pre>${escapeIncidentHtml(nte.allegation)}</pre>
+  ${nte.provisionCode || nte.provisionTitle || nte.provisionText ? `<h2>Code of Conduct Reference</h2><p><strong>${escapeIncidentHtml([nte.provisionCode, nte.provisionTitle].filter(Boolean).join(' — '))}</strong></p><pre>${escapeIncidentHtml(nte.provisionText || '')}</pre>` : ''}<h2>Explanation of the Allegation</h2><pre>${escapeIncidentHtml(nte.allegation)}</pre>
   <h2>Supporting Evidence</h2><ul>${evidence || '<li>None attached</li>'}</ul>
   <h2>Authorized HR Signatory</h2><p>${escapeIncidentHtml(nte.signerName)} (${escapeIncidentHtml(nte.signerEmail)})</p>${nte.signature ? `<img class="signature" src="${nte.signature}" alt="HR signature">` : ''}
   <p>Please provide your explanation by the deadline stated above. Issuance of this notice does not establish that an allegation is true.</p></body></html>`;
@@ -586,7 +585,7 @@ function createDecisionDocumentHtml(incident, decision) {
     <button onclick="window.print()">Print / Save as PDF</button><h1>FINAL DECISION</h1>
     <p><strong>Case Number:</strong> ${escapeIncidentHtml(incident.caseNumber)}</p><p><strong>Employee:</strong> ${escapeIncidentHtml(incident.reportedEmployeeName)} (${escapeIncidentHtml(incident.reportedEmployeeId)})</p>
     <p><strong>Decision issued:</strong> ${escapeIncidentHtml(decision.issuedAt)}</p><h2>Evaluation Findings</h2><p><strong>Finding:</strong> ${decision.outcome === 'NO_VIOLATION' ? 'No Violation Established' : 'Violation Established'}</p><pre>${escapeIncidentHtml(decision.evaluationFindings || '')}</pre>
-    ${decision.outcome !== 'NO_VIOLATION' ? `<p><strong>Violation:</strong> ${escapeIncidentHtml(decision.violationTitle)} · ${escapeIncidentHtml(decision.codeReference)} · ${escapeIncidentHtml(decision.severity)}</p>` : ''}
+    ${decision.outcome !== 'NO_VIOLATION' ? `<p><strong>Violation:</strong> ${escapeIncidentHtml([decision.violationTitle, decision.codeReference, decision.severity].filter(Boolean).join(' · '))}</p>` : ''}
     <h2>Approved Decision</h2><p><strong>Outcome:</strong> ${escapeIncidentHtml(decision.outcomeLabel || decision.outcome.replaceAll('_', ' '))}</p>${decision.finalAction ? `<p><strong>Corrective action:</strong> ${escapeIncidentHtml(decision.finalAction)}</p>` : ''}${decision.effectiveDate ? `<p><strong>Effective date:</strong> ${escapeIncidentHtml(decision.effectiveDate)}</p>` : ''}<pre>${escapeIncidentHtml(decision.decisionReason)}</pre>
     <h2>Authorized Approval</h2><p>${escapeIncidentHtml(decision.approverName)} (${escapeIncidentHtml(decision.approverEmail)})</p>${signature}<p><strong>Delivered:</strong> ${escapeIncidentHtml(decision.deliveredAt)}</p></body></html>`;
 }
@@ -629,7 +628,7 @@ function renderIncidentDecision(parent, incident, ui = {}) {
       incidentElement(
         'p',
         '',
-        `Established violation: ${decision.violationTitle} · ${decision.codeReference} · ${decision.severity}`
+        `Established violation: ${[decision.violationTitle, decision.codeReference, decision.severity].filter(Boolean).join(' · ')}`
       )
     );
   if (decision.finalAction)
@@ -674,7 +673,9 @@ function renderIncidentDecision(parent, incident, ui = {}) {
     close.type = 'button';
     close.onclick = async () => {
       if (
-        !window.confirm('Record administrative completion and close this case?')
+        !(await window.appConfirm('Record administrative completion and close this case?', {
+          title: 'Close case', confirmText: 'Close case', danger: true
+        }))
       )
         return;
       try {
@@ -722,16 +723,6 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
         `Finding: ${evaluation.finding.replaceAll('_', ' ')}`
       ),
       incidentElement('p', 'incident-case-text', evaluation.findings),
-      incidentElement(
-        'p',
-        '',
-        `Applicable violation: ${evaluation.violationTitle || 'None'}`
-      ),
-      incidentElement(
-        'p',
-        '',
-        `Code reference: ${evaluation.codeReference || 'None'}`
-      ),
       incidentElement('p', '', `Severity: ${evaluation.severity || 'None'}`),
       incidentElement(
         'p',
@@ -741,17 +732,7 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
       incidentElement(
         'p',
         '',
-        `Suggested action: ${evaluation.suggestedAction || 'None configured'}`
-      ),
-      incidentElement(
-        'p',
-        '',
-        `HR recommendation: ${evaluation.recommendedAction || 'None'}`
-      ),
-      incidentElement(
-        'p',
-        'incident-case-text',
-        `Justification: ${evaluation.recommendationJustification}`
+        `Corrective action: ${evaluation.recommendedAction || 'None'}`
       )
     );
     if (evaluation.remarks)
@@ -783,25 +764,17 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
     parent.appendChild(section);
     return;
   }
-  const rules = (incidentCodeProvisions || []).flatMap((provision) =>
-    (provision.rules || []).map((rule) => ({ ...rule, provision }))
-  );
   const finding = incidentElement('select');
   finding.add(new Option('Select finding', ''));
   finding.add(new Option('Allegation substantiated', 'SUBSTANTIATED'));
   finding.add(new Option('Allegation not substantiated', 'NOT_SUBSTANTIATED'));
   finding.value = incident.evaluation?.finding || '';
-  const ruleSelect = incidentElement('select');
-  ruleSelect.add(new Option('Select applicable violation', ''));
-  rules.forEach((item) =>
-    ruleSelect.add(
-      new Option(
-        `${item.provision.code} — ${item.violationTitle} (${item.severity})`,
-        item.id
-      )
-    )
+  const severity = incidentElement('select');
+  severity.add(new Option('Select severity', ''));
+  ['Light', 'Moderate', 'Grave', 'Intolerable'].forEach((value) =>
+    severity.add(new Option(value, value))
   );
-  ruleSelect.value = incident.evaluation?.ruleId || '';
+  severity.value = incident.evaluation?.severity || '';
   const findings = incidentElement('textarea');
   findings.rows = 5;
   findings.maxLength = 20000;
@@ -809,13 +782,8 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
   findings.value = incident.evaluation?.findings || '';
   const recommendation = incidentElement('input');
   recommendation.maxLength = 191;
-  recommendation.placeholder = 'Recommended corrective action';
+  recommendation.placeholder = 'Corrective action';
   recommendation.value = incident.evaluation?.recommendedAction || '';
-  const justification = incidentElement('textarea');
-  justification.rows = 3;
-  justification.maxLength = 5000;
-  justification.placeholder = 'Justification for the recommendation';
-  justification.value = incident.evaluation?.recommendationJustification || '';
   const remarks = incidentElement('textarea');
   remarks.rows = 3;
   remarks.maxLength = 5000;
@@ -828,215 +796,145 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
     section.appendChild(wrapper);
   };
   field('Finding', finding);
-  field('Applicable Code of Conduct violation', ruleSelect);
+  field('Violation severity', severity);
   field('Evaluation findings', findings);
-  field('Recommended corrective action', recommendation);
-  field('Recommendation justification', justification);
+  field('Corrective action', recommendation);
   field('Additional remarks', remarks);
   section.appendChild(context);
-  const loadContext = async () => {
-    context.replaceChildren();
-    if (finding.value !== 'SUBSTANTIATED' || !ruleSelect.value) return;
-    try {
-      const data = await api(
-        'getIncidentEvaluationContext',
-        incident.id,
-        ruleSelect.value
-      );
-      context.appendChild(
-        incidentElement(
-          'p',
-          'note',
-          `Severity: ${data.rule.severity}; ${data.priorOffenses} relevant finalized previous offense(s).`
-        )
-      );
-      context.appendChild(
-        incidentElement(
-          'p',
-          'note',
-          `COC suggestion: ${data.suggestedAction || 'No action configured for this occurrence count.'} This is advisory and must be reviewed by HR.`
-        )
-      );
-      if (!recommendation.value && data.suggestedAction)
-        recommendation.value = data.suggestedAction;
-      if (data.history.length) {
-        const list = incidentElement('ul');
-        data.history.forEach((item) =>
-          list.appendChild(
-            incidentElement(
-              'li',
-              '',
-              `${item.violationTitle} · ${item.severity} · ${item.correctiveAction} · ${new Date(item.finalizedAt).toLocaleDateString()}`
-            )
-          )
-        );
-        context.appendChild(list);
-      }
-    } catch (error) {
-      context.appendChild(
-        incidentElement('p', 'note error', error.message || String(error))
-      );
+  const updateFindingFields = () => {
+    const substantiated = finding.value === 'SUBSTANTIATED';
+    [severity, recommendation].forEach(
+      (control) => (control.disabled = !substantiated)
+    );
+    if (!substantiated) {
+      severity.value = '';
+      recommendation.value = '';
     }
+    updatePriorOffenseCount();
   };
-  finding.addEventListener('change', () => {
-    ruleSelect.disabled = finding.value !== 'SUBSTANTIATED';
-    recommendation.disabled = finding.value !== 'SUBSTANTIATED';
-    if (finding.value === 'NOT_SUBSTANTIATED') recommendation.value = '';
-    loadContext();
+  const updatePriorOffenseCount = () => {
+    context.replaceChildren();
+    if (finding.value !== 'SUBSTANTIATED' || !severity.value) return;
+    const relevant = (incident.disciplinaryHistory || []).filter(
+      (item) => item.severity === severity.value
+    );
+    context.appendChild(
+      incidentElement(
+        'p',
+        'note',
+        `Finalized prior offenses at this severity: ${relevant.length}.`
+      )
+    );
+  };
+  finding.addEventListener('change', updateFindingFields);
+  severity.addEventListener('change', updatePriorOffenseCount);
+  updateFindingFields();
+  const effectiveDate = incidentElement('input');
+  effectiveDate.type = 'date';
+  field('Effective date (for suspension or termination)', effectiveDate);
+  const authorized = incidentElement(
+    'p',
+    'note',
+    `Authorized HR signatory: ${incident.currentUserEmail}`
+  );
+  const signatureCanvas = incidentElement(
+    'canvas',
+    'signature-pad incident-signature-pad'
+  );
+  signatureCanvas.width = 560;
+  signatureCanvas.height = 120;
+  signatureCanvas.setAttribute('aria-label', 'Authorized HR approval signature');
+  const clear = incidentElement('button', 'ghost', 'Clear signature');
+  clear.type = 'button';
+  let decisionPad;
+  padSetup.push(() => {
+    decisionPad = window.createSignaturePad(signatureCanvas, clear);
   });
-  ruleSelect.disabled = finding.value !== 'SUBSTANTIATED';
-  recommendation.disabled = finding.value !== 'SUBSTANTIATED';
-  ruleSelect.addEventListener('change', loadContext);
-  const save = incidentElement('button', 'ghost', 'Save evaluation');
-  save.type = 'button';
-  save.onclick = async () => {
-    try {
-      await api('saveIncidentEvaluation', incident.id, {
-        finding: finding.value,
-        ruleId: ruleSelect.value,
-        findings: findings.value,
-        recommendedAction: recommendation.value,
-        recommendationJustification: justification.value,
-        remarks: remarks.value
-      });
-      await (ui.reload || openIncidentCase)(incident.id);
+  const process = incidentElement('button', '', 'Process Evaluation');
+  process.type = 'button';
+  process.onclick = async () => {
+    if (!['SUBSTANTIATED', 'NOT_SUBSTANTIATED'].includes(finding.value)) {
       setIncidentFeedback(
         ui.feedback || document.getElementById('ir-case-feedback'),
-        'Evaluation saved.'
+        'Select an evaluation finding.',
+        true
       );
+      return;
+    }
+    if (finding.value === 'SUBSTANTIATED' && !severity.value) {
+      setIncidentFeedback(
+        ui.feedback || document.getElementById('ir-case-feedback'),
+        'Select the violation severity.',
+        true
+      );
+      return;
+    }
+    if (finding.value === 'SUBSTANTIATED' && !recommendation.value.trim()) {
+      setIncidentFeedback(
+        ui.feedback || document.getElementById('ir-case-feedback'),
+        'Enter the corrective action.',
+        true
+      );
+      return;
+    }
+    if (!decisionPad?.toDataURL()) {
+      setIncidentFeedback(
+        ui.feedback || document.getElementById('ir-case-feedback'),
+        'Add the authorized HR signature.',
+        true
+      );
+      return;
+    }
+    if (
+      !(await window.appConfirm(
+        'Process and issue this evaluation to everyone authorized on the case?',
+        { title: 'Process evaluation', confirmText: 'Process and issue' }
+      ))
+    )
+      return;
+    process.disabled = true;
+    try {
+      const action = recommendation.value.trim();
+      const actionLower = action.toLowerCase();
+      const outcome =
+        finding.value === 'NOT_SUBSTANTIATED'
+          ? 'NO_VIOLATION'
+          : /termination/.test(actionLower)
+            ? 'TERMINATION'
+            : /written warning|reprimand/.test(actionLower)
+              ? 'WRITTEN_WARNING'
+              : /suspension/.test(actionLower)
+                ? 'SUSPENSION'
+                : 'OTHER_CORRECTIVE_ACTION';
+      await api('saveIncidentEvaluation', incident.id, {
+        finding: finding.value,
+        severity: severity.value,
+        findings: findings.value,
+        recommendedAction: action,
+        remarks: remarks.value
+      });
+      await api('issueIncidentDecision', incident.id, {
+        outcome,
+        finalAction: action,
+        effectiveDate: effectiveDate.value,
+        decisionReason: [findings.value, remarks.value]
+          .filter((value) => value.trim())
+          .join('\n\n'),
+        signature: decisionPad.toDataURL()
+      });
+      await window.refreshInboxBadge().catch(() => {});
+      await refreshIncidentBadges();
+      await (ui.reload || openIncidentCase)(incident.id);
     } catch (error) {
       setIncidentFeedback(
         ui.feedback || document.getElementById('ir-case-feedback'),
         error.message || String(error),
         true
       );
+      process.disabled = false;
     }
   };
-  section.appendChild(save);
-  if (incident.evaluation) {
-    const decisionForm = incidentElement('div', 'incident-case-section');
-    decisionForm.appendChild(
-      incidentElement('h4', '', 'Review and issue final decision')
-    );
-    decisionForm.appendChild(
-      incidentElement(
-        'p',
-        'note',
-        'The evaluation recommendation is advisory. The approver must choose and sign the final action separately; only actions configured for the applicable Code of Conduct rule are available.'
-      )
-    );
-    const outcome = incidentElement('select');
-    const noViolation = incident.evaluation.finding === 'NOT_SUBSTANTIATED';
-    if (noViolation)
-      outcome.add(new Option('No Violation Established', 'NO_VIOLATION'));
-    else {
-      outcome.add(new Option('Select final decision', ''));
-      outcome.add(new Option('Written Warning', 'WRITTEN_WARNING'));
-      outcome.add(new Option('Suspension', 'SUSPENSION'));
-      outcome.add(new Option('Termination', 'TERMINATION'));
-      outcome.add(
-        new Option('Other Corrective Action', 'OTHER_CORRECTIVE_ACTION')
-      );
-    }
-    const finalAction = incidentElement('select');
-    const updateDecisionActions = () => {
-      finalAction.replaceChildren(new Option('Select approved COC action', ''));
-      (incident.evaluation.allowedActions || [])
-        .filter((action) => action.decisionType === outcome.value)
-        .forEach((action) =>
-          finalAction.add(
-            new Option(
-              `${action.correctiveAction}${action.details ? ` — ${action.details}` : ''}`,
-              action.correctiveAction
-            )
-          )
-        );
-    };
-    updateDecisionActions();
-    outcome.addEventListener('change', updateDecisionActions);
-    const effectiveDate = incidentElement('input');
-    effectiveDate.type = 'date';
-    const decisionReason = incidentElement('textarea');
-    decisionReason.rows = 3;
-    decisionReason.maxLength = 10000;
-    decisionReason.placeholder = 'Reason for the approved final decision';
-    const authorized = incidentElement(
-      'p',
-      'note',
-      `Authorized decision approver: ${incident.currentUserEmail}`
-    );
-    const signatureCanvas = incidentElement(
-      'canvas',
-      'signature-pad incident-signature-pad'
-    );
-    signatureCanvas.width = 560;
-    signatureCanvas.height = 120;
-    signatureCanvas.setAttribute(
-      'aria-label',
-      'Authorized decision approval signature'
-    );
-    const clear = incidentElement('button', 'ghost', 'Clear signature');
-    clear.type = 'button';
-    let decisionPad;
-    padSetup.push(() => {
-      decisionPad = window.createSignaturePad(signatureCanvas, clear);
-    });
-    const issue = incidentElement('button', '', 'Approve and issue decision');
-    issue.type = 'button';
-    issue.onclick = async () => {
-      if (
-        !window.confirm(
-          'Approve and issue this final decision to the reported employee?'
-        )
-      )
-        return;
-      try {
-        await api('issueIncidentDecision', incident.id, {
-          outcome: outcome.value,
-          finalAction: finalAction.value,
-          effectiveDate: effectiveDate.value,
-          decisionReason: decisionReason.value,
-          signature: decisionPad?.toDataURL()
-        });
-        await window.refreshInboxBadge().catch(() => {});
-        await refreshIncidentBadges();
-        await (ui.reload || openIncidentCase)(incident.id);
-      } catch (error) {
-        setIncidentFeedback(
-          ui.feedback || document.getElementById('ir-case-feedback'),
-          error.message || String(error),
-          true
-        );
-      }
-    };
-    decisionForm.append(
-      incidentElement('label', '', 'Final decision'),
-      outcome,
-      incidentElement('label', '', 'Approved corrective action'),
-      finalAction,
-      incidentElement('label', '', 'Effective date, when applicable'),
-      effectiveDate,
-      incidentElement('label', '', 'Decision reasons'),
-      decisionReason,
-      authorized,
-      signatureCanvas,
-      clear,
-      issue
-    );
-    if (noViolation) {
-      finalAction.disabled = true;
-      outcome.value = 'NO_VIOLATION';
-    }
-    decisionForm.hidden = false;
-    section.appendChild(decisionForm);
-  }
-  if (incident.evaluation?.ruleId) {
-    const selected = rules.find(
-      (item) => Number(item.id) === Number(incident.evaluation.ruleId)
-    );
-    if (selected) ruleSelect.value = String(selected.id);
-  }
-  loadContext();
+  section.append(authorized, signatureCanvas, clear, process);
   parent.appendChild(section);
 }
 
@@ -1111,10 +1009,6 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
   ) {
     const editor = incidentElement('div', 'incident-nte-editor');
     editor.appendChild(incidentElement('h4', '', 'Prepare and issue an NTE'));
-    const provision = incidentElement('select');
-    provision.appendChild(
-      new Option('Loading Code of Conduct provisions…', '')
-    );
     const allegation = incidentElement('textarea');
     allegation.rows = 5;
     allegation.maxLength = 12000;
@@ -1155,43 +1049,15 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
       wrapper.appendChild(input);
       fields.appendChild(wrapper);
     };
-    field('Alleged Code of Conduct provision', provision);
     field('Date of issuance', issueDate);
     field('Documented date of receipt', receiptDate);
     field('Response period (working days)', responseDays);
     field('Explanation deadline (confirm HR policy)', deadline);
-    const provisionText = incidentElement(
-      'p',
-      'note',
-      'Select a provision to include its current Code of Conduct text.'
-    );
     const deadlineNote = incidentElement(
       'p',
       'note',
       'The response period defaults to five working days and can be changed for this NTE. The calculated deadline skips weekends; adjust it to match the HR-approved procedure and calendar.'
     );
-    provision.addEventListener('change', () => {
-      const item = incidentCodeProvisions.find(
-        (row) => String(row.id) === provision.value
-      );
-      provisionText.textContent = item ? item.description : '';
-    });
-    const savedProvisionId = incident.nte?.provisionId;
-    api('listIncidentCodeProvisions')
-      .then((rows) => {
-        incidentCodeProvisions = rows;
-        provision.replaceChildren(new Option('Select a provision', ''));
-        rows.forEach((row) =>
-          provision.add(new Option(`${row.code} — ${row.title}`, row.id))
-        );
-        if (savedProvisionId) provision.value = String(savedProvisionId);
-        provision.dispatchEvent(new Event('change'));
-      })
-      .catch((error) =>
-        provision.replaceChildren(
-          new Option(error.message || 'Could not load provisions', '')
-        )
-      );
     const signatureCanvas = incidentElement(
       'canvas',
       'signature-pad incident-signature-pad'
@@ -1215,7 +1081,6 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
     const feedback = incidentElement('p');
     feedback.hidden = true;
     const values = async () => ({
-      provisionId: provision.value,
       allegation: allegation.value,
       issuanceDate: issueDate.value,
       receiptDate: receiptDate.value,
@@ -1244,14 +1109,10 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
     preview.type = 'button';
     preview.onclick = async () => {
       try {
-        const selected = incidentCodeProvisions.find(
-          (row) => String(row.id) === provision.value
-        );
-        if (!selected) throw new Error('Select a Code of Conduct provision.');
         openNtePreview(incident, {
-          provisionCode: selected.code,
-          provisionTitle: selected.title,
-          provisionText: selected.description,
+          provisionCode: incident.nte?.provisionCode || '',
+          provisionTitle: incident.nte?.provisionTitle || '',
+          provisionText: incident.nte?.provisionText || '',
           allegation: allegation.value,
           issuanceDate: issueDate.value,
           receiptDate: receiptDate.value,
@@ -1292,7 +1153,6 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
     signatureControls.append(save, preview, issue);
     editor.append(
       fields,
-      provisionText,
       deadlineNote,
       incidentElement('label', '', 'Explanation of the allegation'),
       allegation,
@@ -1363,9 +1223,10 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
     submit.type = 'button';
     submit.onclick = async () => {
       if (
-        !window.confirm(
-          'Submit this explanation to HR? A submitted explanation cannot be edited.'
-        )
+        !(await window.appConfirm(
+          'Submit this explanation to HR? A submitted explanation cannot be edited.',
+          { title: 'Submit explanation', confirmText: 'Submit' }
+        ))
       )
         return;
       submit.disabled = true;
@@ -1611,8 +1472,7 @@ function renderIncidentNte(parent, incident, padSetup, ui = {}) {
 
   if (
     incident.canReview &&
-    incident.status === 'EXPLANATION SENT' &&
-    incident.explanations.length
+    incident.status === 'EXPLANATION SENT'
   ) {
     const start = incidentElement('button', '', 'Start evaluation');
     start.type = 'button';
@@ -1778,8 +1638,6 @@ async function openIncidentCase(incidentId, options = {}) {
     }
     incident = await api('getIncidentCase', incident.id);
   }
-  if (incident.canReview && incident.status === 'EVALUATION')
-    incidentCodeProvisions = await api('listIncidentCodeProvisions');
   if (
     ticket !== incidentOpenRequest ||
     owner !== session?.email ||
@@ -2115,9 +1973,10 @@ async function readIncidentEvidenceFiles(fileList) {
 async function runIncidentTransition(incident, action, details, ui = {}) {
   if (
     action.startsWith('CLOSE_') &&
-    !window.confirm(
-      'Close this case? This decision will be recorded in the case history.'
-    )
+    !(await window.appConfirm(
+      'Close this case? This decision will be recorded in the case history.',
+      { title: 'Close case', confirmText: 'Close case', danger: true }
+    ))
   )
     return;
   try {
@@ -2206,6 +2065,7 @@ window.IncidentCaseUI = {
   renderReport: renderIncidentReport,
   renderSignature: renderIncidentSignature,
   renderNte: renderIncidentNte,
+  renderEvaluation: renderIncidentEvaluation,
   renderReviewActions: renderIncidentReviewActions,
   renderDecision: renderIncidentDecision,
   readEvidenceFiles: readIncidentEvidenceFiles,

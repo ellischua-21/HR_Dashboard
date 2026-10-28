@@ -36,6 +36,7 @@ if (stylesheet)
     '../shared/FormStatus.js',
     'js/incident-management/Navigation.js',
     'js/SignaturePad.js',
+    'js/AppConfirm.js',
     'js/Main.js',
     'js/Employees.js',
     'js/Reports.js',
@@ -48,7 +49,6 @@ if (stylesheet)
     'js/incident-management/Track.js',
     'js/incident-management/Review.js',
     'js/incident-management/History.js',
-    'js/incident-management/CodeConfiguration.js',
     'js/incident-management/CodeOfConduct.js'
   ]) {
     await new Promise((resolve, reject) => {

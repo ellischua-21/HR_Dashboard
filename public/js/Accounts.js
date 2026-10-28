@@ -102,7 +102,9 @@ function renderAccountRequests(requestList) {
     approve.type = 'button';
     approve.textContent = 'Approve';
     approve.onclick = async () => {
-      if (!confirm(`Approve ${request.email} as ${request.assigned_role}?`))
+      if (!(await window.appConfirm(`Approve ${request.email} as ${request.assigned_role}?`, {
+        title: 'Approve account request', confirmText: 'Approve'
+      })))
         return;
       approve.disabled = true;
       try {
@@ -120,7 +122,9 @@ function renderAccountRequests(requestList) {
     reject.textContent = 'Reject';
     reject.onclick = async () => {
       if (
-        !confirm(`Reject and remove the account request from ${request.email}?`)
+        !(await window.appConfirm(`Reject and remove the account request from ${request.email}?`, {
+          title: 'Reject account request', confirmText: 'Reject', danger: true
+        }))
       )
         return;
       reject.disabled = true;

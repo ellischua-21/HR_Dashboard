@@ -472,24 +472,25 @@
           `Explanation submitted ${dateTime(sent.reachedAt)}. Awaiting HR evaluation.`
         )
       );
+      if (incident.canReview) {
+        const startEvaluation = el('button', '', 'Start evaluation');
+        startEvaluation.type = 'button';
+        startEvaluation.onclick = async () => {
+          startEvaluation.disabled = true;
+          try {
+            await api('startIncidentEvaluation', incident.id);
+            await select(incident.id);
+            await window.refreshIncidentBadges();
+          } catch (error) {
+            ui.feedback(feedback, error.message || String(error), true);
+            startEvaluation.disabled = false;
+          }
+        };
+        content.appendChild(startEvaluation);
+      }
     }
-    if (
-      incident.status === 'EVALUATION' &&
-      incident.canReview &&
-      incident.evaluation
-    ) {
-      const evaluation = el('details');
-      evaluation.append(
-        el('summary', '', 'Authorized evaluation findings'),
-        el('p', 'incident-case-text', incident.evaluation.findings),
-        el(
-          'p',
-          'note',
-          `Recommendation: ${incident.evaluation.recommendedAction || 'No disciplinary action recommended'}`
-        )
-      );
-      content.appendChild(evaluation);
-    }
+    if (incident.status === 'EVALUATION' && incident.canReview)
+      ui.renderEvaluation(content, view, pads, { feedback, reload: select });
     window.IncidentTimeline.render(content, incident);
     ui.renderDecision(content, view);
     if (tracking.currentStage === 'DECISION ISSUED' && !incident.decision)

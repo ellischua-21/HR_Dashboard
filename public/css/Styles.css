@@ -1769,26 +1769,10 @@ legend {
     min-height: 44px;
   }
 }
-.incident-code-provision-form {
-  display: grid;
-  gap: 12px;
-  margin: 16px 0;
-  padding: 14px;
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  background: #fff;
-}
-.incident-code-provision-form label,
 .incident-case-section > label {
   display: grid;
   gap: 6px;
   margin: 8px 0;
-}
-.incident-code-rule-card {
-  margin: 10px 0;
-  padding: 10px;
-  border-left: 3px solid var(--teal);
-  background: var(--surface, #f7f8fa);
 }
 .incident-public-timeline ol {
   padding-left: 24px;
@@ -1837,20 +1821,6 @@ legend {
   max-width: none;
   margin: 0;
   overflow-wrap: anywhere;
-}
-.incident-coc-provision {
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  padding: 12px;
-  margin: 12px 0;
-}
-.incident-coc-provision > summary,
-#ir-coc-management > summary {
-  cursor: pointer;
-  font-weight: 600;
-}
-.incident-policy-description {
-  white-space: pre-wrap;
 }
 #ir-coc-management {
   max-width: none;
@@ -1903,6 +1873,41 @@ legend {
 }
 .incident-signature-pad {
   height: 120px;
+}
+.app-confirm-dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-width: none;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  color: var(--ink);
+  background: var(--card);
+  box-shadow: 0 18px 55px rgb(20 33 61 / 25%);
+}
+.app-confirm-dialog::backdrop {
+  background: rgb(20 33 61 / 45%);
+}
+.app-confirm-card {
+  padding: 22px;
+}
+.app-confirm-card h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+.app-confirm-message {
+  margin: 0;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+.app-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+.app-confirm-accept.danger {
+  background: #7b2639;
+  border-color: #7b2639;
 }
 .incident-signature-field .actions {
   margin-top: 8px;

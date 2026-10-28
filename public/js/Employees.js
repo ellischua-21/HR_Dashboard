@@ -374,9 +374,10 @@ $('p_edit').onclick = () => {
 };
 $('p_archive').onclick = guard(async () => {
   if (
-    !confirm(
-      'Archive ' + CUR.name + '? The record is kept but hidden from lists.'
-    )
+    !(await window.appConfirm(
+      'Archive ' + CUR.name + '? The record is kept but hidden from lists.',
+      { title: 'Archive employee', confirmText: 'Archive', danger: true }
+    ))
   )
     return;
   await api('archiveEmployee', CUR.record_id);
@@ -776,6 +777,8 @@ async function runImport(commit) {
 }
 $('i_validate').onclick = guard(() => runImport(false));
 $('i_commit').onclick = guard(async () => {
-  if (confirm('Import all valid rows now? Rows with errors will be skipped.'))
+  if (await window.appConfirm('Import all valid rows now? Rows with errors will be skipped.', {
+    title: 'Import employees', confirmText: 'Import'
+  }))
     await runImport(true);
 });

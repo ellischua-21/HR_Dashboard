@@ -240,11 +240,17 @@ async function getIncidentFileContext(req) {
 
 async function searchIncidentEmployees(req, query, purpose = 'reported') {
   const user = await requirePerm(req, 'inbox.read');
-  requireIncidentRole(
-    user,
-    FILING_ROLES,
-    'Only HEAD, HR, and ADMIN accounts can file an Incident Report.'
-  );
+  if (purpose === 'violation-history') {
+    if (user.role !== 'HR')
+      throw httpError('Only HR can search violation history by employee.', 403);
+    await requirePerm(req, 'emp.read');
+  } else {
+    requireIncidentRole(
+      user,
+      FILING_ROLES,
+      'Only HEAD, HR, and ADMIN accounts can file an Incident Report.'
+    );
+  }
   const term = normalizeText(String(query || ''), 'Search text', 100, false)
     .toLowerCase()
     .replace(/[!%_]/g, '!$&');
@@ -256,7 +262,8 @@ async function searchIncidentEmployees(req, query, purpose = 'reported') {
       : 'JOIN user_roles u ON LOWER(u.email) = LOWER(e.personal_email)';
   const activeAccount = purpose === 'participant' ? '' : 'AND u.active = 1';
   const [rows] = await pool.execute(
-    `SELECT e.record_id AS employeeId, e.name, e.emp_no AS employeeNo,
+    `SELECT e.record_id AS employeeId, e.personal_email AS email,
+            e.name, e.emp_no AS employeeNo,
             e.department, e.position
      FROM employees e ${accountJoin}
      WHERE e.record_status <> 'Archived' ${activeAccount}
@@ -723,7 +730,7 @@ async function getIncidentReviewDashboard(req, input = {}) {
 
 async function getIncidentForAction(connection, incidentId) {
   const [rows] = await connection.execute(
-    `SELECT id, case_number, status, reporter_email, reported_employee_email,
+    `SELECT id, case_number, subject, status, reporter_email, reported_employee_email,
             assigned_head_email
      FROM incident_reports WHERE id = ? FOR UPDATE`,
     [incidentId]
@@ -1085,7 +1092,7 @@ async function deleteIncidentCodeRuleAction(req, actionId) {
 function normalizeNteInput(input = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input))
     throw httpError('Enter valid NTE details.', 400);
-  const provisionId = Number(input.provisionId);
+  const provisionId = input.provisionId ? Number(input.provisionId) : null;
   const allegation = normalizeText(
     String(input.allegation || ''),
     'Allegation details',
@@ -1112,8 +1119,11 @@ function normalizeNteInput(input = {}) {
       'The explanation deadline cannot be before the receipt date.',
       400
     );
-  if (!Number.isSafeInteger(provisionId) || provisionId < 1)
-    throw httpError('Select a Code of Conduct provision.', 400);
+  if (
+    provisionId !== null &&
+    (!Number.isSafeInteger(provisionId) || provisionId < 1)
+  )
+    throw httpError('Choose a valid Code of Conduct provision.', 400);
   return {
     provisionId,
     allegation,
@@ -1138,16 +1148,20 @@ async function getPrimaryIncidentSubjectId(connection, incidentId) {
 
 async function upsertIncidentNte(connection, user, incident, input) {
   const fields = normalizeNteInput(input);
-  const [[provision]] = await connection.execute(
-    `SELECT id, provision_code AS code, title, description
-     FROM incident_code_provisions WHERE id = ? AND active = 1 FOR UPDATE`,
-    [fields.provisionId]
-  );
-  if (!provision)
-    throw httpError(
-      'The selected Code of Conduct provision is unavailable.',
-      409
+  let provision = null;
+  if (fields.provisionId) {
+    const [[selectedProvision]] = await connection.execute(
+      `SELECT id, provision_code AS code, title, description
+       FROM incident_code_provisions WHERE id = ? AND active = 1 FOR UPDATE`,
+      [fields.provisionId]
     );
+    if (!selectedProvision)
+      throw httpError(
+        'The selected Code of Conduct provision is unavailable.',
+        409
+      );
+    provision = selectedProvision;
+  }
   const [existingRows] = await connection.execute(
     'SELECT id, status FROM incident_ntes WHERE incident_id = ? FOR UPDATE',
     [incident.id]
@@ -1156,15 +1170,16 @@ async function upsertIncidentNte(connection, user, incident, input) {
     throw httpError('An NTE has already been issued for this case.', 409);
   if (existingRows[0]) {
     await connection.execute(
-      `UPDATE incident_ntes SET provision_id = ?, provision_code = ?, provision_title = ?,
-       provision_text = ?, allegation = ?, issuance_date = ?, receipt_date = ?,
+      `UPDATE incident_ntes SET provision_id = COALESCE(?, provision_id),
+       provision_code = COALESCE(?, provision_code), provision_title = COALESCE(?, provision_title),
+       provision_text = COALESCE(?, provision_text), allegation = ?, issuance_date = ?, receipt_date = ?,
        response_working_days = ?, deadline_date = ?, signer_email = ?, signer_name = ?
        WHERE id = ? AND status = 'DRAFT'`,
       [
         fields.provisionId,
-        provision.code,
-        provision.title,
-        provision.description,
+        provision?.code || null,
+        provision?.title || null,
+        provision?.description || null,
         fields.allegation,
         fields.issuanceDate,
         fields.receiptDate,
@@ -1190,9 +1205,9 @@ async function upsertIncidentNte(connection, user, incident, input) {
         incident.id,
         subjectId,
         fields.provisionId,
-        provision.code,
-        provision.title,
-        provision.description,
+        provision?.code || null,
+        provision?.title || null,
+        provision?.description || null,
         fields.allegation,
         fields.issuanceDate,
         fields.receiptDate,
@@ -1227,7 +1242,8 @@ async function upsertIncidentNte(connection, user, incident, input) {
       ]
     );
   }
-  await snapshotCasePolicy(connection, incident.id, 'NTE', fields.provisionId);
+  if (fields.provisionId)
+    await snapshotCasePolicy(connection, incident.id, 'NTE', fields.provisionId);
   return { nteId, ...fields, provision };
 }
 
@@ -1516,6 +1532,14 @@ async function startIncidentEvaluation(req, incidentId) {
     const incident = await getIncidentForAction(connection, id);
     if (incident.status !== 'EXPLANATION SENT')
       throw httpError('This case is not awaiting explanation review.', 409);
+    const [[submittedExplanation]] = await connection.execute(
+      `SELECT e.id FROM incident_explanations e
+       JOIN incident_ntes n ON n.id = e.nte_id
+       WHERE n.incident_id = ? LIMIT 1 FOR UPDATE`,
+      [id]
+    );
+    if (!submittedExplanation)
+      throw httpError('No submitted employee explanation is available to review.', 409);
     await connection.execute(
       `UPDATE incident_reports SET status = 'EVALUATION' WHERE id = ?`,
       [id]
@@ -1632,12 +1656,7 @@ async function saveIncidentEvaluation(req, incidentId, input = {}) {
     'Evaluation findings',
     20000
   );
-  const justification = normalizeText(
-    String(input.recommendationJustification || ''),
-    'Recommendation justification',
-    5000,
-    finding === 'SUBSTANTIATED'
-  );
+  const justification = '';
   const remarks = normalizeText(
     String(input.remarks || ''),
     'Additional remarks',
@@ -1660,23 +1679,26 @@ async function saveIncidentEvaluation(req, incidentId, input = {}) {
     );
     if (decision)
       throw httpError('The final decision has already been issued.', 409);
-    let rule = null;
     let previousOffenses = 0;
-    let suggestedAction = '';
     let recommendedAction = '';
     let reference = '';
-    let allowedActions = [];
+    let violationTitle = '';
+    let severity = '';
     if (finding === 'SUBSTANTIATED') {
-      const context = await getIncidentEvaluationContextForConnection(
-        connection,
-        id,
-        Number(input.ruleId)
+      violationTitle = normalizeText(
+        String(incident.subject || incident.case_number),
+        'Incident title',
+        191
       );
-      rule = context.rule;
-      previousOffenses = context.priorOffenses;
-      suggestedAction = context.suggestedAction;
-      allowedActions = context.actions;
-      reference = `${rule.provisionCode} — ${rule.provisionTitle}`;
+      severity = String(input.severity || '');
+      if (!['Light', 'Moderate', 'Grave', 'Intolerable'].includes(severity))
+        throw httpError('Choose a valid violation severity.', 400);
+      const [[prior]] = await connection.execute(
+        `SELECT COUNT(*) AS total FROM incident_disciplinary_history
+         WHERE LOWER(employee_email) = LOWER(?) AND LOWER(severity) = LOWER(?) AND incident_id <> ?`,
+        [incident.reported_employee_email, severity, id]
+      );
+      previousOffenses = Number(prior.total || 0);
       recommendedAction = normalizeText(
         String(input.recommendedAction || ''),
         'Recommended corrective action',
@@ -1707,19 +1729,18 @@ async function saveIncidentEvaluation(req, incidentId, input = {}) {
         subjectId,
         finding,
         findings,
-        rule?.id || null,
-        rule?.violationTitle || null,
-        reference || null,
-        rule?.severity || null,
+        null,
+        violationTitle || null,
+        reference,
+        severity || null,
         previousOffenses,
-        suggestedAction || null,
+        null,
         recommendedAction || null,
         justification,
         remarks,
         user.email
       ]
     );
-    await snapshotCasePolicy(connection, id, 'EVALUATION', rule?.provisionId);
     const [[savedEvaluation]] = await connection.execute(
       'SELECT id FROM incident_evaluations WHERE incident_id = ? FOR UPDATE',
       [id]
@@ -1728,19 +1749,6 @@ async function saveIncidentEvaluation(req, incidentId, input = {}) {
       'DELETE FROM incident_evaluation_allowed_actions WHERE evaluation_id = ?',
       [savedEvaluation.id]
     );
-    for (const action of allowedActions)
-      await connection.execute(
-        `INSERT INTO incident_evaluation_allowed_actions
-         (evaluation_id, prior_offenses, decision_type, corrective_action, details)
-         VALUES (?, ?, ?, ?, ?)`,
-        [
-          savedEvaluation.id,
-          action.priorOffenses,
-          action.decisionType,
-          action.correctiveAction,
-          action.details
-        ]
-      );
     await recordIncidentActivity(
       connection,
       user,
@@ -1748,13 +1756,8 @@ async function saveIncidentEvaluation(req, incidentId, input = {}) {
       'EVALUATION_SAVED',
       `${finding === 'SUBSTANTIATED' ? 'Substantiated' : 'Not substantiated'} evaluation saved.`
     );
-    await connection.execute(
-      `INSERT IGNORE INTO incident_notifications (incident_id, recipient_email, notification_type)
-       SELECT ?, email, 'DECISION_PENDING' FROM user_roles WHERE active = 1 AND role IN ('HR', 'ADMIN')`,
-      [id]
-    );
     await connection.commit();
-    return { ok: true, finding, suggestedAction, recommendedAction };
+    return { ok: true, finding, recommendedAction };
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -1901,15 +1904,17 @@ async function issueIncidentDecision(req, incidentId, input = {}) {
         'Approved corrective action',
         191
       );
-      const [allowed] = await connection.execute(
-        'SELECT id FROM incident_evaluation_allowed_actions WHERE evaluation_id = ? AND corrective_action = ? AND decision_type = ? LIMIT 1',
-        [evaluation.id, finalAction, outcome]
-      );
-      if (!allowed.length)
-        throw httpError(
-          'Choose a corrective action configured for this Code of Conduct rule.',
-          400
+      if (evaluation.rule_id) {
+        const [allowed] = await connection.execute(
+          'SELECT id FROM incident_evaluation_allowed_actions WHERE evaluation_id = ? AND corrective_action = ? AND decision_type = ? LIMIT 1',
+          [evaluation.id, finalAction, outcome]
         );
+        if (!allowed.length)
+          throw httpError(
+            'Choose a corrective action configured for this Code of Conduct rule.',
+            400
+          );
+      }
       if (['SUSPENSION', 'TERMINATION'].includes(outcome) && !effectiveDate)
         throw httpError('Enter the effective date for this decision.', 400);
     }

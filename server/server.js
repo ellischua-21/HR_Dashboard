@@ -196,30 +196,6 @@ const methods = {
     incidents.transitionIncident(req, incidentId, action, details),
   listIncidentCodeProvisions: (req) =>
     incidents.listIncidentCodeProvisions(req),
-  saveIncidentCodeProvision: (req, data) =>
-    incidents.saveIncidentCodeProvision(req, data),
-  saveIncidentCodeRule: (req, data) =>
-    incidents.saveIncidentCodeRule(req, data),
-  saveIncidentCodeRuleAction: (
-    req,
-    ruleId,
-    priorOffenses,
-    action,
-    decisionType,
-    details
-  ) =>
-    incidents.saveIncidentCodeRuleAction(
-      req,
-      ruleId,
-      priorOffenses,
-      action,
-      decisionType,
-      details
-    ),
-  deactivateIncidentCodeRule: (req, ruleId) =>
-    incidents.deactivateIncidentCodeRule(req, ruleId),
-  deleteIncidentCodeRuleAction: (req, actionId) =>
-    incidents.deleteIncidentCodeRuleAction(req, actionId),
   saveIncidentNteDraft: (req, incidentId, data) =>
     incidents.saveIncidentNteDraft(req, incidentId, data),
   issueIncidentNte: (req, incidentId, data) =>

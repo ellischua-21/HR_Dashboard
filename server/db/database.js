@@ -544,6 +544,25 @@ async function initializeDatabase() {
     KEY idx_incident_nte_deadline (status, deadline_date, overdue_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
+  // A COC provision is optional on an NTE; keep existing captured references.
+  const optionalNteProvisionColumns = [
+    ['provision_id', 'BIGINT UNSIGNED NULL'],
+    ['provision_code', 'VARCHAR(100) NULL'],
+    ['provision_title', 'VARCHAR(191) NULL'],
+    ['provision_text', 'TEXT NULL']
+  ];
+  for (const [column, definition] of optionalNteProvisionColumns) {
+    const [columns] = await pool.query(
+      `SHOW COLUMNS FROM incident_ntes LIKE ?`,
+      [column]
+    );
+    if (columns.length && columns[0].Null !== 'YES') {
+      await pool.query(
+        `ALTER TABLE incident_ntes MODIFY COLUMN \`${column}\` ${definition}`
+      );
+    }
+  }
+
   await pool.query(`CREATE TABLE IF NOT EXISTS incident_nte_evidence (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     nte_id BIGINT UNSIGNED NOT NULL,
