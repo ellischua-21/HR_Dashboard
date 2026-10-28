@@ -365,3 +365,48 @@ test('Track actions reject an unrelated signer, employee explanation, or informa
     { status: 403 }
   );
 });
+
+test('HR cannot take investigation actions while any information request is pending', async (t) => {
+  const { pool } = require('../server/db/database');
+  const incidents = require('../server/services/IncidentService');
+  t.mock.method(pool, 'execute', async (sql) => {
+    if (sql.includes('FROM user_roles WHERE email'))
+      return [[{ email: 'hr@example.com', role: 'HR', active: 1 }]];
+    throw new Error(`Unexpected pool query: ${sql}`);
+  });
+  let wrote = false;
+  const connection = {
+    beginTransaction: async () => {},
+    commit: async () => {},
+    rollback: async () => {},
+    release: () => {},
+    execute: async (sql) => {
+      if (sql.includes('FROM incident_reports'))
+        return [
+          [{ id: 12, status: 'UNDER INVESTIGATION', case_number: 'IR-12' }]
+        ];
+      if (sql.includes("status = 'PENDING'")) return [[{ pending: 1 }]];
+      wrote = true;
+      throw new Error(`Action should have been blocked: ${sql}`);
+    }
+  };
+  t.mock.method(pool, 'getConnection', async () => connection);
+  const req = { session: { userEmail: 'hr@example.com' } };
+  const blocked = { status: 409, message: /Wait for all|Wait for all current/ };
+  await assert.rejects(
+    incidents.transitionIncident(req, 12, 'CLOSE_INVESTIGATION', 'Close'),
+    blocked
+  );
+  await assert.rejects(
+    incidents.requestIncidentInformationBatch(req, 12, [
+      { recipientEmail: 'employee@example.com', requestText: 'More details' }
+    ]),
+    blocked
+  );
+  await assert.rejects(
+    incidents.addIncidentInvestigationNote(req, 12, 'Finding'),
+    blocked
+  );
+  await assert.rejects(incidents.saveIncidentNteDraft(req, 12, {}), blocked);
+  assert.equal(wrote, false);
+});

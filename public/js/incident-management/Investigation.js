@@ -330,11 +330,38 @@
   }
 
   function render(parent, incident, controls) {
+    const hasPendingRequests = incident.informationRequests.some(
+      (request) => request.status === 'PENDING'
+    );
     if (incident.informationRequests.length)
       renderInformationRequests(parent, incident, controls);
     if (incident.canReview && incident.status === 'UNDER INVESTIGATION') {
-      renderActions(parent, incident, controls);
-      renderInvestigationRequests(parent, incident, controls);
+      if (hasPendingRequests) {
+        parent.appendChild(
+          el(
+            'p',
+            'note',
+            'Waiting for the requested responses. Case actions will be available after all responses are received.'
+          )
+        );
+      } else {
+        renderActions(parent, incident, controls);
+        renderInvestigationRequests(parent, incident, controls);
+      }
+    } else if (
+      !incident.canReview &&
+      incident.informationRequests.some(
+        (request) => request.status === 'RESPONDED'
+      ) &&
+      !hasPendingRequests
+    ) {
+      parent.appendChild(
+        el(
+          'p',
+          'note',
+          'Your requested response has been submitted. You can view the case progress while HR reviews it.'
+        )
+      );
     }
   }
   window.IncidentInvestigation = { render };

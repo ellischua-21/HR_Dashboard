@@ -209,9 +209,16 @@
       );
     }
     window.IncidentInvestigation.render(content, incident, controls);
+    const waitingForRequestedInformation = incident.informationRequests.some(
+      (request) => request.status === 'PENDING'
+    );
     if (
       incident.canReview &&
-      ['UNDER_REVIEW', 'UNDER INVESTIGATION'].includes(incident.status)
+      ['UNDER_REVIEW', 'UNDER INVESTIGATION'].includes(incident.status) &&
+      !(
+        incident.status === 'UNDER INVESTIGATION' &&
+        waitingForRequestedInformation
+      )
     ) {
       ui.renderNte(content, view, pads, controls);
     } else if (incident.nte?.status === 'ISSUED') {

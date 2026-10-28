@@ -722,6 +722,14 @@ async function transitionIncident(req, incidentId, action, details = '') {
     const incident = await getIncidentForAction(connection, id);
     if (incident.status !== transition.from)
       throw httpError('This case has already changed status.', 409);
+    if (
+      action === 'CLOSE_INVESTIGATION' &&
+      (await hasPendingIncidentInformationRequests(connection, id))
+    )
+      throw httpError(
+        'Wait for all requested information before closing this case.',
+        409
+      );
     await connection.execute(
       'UPDATE incident_reports SET status = ? WHERE id = ?',
       [transition.to, id]
@@ -751,6 +759,15 @@ async function transitionIncident(req, incidentId, action, details = '') {
   } finally {
     connection.release();
   }
+}
+
+async function hasPendingIncidentInformationRequests(connection, incidentId) {
+  const [[pending]] = await connection.execute(
+    `SELECT 1 AS pending FROM incident_information_requests
+     WHERE incident_id = ? AND status = 'PENDING' LIMIT 1`,
+    [incidentId]
+  );
+  return Boolean(pending);
 }
 
 async function listIncidentCodeProvisions(req) {
@@ -895,6 +912,14 @@ async function saveIncidentNteDraft(req, incidentId, input = {}) {
         'An NTE can only be prepared during HR review or investigation.',
         409
       );
+    if (
+      incident.status === 'UNDER INVESTIGATION' &&
+      (await hasPendingIncidentInformationRequests(connection, id))
+    )
+      throw httpError(
+        'Wait for all requested information before preparing an NTE.',
+        409
+      );
     const nte = await upsertIncidentNte(connection, user, incident, input);
     await recordIncidentActivity(
       connection,
@@ -933,6 +958,14 @@ async function issueIncidentNte(req, incidentId, input = {}) {
     if (!['UNDER_REVIEW', 'UNDER INVESTIGATION'].includes(incident.status))
       throw httpError(
         'An NTE can only be issued during HR review or investigation.',
+        409
+      );
+    if (
+      incident.status === 'UNDER INVESTIGATION' &&
+      (await hasPendingIncidentInformationRequests(connection, id))
+    )
+      throw httpError(
+        'Wait for all requested information before issuing an NTE.',
         409
       );
     const nte = await upsertIncidentNte(connection, user, incident, input);
@@ -2157,6 +2190,11 @@ async function requestIncidentInformationBatch(req, incidentId, requests) {
         'Information can only be requested during investigation.',
         409
       );
+    if (await hasPendingIncidentInformationRequests(connection, id))
+      throw httpError(
+        'Wait for all current information requests to be answered before sending another request.',
+        409
+      );
     const requestIds = [];
     for (const request of normalizedRequests) {
       const [allowed] = await connection.execute(
@@ -2233,6 +2271,11 @@ async function addIncidentInvestigationNote(
     if (incident.status !== 'UNDER INVESTIGATION')
       throw httpError(
         'Investigation notes can only be added while the case is under investigation.',
+        409
+      );
+    if (await hasPendingIncidentInformationRequests(connection, id))
+      throw httpError(
+        'Wait for all requested information before adding investigation findings.',
         409
       );
     await recordIncidentActivity(
