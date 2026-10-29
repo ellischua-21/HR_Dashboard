@@ -1,9 +1,11 @@
 const { requirePerm } = require('../middleware/Auth');
 const { httpError } = require('../utils/HttpError');
 const { isValidDate, manilaDate } = require('../../shared/DateUtils');
-const { createHikConnectClient } = require('../integrations/HikConnectClient');
+const {
+  createHikConnectAccounts
+} = require('../integrations/HikConnectAccounts');
 
-const client = createHikConnectClient();
+const providers = createHikConnectAccounts();
 const text = (value) =>
   typeof value === 'string' || typeof value === 'number'
     ? String(value).slice(0, 200)
@@ -195,9 +197,110 @@ function normalizeDailySummaries(data) {
   }));
 }
 
+// Enrich each account separately: employee IDs are only unique within that account.
+async function loadAccountAttendance(client, query) {
+  const allRows = [];
+  let providerPage = 1;
+  let total = null;
+  while (total === null || allRows.length < total) {
+    const data = await client.search({ ...query, providerPage });
+    const rows = normalizeRecords(data);
+    allRows.push(...rows);
+    total = Number(data.totalNum);
+    if (!Number.isFinite(total) || total < 0) total = allRows.length;
+    if (allRows.length >= MAX_PROVIDER_ROWS && allRows.length < total) {
+      throw httpError(
+        'This date range has too many records to sort. Narrow the date range and try again.',
+        422
+      );
+    }
+    if (!rows.length || rows.length < PROVIDER_PAGE_SIZE) break;
+    providerPage++;
+  }
+  const summaries = [];
+  providerPage = 1;
+  let hasMoreSummaries = true;
+  let summaryAvailable = false;
+  try {
+    while (hasMoreSummaries) {
+      if (providerPage > MAX_PROVIDER_ROWS / PROVIDER_PAGE_SIZE) {
+        throw httpError(
+          'This date range has too many daily summaries to load. Narrow the date range and try again.',
+          422
+        );
+      }
+      const data = await client.searchDailySummary({
+        ...query,
+        providerPage
+      });
+      if (!Array.isArray(data?.reportDataList)) {
+        throw httpError(
+          'Hik-Connect returned an unexpected daily attendance format.',
+          422
+        );
+      }
+      summaries.push(...normalizeDailySummaries(data));
+      hasMoreSummaries = Number(data.moreData) === 1;
+      if (summaries.length >= MAX_PROVIDER_ROWS && hasMoreSummaries) {
+        throw httpError(
+          'This date range has too many daily summaries to load. Narrow the date range and try again.',
+          422
+        );
+      }
+      if (hasMoreSummaries) providerPage++;
+    }
+    summaryAvailable = summaries.length > 0;
+  } catch {
+    summaries.length = 0;
+  }
+  const summaryByEmployeeDay = new Map(
+    summaries.map((summary) => [
+      `${summary.employeeNo}|${summary.date}`,
+      summary
+    ])
+  );
+  const punchesByEmployeeDay = new Map();
+  for (const row of allRows) {
+    const key = `${row.employeeNo}|${row.date}`;
+    let punches = punchesByEmployeeDay.get(key);
+    if (!punches) {
+      punches = { timeIn: '', timeOut: '' };
+      punchesByEmployeeDay.set(key, punches);
+    }
+    if (
+      row.attendanceStatusCode === 1 &&
+      (!punches.timeIn || row.sortTime < punches.inSortTime)
+    ) {
+      punches.timeIn = row.time;
+      punches.inSortTime = row.sortTime;
+    }
+    if (
+      row.attendanceStatusCode === 2 &&
+      (!punches.timeOut || row.sortTime > punches.outSortTime)
+    ) {
+      punches.timeOut = row.time;
+      punches.outSortTime = row.sortTime;
+    }
+  }
+  for (const row of allRows) {
+    const key = `${row.employeeNo}|${row.date}`;
+    const summary = summaryByEmployeeDay.get(key) || {};
+    const punches = punchesByEmployeeDay.get(key) || {};
+    row.firstName ||= summary.firstName;
+    row.lastName ||= summary.lastName;
+    row.department ||= summary.department;
+    row.weekday ||= summary.weekday;
+    row.timeIn = summary.timeIn || punches.timeIn || '';
+    row.timeOut = summary.timeOut || punches.timeOut || '';
+    row.workHours = summary.workHours || '';
+    row.status = summary.status || 'Not calculated';
+  }
+  return { rows: allRows, summaryAvailable };
+}
+
 async function getAttendanceContext(req) {
   await requireAttendanceAccess(req);
-  return client.configuration();
+  return providers.configuration();
 }
 
 async function listAttendance(req, input) {
@@ -213,102 +316,28 @@ async function listAttendance(req, input) {
   let cached = attendanceCache.get(cacheKey);
   if (!cached || cached.expiresAt <= now) {
     cached = null;
-    const allRows = [];
-    let providerPage = 1;
-    let total = null;
-    while (total === null || allRows.length < total) {
-      const data = await client.search({ ...query, providerPage });
-      const rows = normalizeRecords(data);
-      allRows.push(...rows);
-      total = Number(data.totalNum);
-      if (!Number.isFinite(total) || total < 0) total = allRows.length;
-      if (allRows.length >= MAX_PROVIDER_ROWS && allRows.length < total) {
-        throw httpError(
-          'This date range has too many records to sort. Narrow the date range and try again.',
-          422
-        );
-      }
-      if (!rows.length || rows.length < PROVIDER_PAGE_SIZE) break;
-      providerPage++;
-    }
-    const summaries = [];
-    providerPage = 1;
-    let hasMoreSummaries = true;
-    let summaryAvailable = false;
-    try {
-      while (hasMoreSummaries) {
-        if (providerPage > MAX_PROVIDER_ROWS / PROVIDER_PAGE_SIZE) {
+    const configuration = providers.configuration();
+    if (!configuration.configured)
+      throw httpError(
+        'Complete the Hik-Connect account settings in .env and restart the Node.js server.',
+        409
+      );
+    const batches = await Promise.all(
+      providers.accounts.map(async ({ client, name }) => {
+        try {
+          return await loadAccountAttendance(client, query);
+        } catch (error) {
           throw httpError(
-            'This date range has too many daily summaries to load. Narrow the date range and try again.',
-            422
+            name +
+              ': ' +
+              (error.status ? error.message : 'Could not load attendance.'),
+            error.status || 422
           );
         }
-        const data = await client.searchDailySummary({
-          ...query,
-          providerPage
-        });
-        if (!Array.isArray(data?.reportDataList)) {
-          throw httpError(
-            'Hik-Connect returned an unexpected daily attendance format.',
-            422
-          );
-        }
-        summaries.push(...normalizeDailySummaries(data));
-        hasMoreSummaries = Number(data.moreData) === 1;
-        if (summaries.length >= MAX_PROVIDER_ROWS && hasMoreSummaries) {
-          throw httpError(
-            'This date range has too many daily summaries to load. Narrow the date range and try again.',
-            422
-          );
-        }
-        if (hasMoreSummaries) providerPage++;
-      }
-      summaryAvailable = summaries.length > 0;
-    } catch {
-      summaries.length = 0;
-    }
-    const summaryByEmployeeDay = new Map(
-      summaries.map((summary) => [
-        `${summary.employeeNo}|${summary.date}`,
-        summary
-      ])
+      })
     );
-    const punchesByEmployeeDay = new Map();
-    for (const row of allRows) {
-      const key = `${row.employeeNo}|${row.date}`;
-      let punches = punchesByEmployeeDay.get(key);
-      if (!punches) {
-        punches = { timeIn: '', timeOut: '' };
-        punchesByEmployeeDay.set(key, punches);
-      }
-      if (
-        row.attendanceStatusCode === 1 &&
-        (!punches.timeIn || row.sortTime < punches.inSortTime)
-      ) {
-        punches.timeIn = row.time;
-        punches.inSortTime = row.sortTime;
-      }
-      if (
-        row.attendanceStatusCode === 2 &&
-        (!punches.timeOut || row.sortTime > punches.outSortTime)
-      ) {
-        punches.timeOut = row.time;
-        punches.outSortTime = row.sortTime;
-      }
-    }
-    for (const row of allRows) {
-      const key = `${row.employeeNo}|${row.date}`;
-      const summary = summaryByEmployeeDay.get(key) || {};
-      const punches = punchesByEmployeeDay.get(key) || {};
-      row.firstName ||= summary.firstName;
-      row.lastName ||= summary.lastName;
-      row.department ||= summary.department;
-      row.weekday ||= summary.weekday;
-      row.timeIn = summary.timeIn || punches.timeIn || '';
-      row.timeOut = summary.timeOut || punches.timeOut || '';
-      row.workHours = summary.workHours || '';
-      row.status = summary.status || 'Not calculated';
-    }
+    const allRows = batches.flatMap((batch) => batch.rows);
+    const summaryAvailable = batches.every((batch) => batch.summaryAvailable);
     const departments = [
       ...new Set(allRows.map((row) => row.department).filter(Boolean))
     ].sort((a, b) => a.localeCompare(b));
@@ -321,7 +350,7 @@ async function listAttendance(req, input) {
       statuses,
       summaryAvailable,
       fetchedAt: new Date().toISOString(),
-      expiresAt: now + 60000
+      expiresAt: Date.now() + 60000
     };
     attendanceCache.set(cacheKey, cached);
     while (attendanceCache.size > 5)
