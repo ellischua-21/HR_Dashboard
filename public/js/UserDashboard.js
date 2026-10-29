@@ -575,7 +575,6 @@ function openTemplateForm(template, existingForm = null) {
     'time-record-dialog',
     template.fields.some((field) => field.type === 'time-records')
   );
-  $('user-template-feedback').hidden = true;
   const fields = $('user-template-fields');
   fields.replaceChildren();
   const deferredFields = [];
@@ -731,7 +730,6 @@ function openLeaveForm(existingForm = null) {
     form.elements[name].readOnly = true;
   });
   setOtherLeaveVisibility();
-  $('uf_submit_feedback').hidden = true;
   $('leave-form-dialog').showModal();
   leaveSignaturePad.clear();
 }
@@ -739,15 +737,12 @@ function openLeaveForm(existingForm = null) {
 async function submitLeaveRequest(event) {
   event.preventDefault();
   const form = $('leave-form');
-  const feedback = $('uf_submit_feedback');
   if (!leaveSignaturePad.hasSignature()) {
-    feedback.textContent = 'Draw your electronic signature before submitting.';
-    feedback.hidden = false;
+    showErr('Draw your electronic signature before submitting.');
     return;
   }
   const submit = form.querySelector('button[type="submit"]');
   submit.disabled = true;
-  feedback.hidden = true;
   try {
     const values = new FormData(form);
     const formData = {
@@ -779,10 +774,9 @@ async function submitLeaveRequest(event) {
     formBeingEdited = null;
     if (wasEdited) await loadMyForms();
     else go(USER_NAV[0]);
-    $('uf_global_feedback').textContent = wasEdited
-      ? 'Changes saved successfully.'
-      : 'Submitted successfully.';
-    $('uf_global_feedback').hidden = false;
+    AppFeedback.success(
+      wasEdited ? 'Changes saved successfully.' : 'Submitted successfully.'
+    );
   } catch (error) {
     showErr(error.message || String(error));
   } finally {
@@ -1095,8 +1089,7 @@ async function approveWithoutReviewerSignature(form, button) {
   try {
     await api('reviewUserForm', form.id, 'APPROVED', '', '');
     await loadFormsForReview();
-    $('uf_review_feedback').textContent = 'Approved successfully.';
-    $('uf_review_feedback').hidden = false;
+    AppFeedback.success('Approved successfully.');
   } catch (error) {
     showErr(error.message || String(error));
     button.disabled = false;
@@ -1138,7 +1131,6 @@ function openHeadSignature(form) {
     session.is_hr_head ? 'Head HR signature' : 'Head signature';
   $('head-signature-form').querySelector('[type="submit"]').textContent =
     'Sign';
-  $('head-signature-feedback').hidden = true;
   $('head-signature-dialog').showModal();
   headSignaturePad.clear();
 }
@@ -1146,18 +1138,16 @@ function openHeadSignature(form) {
 async function signAndForwardForm(event) {
   event.preventDefault();
   if (!formToSign) return;
-  const feedback = $('head-signature-feedback');
   if (!headSignaturePad.hasSignature()) {
-    feedback.textContent =
+    showErr(
       session.is_hr_head && formToSign.submitter_role === 'HR'
         ? 'Draw your signature before approving this HR form.'
-        : 'Draw your signature before forwarding this form.';
-    feedback.hidden = false;
+        : 'Draw your signature before forwarding this form.'
+    );
     return;
   }
   const submit = $('head-signature-form').querySelector('[type="submit"]');
   submit.disabled = true;
-  feedback.hidden = true;
   try {
     const isHrHeadApproval =
       session.is_hr_head && formToSign.submitter_role === 'HR';
@@ -1170,14 +1160,12 @@ async function signAndForwardForm(event) {
     );
     $('head-signature-dialog').close();
     formToSign = null;
-    $('uf_review_feedback').textContent = isHrHeadApproval
-      ? 'Approved successfully.'
-      : 'Forwarded successfully.';
-    $('uf_review_feedback').hidden = false;
+    AppFeedback.success(
+      isHrHeadApproval ? 'Approved successfully.' : 'Forwarded successfully.'
+    );
     await loadFormsForReview();
   } catch (error) {
-    feedback.textContent = error.message || String(error);
-    feedback.hidden = false;
+    showErr(error.message || String(error));
   } finally {
     submit.disabled = false;
   }
@@ -1188,7 +1176,6 @@ function openFormRejection(form) {
   $('form-rejection-control').textContent = `Serial Number ${form.control_no}`;
   $('form-rejection-reason').value = '';
   setHrLeaveBalances('form-rejection-leave-balances', form);
-  $('form-rejection-feedback').hidden = true;
   $('form-rejection-dialog').showModal();
   $('form-rejection-reason').focus();
 }
@@ -1197,16 +1184,13 @@ async function rejectSelectedForm(event) {
   event.preventDefault();
   if (!formToReject) return;
   const reason = $('form-rejection-reason').value.trim();
-  const feedback = $('form-rejection-feedback');
   if (!reason) {
-    feedback.textContent = 'Enter a reason for rejection.';
-    feedback.hidden = false;
+    showErr('Enter a reason for rejection.');
     return;
   }
 
   const submit = $('form-rejection-form').querySelector('[type="submit"]');
   submit.disabled = true;
-  feedback.hidden = true;
   try {
     await api(
       'reviewUserForm',
@@ -1219,11 +1203,9 @@ async function rejectSelectedForm(event) {
     $('form-rejection-dialog').close();
     formToReject = null;
     await loadFormsForReview();
-    $('uf_review_feedback').textContent = 'Rejected successfully.';
-    $('uf_review_feedback').hidden = false;
+    AppFeedback.success('Rejected successfully.');
   } catch (error) {
-    feedback.textContent = error.message || String(error);
-    feedback.hidden = false;
+    showErr(error.message || String(error));
   } finally {
     submit.disabled = false;
   }
@@ -1232,7 +1214,6 @@ async function rejectSelectedForm(event) {
 function openHrSignature(form) {
   formToApprove = form;
   $('hr-signature-control').textContent = `Serial Number ${form.control_no}`;
-  $('hr-signature-feedback').hidden = true;
   setHrLeaveBalances('hr-leave-balances', form);
   $('hr-signature-dialog').showModal();
   hrSignaturePad.clear();
@@ -1241,15 +1222,12 @@ function openHrSignature(form) {
 async function signAndApproveForm(event) {
   event.preventDefault();
   if (!formToApprove) return;
-  const feedback = $('hr-signature-feedback');
   if (!hrSignaturePad.hasSignature()) {
-    feedback.textContent = 'Draw your signature before approving this form.';
-    feedback.hidden = false;
+    showErr('Draw your signature before approving this form.');
     return;
   }
   const submit = $('hr-signature-form').querySelector('[type="submit"]');
   submit.disabled = true;
-  feedback.hidden = true;
   try {
     await api(
       'reviewUserForm',
@@ -1262,11 +1240,9 @@ async function signAndApproveForm(event) {
     $('hr-signature-dialog').close();
     formToApprove = null;
     await loadFormsForReview();
-    $('uf_review_feedback').textContent = 'Approved successfully.';
-    $('uf_review_feedback').hidden = false;
+    AppFeedback.success('Approved successfully.');
   } catch (error) {
-    feedback.textContent = error.message || String(error);
-    feedback.hidden = false;
+    showErr(error.message || String(error));
   } finally {
     submit.disabled = false;
   }
@@ -1346,14 +1322,11 @@ async function submitTemplateForm(event) {
   if (!template) return;
   const form = $('user-template-form');
   const submit = form.querySelector('[type="submit"]');
-  const feedback = $('user-template-feedback');
   if (!templateSignaturePad.hasSignature()) {
-    feedback.textContent = 'Draw your electronic signature before submitting.';
-    feedback.hidden = false;
+    showErr('Draw your electronic signature before submitting.');
     return;
   }
   submit.disabled = true;
-  feedback.hidden = true;
   try {
     const values = new FormData(form);
     const data = {};
@@ -1393,13 +1366,11 @@ async function submitTemplateForm(event) {
     formBeingEdited = null;
     if (wasEdited) await loadMyForms();
     else go(USER_NAV[0]);
-    $('uf_global_feedback').textContent = wasEdited
-      ? 'Changes saved successfully.'
-      : 'Submitted successfully.';
-    $('uf_global_feedback').hidden = false;
+    AppFeedback.success(
+      wasEdited ? 'Changes saved successfully.' : 'Submitted successfully.'
+    );
   } catch (error) {
-    feedback.textContent = error.message || String(error);
-    feedback.hidden = false;
+    showErr(error.message || String(error));
   } finally {
     submit.disabled = false;
   }
@@ -1503,9 +1474,7 @@ async function loadPendingAnnouncementsPopup() {
       } catch (error) {
         open.disabled = false;
         $('staff-announcements-dialog').showModal();
-        $('staff-announcements-feedback').textContent =
-          error.message || String(error);
-        $('staff-announcements-feedback').hidden = false;
+        showErr(error.message || String(error));
       }
     };
     card.append(title, message, open);
@@ -1543,15 +1512,12 @@ async function loadPendingAnnouncementsPopup() {
   $('staff-announcements-acknowledge').textContent = pendingAnnouncements.length
     ? 'Acknowledge announcements'
     : 'Close';
-  $('staff-announcements-feedback').hidden = true;
   $('staff-announcements-dialog').showModal();
 }
 
 async function acknowledgePendingAnnouncements() {
   const button = $('staff-announcements-acknowledge');
-  const feedback = $('staff-announcements-feedback');
   button.disabled = true;
-  feedback.hidden = true;
   try {
     if (pendingAnnouncements.length)
       await api(
@@ -1567,8 +1533,7 @@ async function acknowledgePendingAnnouncements() {
     pendingIncidentNotifications = [];
     $('staff-announcements-dialog').close();
   } catch (error) {
-    feedback.textContent = error.message || String(error);
-    feedback.hidden = false;
+    showErr(error.message || String(error));
   } finally {
     button.disabled = false;
   }

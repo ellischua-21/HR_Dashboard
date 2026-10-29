@@ -1,25 +1,20 @@
-function bindPasswordChange(formId, feedbackId) {
+function bindPasswordChange(formId) {
   const form = $(formId);
-  const feedback = $(feedbackId);
   form.onsubmit = async (event) => {
     event.preventDefault();
     const submit = form.querySelector('button[type="submit"]');
     const values = new FormData(form);
     const currentPassword = values.get('currentPassword');
     const newPassword = values.get('newPassword');
-    feedback.hidden = true;
 
     if (newPassword !== values.get('confirmPassword')) {
-      feedback.className = 'login-error';
-      feedback.textContent = 'The new passwords do not match.';
-      feedback.hidden = false;
+      AppErrors.show('The new passwords do not match.');
       return;
     }
     if (currentPassword === newPassword) {
-      feedback.className = 'login-error';
-      feedback.textContent =
-        'Choose a new password different from your current password.';
-      feedback.hidden = false;
+      AppErrors.show(
+        'Choose a new password different from your current password.'
+      );
       return;
     }
 
@@ -27,13 +22,9 @@ function bindPasswordChange(formId, feedbackId) {
     try {
       await api('changeMyPassword', currentPassword, newPassword);
       form.reset();
-      feedback.className = 'okmsg';
-      feedback.textContent = 'Password changed successfully.';
-      feedback.hidden = false;
+      AppFeedback.success('Password changed successfully.');
     } catch (error) {
-      feedback.className = 'login-error';
-      feedback.textContent = error.message || String(error);
-      feedback.hidden = false;
+      AppErrors.show(error.message || String(error));
     } finally {
       submit.disabled = false;
     }
@@ -41,4 +32,4 @@ function bindPasswordChange(formId, feedbackId) {
 }
 
 VIEWS['account-settings'] = () => {};
-bindPasswordChange('account-password-form', 'account-password-feedback');
+bindPasswordChange('account-password-form');

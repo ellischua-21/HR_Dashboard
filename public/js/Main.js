@@ -3,36 +3,33 @@ const can = (permission) => session.perms.includes(permission);
 const guard =
   (fn) =>
   async (...a) => {
+    const finishLoading = AppLoading.begin();
     try {
       showErr('');
-      busy(true);
       await fn(...a);
     } catch (e) {
       showErr(e.message || String(e));
     } finally {
-      busy(false);
+      finishLoading();
     }
   };
 
 const $ = (id) => document.getElementById(id);
 const API_BASE = window.HR_API_BASE || 'http://localhost:3001/api';
-const api = async (fn, ...args) => {
-  const response = await fetch(API_BASE + '/' + encodeURIComponent(fn), {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ args })
+const api = async (fn, ...args) =>
+  AppLoading.run(async () => {
+    const response = await fetch(API_BASE + '/' + encodeURIComponent(fn), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ args })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'The request failed.');
+    return result;
   });
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error || 'The request failed.');
-  return result;
-};
 const showErr = (m) => {
-  $('err').textContent = m;
-  $('err').hidden = !m;
-};
-const busy = (b) => {
-  $('busy').hidden = !b;
+  AppErrors.show(m);
 };
 function setupBackToTop() {
   const button = $('back-to-top');
@@ -321,6 +318,7 @@ async function init() {
     window.addEventListener('resize', positionNavigationNotificationDots);
     $('menuBtn').onclick = () => document.body.classList.toggle('open');
     $('logoutBtn').onclick = async () => {
+      const finishLoading = AppLoading.begin();
       try {
         const response = await fetch(API_BASE + '/logout', {
           method: 'POST',
@@ -330,6 +328,8 @@ async function init() {
         location.reload();
       } catch (error) {
         showErr(error.message || String(error));
+      } finally {
+        finishLoading();
       }
     };
     if (session.perms.includes('inbox.read')) {
@@ -455,11 +455,8 @@ function showLogin(message = '', isError = false) {
       'current-password',
       true
     );
-    const error = document.createElement('p');
-    error.className = feedbackIsError ? 'login-error' : 'login-message';
-    error.textContent = feedback;
-    error.hidden = !feedback;
-    card.appendChild(error);
+    if (feedback)
+      AppFeedback.show(feedback, feedbackIsError ? 'error' : 'success');
     const submit = document.createElement('button');
     submit.type = 'submit';
     submit.textContent = 'Sign in';
@@ -467,8 +464,8 @@ function showLogin(message = '', isError = false) {
 
     card.onsubmit = async (event) => {
       event.preventDefault();
-      error.hidden = true;
       submit.disabled = true;
+      const finishLoading = AppLoading.begin();
       try {
         const response = await fetch(API_BASE + '/login', {
           method: 'POST',
@@ -481,11 +478,11 @@ function showLogin(message = '', isError = false) {
         location.reload();
         return;
       } catch (cause) {
-        error.textContent = cause.message || String(cause);
-        error.hidden = false;
+        AppErrors.show(cause.message || String(cause));
         feedbackIsError = true;
       } finally {
         submit.disabled = false;
+        finishLoading();
       }
     };
   };
@@ -498,6 +495,7 @@ function hideLogin() {
   const login = $('login-screen');
   if (login) login.remove();
   $('app').hidden = false;
+  AppLoading.refresh();
 }
 
 function addLoginInput(form, labelText, name, type, autocomplete, required) {
@@ -539,6 +537,7 @@ function go(n) {
     $('soonMsg').textContent =
       n[1] + ' will be available in the next development stage.';
   }
+  AppLoading.refresh();
 }
 
 function setSubmittedFormsCount(count, scope = 'HR') {
@@ -622,14 +621,14 @@ function buildKpiAndChartShells() {
 }
 
 async function loadDashboard() {
-  busy(true);
+  const finishLoading = AppLoading.begin();
   showErr('');
   try {
     render(await api('getDashboard', getFilters()));
   } catch (e) {
     showErr(e.message || String(e));
   } finally {
-    busy(false);
+    finishLoading();
   }
 }
 

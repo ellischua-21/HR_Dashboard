@@ -47,7 +47,7 @@ function renderIncidentNte(parent, incident, ui = {}) {
     const days = Number(nte.daysRemaining);
     const countdown = incidentElement(
       'p',
-      nte.overdueAt ? 'errs' : 'note',
+      nte.overdueAt ? 'status-warning' : 'note',
       nte.overdueAt
         ? 'Explanation overdue'
         : days === 0

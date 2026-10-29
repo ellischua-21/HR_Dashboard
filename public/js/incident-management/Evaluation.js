@@ -253,7 +253,7 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
       )
     );
     recommendation.value = '';
-    recommendation.placeholder = 'Loading matrix recommendation';
+    recommendation.placeholder = '';
     try {
       matrixRequest ||= api('getIncidentCodeGuide').then((data) => data.matrix);
       const matrix = await matrixRequest;
@@ -278,18 +278,12 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
         ? 'Corrective action from the Code of Conduct matrix'
         : 'No action is configured for this occurrence';
       if (!action)
-        context.appendChild(
-          incidentElement(
-            'p',
-            'errs',
-            'No corrective action is configured for this occurrence. Update the Code of Conduct matrix.'
-          )
+        AppErrors.show(
+          'No corrective action is configured for this occurrence. Update the Code of Conduct matrix.'
         );
     } catch (error) {
       recommendation.placeholder = 'Unable to load the Code of Conduct matrix';
-      context.appendChild(
-        incidentElement('p', 'errs', error.message || String(error))
-      );
+      AppErrors.show(error.message || String(error));
     }
   };
   finding.addEventListener('change', updateFindingFields);

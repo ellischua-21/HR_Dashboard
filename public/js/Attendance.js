@@ -32,10 +32,6 @@
     $('attendance-next').disabled = value || !activeQuery || !hasMore;
   }
 
-  function feedback(message, error = false) {
-    AppUI.feedback($('attendance-feedback'), message, error);
-  }
-
   function updateOptions(select, values) {
     const selected = select.value;
     select.replaceChildren(new Option('All', ''));
@@ -78,7 +74,6 @@
   async function loadRecords(query, refresh = false) {
     if (pending || !configured) return;
     setPending(true);
-    feedback('Loading...');
     try {
       const result = await api('listAttendance', { ...query, refresh });
       activeQuery = { ...query };
@@ -89,13 +84,12 @@
       drawTable(result.rows);
       $('attendance-info').textContent =
         `Page ${page} | ${result.total} matching records | Retrieved ${AppUI.dateTime(result.fetchedAt)}`;
-      feedback('');
     } catch (error) {
       activeQuery = null;
       hasMore = false;
       drawTable([], 'Attendance could not be loaded.');
       $('attendance-info').textContent = '';
-      feedback(error.message || 'Could not load attendance.', true);
+      AppErrors.show(error.message || 'Could not load attendance.');
     } finally {
       setPending(false);
     }
@@ -148,9 +142,8 @@
       const context = await api('getAttendanceContext');
       configured = context.configured;
       if (!configured) {
-        feedback(
-          `Add ${context.missing.join(', ')} to .env and restart the Node.js server.`,
-          true
+        AppErrors.show(
+          `Add ${context.missing.join(', ')} to .env and restart the Node.js server.`
         );
         setPending(false);
         return;
@@ -158,9 +151,8 @@
       await loadRecords(currentFilters());
     } catch (error) {
       configured = false;
-      feedback(
-        error.message || 'Could not load attendance configuration.',
-        true
+      AppErrors.show(
+        error.message || 'Could not load attendance configuration.'
       );
       setPending(false);
     }

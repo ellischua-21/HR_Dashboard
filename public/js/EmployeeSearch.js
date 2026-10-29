@@ -93,7 +93,9 @@ window.createEmployeeSearch = function createEmployeeSearch({
         render();
       } catch (error) {
         if (ticket !== request || owner !== getOwner()) return;
-        message(error.message || String(error));
+        AppErrors.show(error.message || String(error));
+        hide();
+        return;
       }
       if (
         document.activeElement === input ||

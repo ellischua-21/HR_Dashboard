@@ -12,8 +12,7 @@ function hasAccountChanges() {
 function updateAccountSaveButton() {
   const button = $('am_save_changes');
   button.disabled = accountSaveBusy || !hasAccountChanges();
-  if (!accountSaveBusy && button.dataset.saved !== 'true')
-    button.textContent = 'Save Changes';
+  button.textContent = 'Save Changes';
 }
 
 function stagedHrHeadEmail(accounts) {
@@ -26,9 +25,7 @@ async function saveAccountChanges() {
   if (accountSaveBusy || !hasAccountChanges()) return;
   accountSaveBusy = true;
   const button = $('am_save_changes');
-  button.dataset.saved = 'false';
-  button.innerHTML =
-    '<span class="refresh-spinner" aria-hidden="true"></span> Saving changes…';
+  button.textContent = 'Save Changes';
   button.disabled = true;
   showErr('');
   try {
@@ -44,12 +41,7 @@ async function saveAccountChanges() {
     pendingHrHeadEmail = undefined;
     hrHeadChanged = false;
     await loadAccountManagement();
-    button.dataset.saved = 'true';
-    button.textContent = 'Saved successfully.';
-    window.setTimeout(() => {
-      button.dataset.saved = 'false';
-      updateAccountSaveButton();
-    }, 1800);
+    AppFeedback.success('Saved successfully.');
   } catch (error) {
     showErr(error.message || String(error));
   } finally {

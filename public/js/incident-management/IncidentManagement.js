@@ -345,7 +345,7 @@ function renderIncidentReport(body, incident) {
     try {
       openIncidentReportPreview(incident);
     } catch (error) {
-      window.alert(error.message || String(error));
+      AppErrors.show(error.message || String(error));
     }
   });
   body.appendChild(print);
@@ -446,17 +446,6 @@ function renderIncidentClosureAction(incident, ui = {}) {
   reason.placeholder = isInvestigation
     ? 'Investigation findings and reason for closure (required)'
     : 'Reason for closing the case (required)';
-  const reasonFeedback = incidentElement(
-    'p',
-    'errs',
-    isInvestigation
-      ? 'Enter the investigation findings and reason for closure.'
-      : 'Enter a reason for closing the case.'
-  );
-  reasonFeedback.hidden = true;
-  reason.addEventListener('input', () => {
-    if (reason.value.trim()) reasonFeedback.hidden = true;
-  });
   const panel = incidentElement('div', 'incident-case-section');
   panel.hidden = true;
   const confirmClose = incidentElement('button', '', 'Confirm closure');
@@ -469,11 +458,14 @@ function renderIncidentClosureAction(incident, ui = {}) {
   };
   confirmClose.onclick = () => {
     if (!reason.value.trim()) {
-      reasonFeedback.hidden = false;
+      AppErrors.show(
+        isInvestigation
+          ? 'Enter the investigation findings and reason for closure.'
+          : 'Enter a reason for closing the case.'
+      );
       reason.focus();
       return;
     }
-    reasonFeedback.hidden = true;
     runIncidentTransition(
       incident,
       isInvestigation ? 'CLOSE_INVESTIGATION' : 'CLOSE_DOCUMENTATION',
@@ -488,7 +480,6 @@ function renderIncidentClosureAction(incident, ui = {}) {
       'Closing for documentation requires a reason. It does not record a disciplinary violation.'
     ),
     reason,
-    reasonFeedback,
     confirmClose
   );
   workflow.append(toggle, panel);

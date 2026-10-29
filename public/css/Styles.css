@@ -193,13 +193,48 @@ input:focus-visible {
   outline: 2px solid var(--teal);
   outline-offset: 1px;
 }
-#err {
+.feedback-popup {
+  position: fixed;
+  inset: 12px 12px auto;
+  z-index: 10000;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  box-sizing: border-box;
+  width: min(640px, calc(100% - 24px));
+  max-height: min(40vh, 320px);
+  overflow: auto;
+  margin: 0 auto;
   background: #fdecea;
   border: 1px solid #e6a19b;
   color: #7a1f16;
   padding: 10px 14px;
   border-radius: 4px;
-  margin-bottom: 12px;
+  box-shadow: 0 4px 18px #0002;
+}
+.feedback-popup[hidden] {
+  display: none;
+}
+.feedback-popup[data-kind='success'] {
+  background: #e3f3e8;
+  border-color: #9fd0b0;
+  color: #1e6b3a;
+}
+.feedback-popup[data-kind='info'] {
+  background: #edf3fa;
+  border-color: #aac5df;
+  color: #244b70;
+}
+.feedback-popup > span {
+  flex: 1;
+  min-width: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.feedback-popup > button {
+  flex-shrink: 0;
+  padding: 0 6px;
+  color: inherit;
 }
 .filters {
   display: grid;
@@ -873,7 +908,7 @@ legend {
   flex-wrap: wrap;
   margin-top: 12px;
 }
-.errs {
+.status-warning {
   background: #fdecea;
   border: 1px solid #e6a19b;
   color: #7a1f16;
@@ -883,14 +918,6 @@ legend {
   max-height: 200px;
   overflow: auto;
   font-size: 13px;
-}
-.okmsg {
-  background: #e3f3e8;
-  border: 1px solid #9fd0b0;
-  color: #1e6b3a;
-  padding: 8px 12px;
-  border-radius: 4px;
-  margin-top: 10px;
 }
 @media (max-width: 800px) {
   dl {
@@ -927,9 +954,6 @@ legend {
   align-items: flex-start;
   flex-direction: column;
   gap: 3px;
-}
-#attendance-feedback {
-  margin: 0 0 12px;
 }
 .form-filters .form-search {
   flex: 1;
@@ -993,14 +1017,6 @@ legend {
   border: 1px solid var(--rule);
   border-radius: 4px;
 }
-.login-error {
-  margin: 0;
-  color: #7a1f16;
-}
-.login-message {
-  margin: 0;
-  color: #1e6b3a;
-}
 .login-tabs {
   display: flex;
   gap: 8px;
@@ -1034,20 +1050,31 @@ legend {
   margin: 0;
   align-items: center;
 }
-.refresh-spinner {
+.loading-circle {
   display: inline-block;
   width: 13px;
   height: 13px;
-  margin-right: 7px;
   vertical-align: -2px;
   border: 2px solid currentColor;
   border-right-color: transparent;
   border-radius: 50%;
-  animation: account-refresh-spin 0.7s linear infinite;
+  animation: loading-spin 0.7s linear infinite;
 }
-@keyframes account-refresh-spin {
+.loading-slot {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-end;
+  min-height: 34px;
+  color: var(--brand);
+}
+@keyframes loading-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading-circle {
+    animation-duration: 2s;
   }
 }
 .account-requests {
@@ -1694,9 +1721,6 @@ legend {
 .incident-review-list {
   display: grid;
   gap: 12px;
-}
-.incident-review-list[aria-busy='true'] {
-  opacity: 0.65;
 }
 .incident-review-case {
   display: flex;

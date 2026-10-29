@@ -48,6 +48,14 @@ const assets = [
     /['"]((?:\.\.\/shared|js\/|views\/)[^'"]+\.(?:js|html))['"]/g
   )
 ].map((match) => path.resolve(root, 'public', match[1]));
+// Startup helpers load directly from index.html before the fragment loader.
+const index = fs.readFileSync(path.join(root, 'public/index.html'), 'utf8');
+for (const [, source] of index.matchAll(
+  /<script\b[^>]*\bsrc=["']([^"'?#]+\.js)(?:[?#][^"']*)?["']/g
+)) {
+  if (!/^(?:https?:)?\/\//.test(source))
+    assets.push(path.resolve(root, 'public', source));
+}
 for (const asset of assets)
   if (!fs.existsSync(asset))
     errors.push(`Missing browser asset: ${path.relative(root, asset)}`);

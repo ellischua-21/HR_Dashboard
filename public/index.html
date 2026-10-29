@@ -15,9 +15,7 @@
     <main id="bootstrap-screen" class="login" aria-live="polite">
       <div class="login-card">
         <h1>HR Management System</h1>
-        <p id="bootstrap-status" class="note" role="status">
-          Checking your sign-in…
-        </p>
+        <p id="bootstrap-status" class="note" role="status"></p>
       </div>
     </main>
     <div id="app" hidden>
@@ -43,9 +41,8 @@
         <header>
           <button id="menuBtn" aria-label="Toggle menu">Menu</button>
           <h1 id="title">Dashboard</h1>
-          <span id="busy" hidden>Loading…</span>
+          <span id="busy"></span>
         </header>
-        <div id="err" role="alert" hidden></div>
         <section id="view-dashboard" class="view">
           <div id="dashboard-fragment"></div>
         </section>
@@ -72,6 +69,8 @@
       ↑
     </button>
     <section id="leave-print-root" aria-hidden="true"></section>
-    <script src="js/ui-loader.js?v=20261029-45"></script>
+    <script src="js/Feedback.js?v=20261029-48"></script>
+    <script src="js/Loading.js?v=20261029-48"></script>
+    <script src="js/ui-loader.js?v=20261029-48"></script>
   </body>
 </html>

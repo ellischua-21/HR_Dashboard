@@ -124,8 +124,6 @@
       )
     );
     const rows = el('div', 'incident-investigation-request-list');
-    const feedbackMessage = el('p', 'errs');
-    feedbackMessage.hidden = true;
     let recipients = [];
     const requestRows = [];
 
@@ -195,9 +193,7 @@
         (request) => !request.recipientEmail || !request.requestText
       );
       if (!requests.length || invalid) {
-        feedbackMessage.textContent =
-          'Select an employee and enter a request in every row.';
-        feedbackMessage.hidden = false;
+        AppErrors.show('Select an employee and enter a request in every row.');
         return;
       }
       if (
@@ -208,20 +204,18 @@
       )
         return;
       send.disabled = true;
-      feedbackMessage.hidden = true;
       try {
         await api('requestIncidentInformationBatch', incident.id, requests);
         await controls.reload(incident.id);
         ui.feedback(controls.feedback, 'Requests sent.');
         await window.refreshInboxBadge().catch(() => {});
       } catch (error) {
-        feedbackMessage.textContent = error.message || String(error);
-        feedbackMessage.hidden = false;
+        AppErrors.show(error.message || String(error));
       } finally {
         send.disabled = false;
       }
     };
-    section.append(rows, feedbackMessage, el('div', 'actions'));
+    section.append(rows, el('div', 'actions'));
     const actions = section.lastElementChild;
     actions.append(add, addAll, send);
     parent.appendChild(section);
@@ -230,16 +224,13 @@
       requestRows.length = 0;
       rows.replaceChildren();
       if (!recipients.length) {
-        feedbackMessage.textContent =
-          'No employees are available for requests.';
-        feedbackMessage.hidden = false;
+        AppErrors.show('No employees are available for requests.');
         add.disabled = addAll.disabled = send.disabled = true;
         return;
       }
       addRequestRow();
     } catch (error) {
-      feedbackMessage.textContent = error.message || String(error);
-      feedbackMessage.hidden = false;
+      AppErrors.show(error.message || String(error));
       add.disabled = addAll.disabled = send.disabled = true;
     }
   }
@@ -247,9 +238,6 @@
   function renderActions(parent, incident, controls) {
     const workflow = el('section', 'incident-case-section');
     workflow.appendChild(el('h3', '', 'Investigation findings'));
-    const noteFeedback = el('p');
-    noteFeedback.hidden = true;
-    noteFeedback.setAttribute('role', 'status');
     const note = el('textarea');
     note.rows = 4;
     note.maxLength = 4000;
@@ -262,13 +250,8 @@
     const saveNote = el('button', '', 'Save investigation note');
     saveNote.type = 'button';
     saveNote.onclick = async () => {
-      ui.feedback(noteFeedback, '');
       if (!note.value.trim()) {
-        ui.feedback(
-          noteFeedback,
-          'Enter the investigation findings or notes.',
-          true
-        );
+        AppErrors.show('Enter the investigation findings or notes.');
         note.focus();
         return;
       }
@@ -282,7 +265,7 @@
         );
         await controls.reload(incident.id);
       } catch (error) {
-        ui.feedback(noteFeedback, error.message || String(error), true);
+        AppErrors.show(error.message || String(error));
       } finally {
         saveNote.disabled = false;
       }
@@ -291,7 +274,6 @@
       el('h4', '', 'Record findings and evidence'),
       note,
       files,
-      noteFeedback,
       saveNote
     );
     parent.appendChild(workflow);

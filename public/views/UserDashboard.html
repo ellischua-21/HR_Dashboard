@@ -1,7 +1,6 @@
 <section id="view-user-dashboard" class="view" hidden>
   <section class="panel">
     <p id="uf_assigned_head" class="note"></p>
-    <p id="uf_global_feedback" class="okmsg" hidden></p>
     <div class="user-form-summary" aria-label="Form submission summary">
       <article class="user-form-stat">
         <span>Total submitted</span><strong id="uf_total">0</strong>
@@ -71,7 +70,7 @@
         Refresh
       </button>
     </div>
-    <p id="uf_review_feedback" class="okmsg" hidden></p>
+    <p id="uf_review_feedback" hidden></p>
     <div class="user-form-summary" aria-label="Submitted form status summary">
       <article class="user-form-stat">
         <span>Total Requested</span><strong id="uf_review_total">0</strong>
@@ -223,7 +222,6 @@
         Clear signature
       </button>
     </div>
-    <p id="uf_submit_feedback" class="okmsg" hidden></p>
     <div class="actions">
       <button id="leave-form-submit" type="submit">Submit for review</button>
       <button id="uf_cancel_leave" class="ghost" type="button">Cancel</button>
@@ -242,7 +240,6 @@
 <dialog id="user-template-dialog">
   <form id="user-template-form">
     <h2 id="user-template-title"></h2>
-    <p id="user-template-feedback" class="errs" hidden></p>
     <div id="user-template-fields" class="fgrid"></div>
     <label id="user-template-confirmation" class="form-acknowledgment"
       ><input name="confirmation" type="checkbox" required /><span
@@ -286,7 +283,6 @@
         Clear signature
       </button>
     </div>
-    <p id="head-signature-feedback" class="errs" hidden></p>
     <div class="actions">
       <button type="submit">Sign</button>
       <button id="head-signature-cancel" class="ghost" type="button">
@@ -318,7 +314,6 @@
         Clear signature
       </button>
     </div>
-    <p id="hr-signature-feedback" class="errs" hidden></p>
     <div class="actions">
       <button type="submit">Sign</button>
       <button id="hr-signature-cancel" class="ghost" type="button">
@@ -349,7 +344,6 @@
       rows="4"
       required
     ></textarea>
-    <p id="form-rejection-feedback" class="errs" hidden></p>
     <div class="actions">
       <button type="submit">Reject form</button>
       <button id="form-rejection-cancel" class="ghost" type="button">
@@ -362,7 +356,6 @@
 <dialog id="staff-announcements-dialog" class="announcement-dialog">
   <h2>Notifications</h2>
   <div id="staff-announcements-list" class="announcement-list"></div>
-  <p id="staff-announcements-feedback" class="errs" hidden></p>
   <div class="actions">
     <button id="staff-announcements-acknowledge" type="button">
       Acknowledge

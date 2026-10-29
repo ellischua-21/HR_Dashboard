@@ -302,7 +302,7 @@
     selectedId = Number(id);
     const chosen = cases.find((item) => Number(item.id) === selectedId);
     if (chosen) input.value = label(chosen);
-    ui.feedback(byId('ir-track-feedback'), 'Loading case…');
+    ui.feedback(byId('ir-track-feedback'), '');
     byId('ir-track-content-panel').hidden = true;
     byId('ir-track-progress-panel').hidden = true;
     try {

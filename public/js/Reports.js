@@ -421,10 +421,8 @@ async function loadAnnouncementsForManagement() {
 VIEWS.announcements = guard(loadAnnouncementsForManagement);
 $('announcement-create-form').onsubmit = guard(async (event) => {
   event.preventDefault();
-  const feedback = $('announcement-create-feedback');
   const submit = $('announcement-create-form').querySelector('[type="submit"]');
   submit.disabled = true;
-  feedback.hidden = true;
   try {
     await api(
       'createAnnouncement',
@@ -432,8 +430,7 @@ $('announcement-create-form').onsubmit = guard(async (event) => {
       $('announcement-message').value
     );
     $('announcement-create-form').reset();
-    feedback.textContent = 'Published successfully.';
-    feedback.hidden = false;
+    AppFeedback.success('Published successfully.');
     await loadAnnouncementsForManagement();
   } finally {
     submit.disabled = false;

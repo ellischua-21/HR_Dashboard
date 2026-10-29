@@ -190,7 +190,6 @@ const empFilters = () => {
   return f;
 };
 async function loadEmployees() {
-  $('e_body').innerHTML = '<tr><td colspan="7">Loading…</td></tr>';
   const r = await api(
     'listEmployees',
     Object.assign(
@@ -371,8 +370,6 @@ VIEWS.register = guard(async () => {
     ? 'Editing ' + rec.name + ' (' + rec.record_id + ')'
     : '';
   $('r_mode').hidden = !rec;
-  $('r_msg').textContent = '';
-  $('r_msg').hidden = true;
   $('r_account_access').hidden = Boolean(rec);
   $('r_account_role').disabled = Boolean(rec);
   $('r_account_password').disabled = Boolean(rec);
@@ -582,23 +579,18 @@ $('r_preview').onclick = () => {
   }
   $('pv_body').innerHTML = '';
   $('pv_body').appendChild(dl);
-  $('pv_err').innerHTML = '';
   $('preview').showModal();
 };
 $('pv_back').onclick = () => $('preview').close();
 $('pv_save').onclick = guard(async () => {
   const r = await api('saveEmployee', formData());
   if (!r.ok) {
-    const e = el('div', undefined, 'errs');
-    r.errors.forEach((x) => e.appendChild(el('div', '• ' + x)));
-    $('pv_err').innerHTML = '';
-    $('pv_err').appendChild(e);
+    AppErrors.show(r.errors.join('\n'));
     return;
   }
   $('preview').close();
   showErr('');
-  $('r_msg').textContent = 'Saved successfully.';
-  $('r_msg').hidden = false;
+  AppFeedback.success('Saved successfully.');
   $('r_preview').disabled = true;
 });
 $('r_cancel').onclick = () => go(NAV.find((n) => n[0] === 'employees'));
@@ -721,27 +713,28 @@ async function runImport(commit) {
   }
   const box = $('i_result');
   box.innerHTML = '';
-  box.appendChild(
-    el(
-      'div',
-      (commit
-        ? res.imported + ' employee(s) imported. '
-        : res.valid + ' of ' + res.total + ' row(s) are valid. ') +
-        (res.errors.length ? res.errors.length + ' row(s) have errors.' : ''),
-      res.errors.length && !commit ? 'errs' : 'okmsg'
-    )
-  );
+  const summary =
+    (commit
+      ? res.imported + ' employee(s) imported. '
+      : res.valid + ' of ' + res.total + ' row(s) are valid. ') +
+    (res.errors.length ? res.errors.length + ' row(s) have errors.' : '');
+  // Keep import totals available for reviewing the result after the popup clears.
+  box.appendChild(el('div', summary, 'note'));
   if (res.errors.length) {
-    const e = el('div', undefined, 'errs');
-    res.errors
-      .slice(0, 50)
-      .forEach((x) =>
-        e.appendChild(el('div', 'Row ' + x.row + ': ' + x.errors.join('; ')))
-      );
-    if (res.errors.length > 50)
-      e.appendChild(el('div', '…and ' + (res.errors.length - 50) + ' more.'));
-    box.appendChild(e);
-  }
+    AppErrors.show(
+      summary +
+        '\n' +
+        res.errors
+          .slice(0, 50)
+          .map((x) => 'Row ' + x.row + ': ' + x.errors.join('; '))
+          .concat(
+            res.errors.length > 50
+              ? ['…and ' + (res.errors.length - 50) + ' more.']
+              : []
+          )
+          .join('\n')
+    );
+  } else AppFeedback.success(summary);
   $('i_commit').disabled = commit || res.valid === 0;
   if (commit) loadEmployees();
 }

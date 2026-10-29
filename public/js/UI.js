@@ -19,9 +19,11 @@ window.AppUI = {
     return DateUtils.formatDateTime(value, empty);
   },
   feedback(element, message, isError = false) {
-    element.textContent = message;
-    element.className = isError ? 'errs' : 'okmsg';
-    element.hidden = !message;
+    if (element) {
+      element.textContent = '';
+      element.hidden = true;
+    }
+    if (message) AppFeedback.show(message, isError ? 'error' : 'success');
   },
   download(name, text, type) {
     const url = URL.createObjectURL(new Blob([text], { type }));
