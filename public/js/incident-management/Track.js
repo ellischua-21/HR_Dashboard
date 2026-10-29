@@ -5,7 +5,6 @@
   const input = byId('ir-track-selector');
   const options = byId('ir-track-options');
   const content = byId('ir-track-content');
-  const feedback = byId('ir-track-action-feedback');
   let cases = [];
   let selectedId = null;
   let actor = '';
@@ -116,7 +115,7 @@
 
   function renderContent(incident) {
     content.replaceChildren();
-    ui.feedback(feedback, '');
+
     const tracking = incident.tracking;
     const current = tracking.stages.find(
       (stage) => stage.key === tracking.currentStage
@@ -160,7 +159,7 @@
     // HR reviewers need the HR signature control here once employee and head
     // signatures are complete. Review-only actions remain on the Review page.
     const view = incident;
-    const controls = { reload: select, feedback };
+    const controls = { reload: select };
     const signatories = el('details', 'incident-track-report');
     signatories.open = ['PENDING SIGNATURE', 'SIGNED'].includes(
       incident.status
@@ -265,7 +264,7 @@
             await select(incident.id);
             await window.refreshIncidentBadges();
           } catch (error) {
-            ui.feedback(feedback, error.message || String(error), true);
+            ui.feedback(error.message || String(error), true);
             startEvaluation.disabled = false;
           }
         };
@@ -273,7 +272,7 @@
       }
     }
     if (incident.status === 'EVALUATION' && incident.canReview)
-      ui.renderEvaluation(content, view, pads, { feedback, reload: select });
+      ui.renderEvaluation(content, view, pads, { reload: select });
     window.IncidentTimeline.render(content, incident);
     ui.renderDecision(content, view, controls);
     if (tracking.currentStage === 'DECISION ISSUED' && !incident.decision)
@@ -302,7 +301,7 @@
     selectedId = Number(id);
     const chosen = cases.find((item) => Number(item.id) === selectedId);
     if (chosen) input.value = label(chosen);
-    ui.feedback(byId('ir-track-feedback'), '');
+
     byId('ir-track-content-panel').hidden = true;
     byId('ir-track-progress-panel').hidden = true;
     try {
@@ -315,14 +314,9 @@
       input.value = label(incident);
       renderProgress(incident);
       renderContent(incident);
-      ui.feedback(byId('ir-track-feedback'), '');
     } catch (error) {
       if (isCurrent(ticket, owner))
-        ui.feedback(
-          byId('ir-track-feedback'),
-          error.message || String(error),
-          true
-        );
+        ui.feedback(error.message || String(error), true);
     }
   }
 
@@ -369,7 +363,6 @@
       if (`${snapshot.version}:${DateUtils.manilaDate()}` !== version) {
         if (dirty)
           ui.feedback(
-            byId('ir-track-feedback'),
             'Case updates are available. Save your work, then refresh the status.'
           );
         else await select(id);
@@ -392,11 +385,7 @@
     try {
       await load(null, false);
     } catch (error) {
-      ui.feedback(
-        byId('ir-track-feedback'),
-        error.message || 'Could not refresh case status.',
-        true
-      );
+      ui.feedback(error.message || 'Could not refresh case status.', true);
     } finally {
       refreshing = false;
     }

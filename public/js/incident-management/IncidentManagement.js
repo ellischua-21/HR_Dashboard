@@ -67,8 +67,6 @@ wireIncidentSearch(
 );
 
 async function loadIncidentFile() {
-  const feedback = document.getElementById('ir-file-feedback');
-  setIncidentFeedback(feedback, '');
   try {
     incidentFileContext = await api('getIncidentFileContext');
     document.getElementById('ir-reporter-name').value =
@@ -80,7 +78,7 @@ async function loadIncidentFile() {
     document.getElementById('ir-date-reported').value =
       incidentFileContext.dateReported;
   } catch (error) {
-    setIncidentFeedback(feedback, error.message || String(error), true);
+    setIncidentFeedback(error.message || String(error), true);
   }
 }
 
@@ -138,12 +136,10 @@ async function submitIncidentReport(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const button = document.getElementById('ir-submit');
-  const feedback = document.getElementById('ir-file-feedback');
   const files = [...document.getElementById('ir-evidence').files];
-  setIncidentFeedback(feedback, '');
+
   if (!reportedEmployeeId.value) {
     setIncidentFeedback(
-      feedback,
       'Select the reported employee from the suggestions.',
       true
     );
@@ -174,14 +170,13 @@ async function submitIncidentReport(event) {
     incidentEmployeeSearches.forEach((search) => search.reset());
     document.getElementById('ir-evidence-list').textContent = '';
     setIncidentFeedback(
-      feedback,
       `Incident Report submitted. Case ${result.caseNumber}.`
     );
     document.getElementById('ir-date-reported').value = result.dateReported;
     await window.refreshInboxBadge().catch((error) => console.error(error));
     await refreshIncidentBadges().catch((error) => console.error(error));
   } catch (error) {
-    setIncidentFeedback(feedback, error.message || String(error), true);
+    setIncidentFeedback(error.message || String(error), true);
   } finally {
     button.disabled = false;
   }
@@ -322,11 +317,7 @@ function renderIncidentSignature(
           await refreshIncidentBadges().catch((error) => console.error(error));
           await (ui.reload || openIncidentCase)(incident.id);
         } catch (error) {
-          setIncidentFeedback(
-            ui.feedback || document.getElementById('ir-case-feedback'),
-            error.message || String(error),
-            true
-          );
+          setIncidentFeedback(error.message || String(error), true);
         } finally {
           sign.disabled = false;
         }
@@ -520,8 +511,7 @@ async function openIncidentCase(incidentId, options = {}) {
   )
     return;
   const body = document.getElementById('ir-case-body');
-  const feedback = document.getElementById('ir-case-feedback');
-  const ui = { feedback, reload: (id) => openIncidentCase(id, options) };
+  const ui = { reload: (id) => openIncidentCase(id, options) };
   const padSetup = [];
   body.replaceChildren();
   document.getElementById('ir-case-title').textContent = incident.caseNumber;
@@ -639,7 +629,6 @@ async function openIncidentCase(incidentId, options = {}) {
   renderIncidentEvaluation(body, incident, padSetup, ui);
   renderIncidentDecision(body, incident, ui);
 
-  setIncidentFeedback(feedback, '');
   const dialog = document.getElementById('ir-case-dialog');
   if (!dialog.open) dialog.showModal();
   window.requestAnimationFrame(() => padSetup.forEach((setup) => setup()));
@@ -693,16 +682,9 @@ async function runIncidentTransition(incident, action, details, ui = {}) {
     )
       await loadIncidentHistory();
     await (ui.reload || openIncidentCase)(incident.id);
-    setIncidentFeedback(
-      ui.feedback || document.getElementById('ir-case-feedback'),
-      `Case updated: ${result.status}.`
-    );
+    setIncidentFeedback(`Case updated: ${result.status}.`);
   } catch (error) {
-    setIncidentFeedback(
-      ui.feedback || document.getElementById('ir-case-feedback'),
-      error.message || String(error),
-      true
-    );
+    setIncidentFeedback(error.message || String(error), true);
   }
 }
 

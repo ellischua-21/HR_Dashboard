@@ -65,9 +65,6 @@ function renderIncidentDecision(parent, incident, ui = {}) {
     reason.placeholder = 'Administrative completion notes (required)';
     reason.required = true;
     reason.setAttribute('aria-label', 'Administrative completion notes');
-    const closureFeedback = incidentElement('p');
-    closureFeedback.setAttribute('role', 'status');
-    closureFeedback.hidden = true;
     const close = incidentElement(
       'button',
       '',
@@ -75,13 +72,8 @@ function renderIncidentDecision(parent, incident, ui = {}) {
     );
     close.type = 'button';
     close.onclick = async () => {
-      setIncidentFeedback(closureFeedback, '');
       if (!reason.value.trim()) {
-        setIncidentFeedback(
-          closureFeedback,
-          'Enter the completion notes before closing.',
-          true
-        );
+        setIncidentFeedback('Enter the completion notes before closing.', true);
         reason.focus();
         return;
       }
@@ -102,16 +94,12 @@ function renderIncidentDecision(parent, incident, ui = {}) {
         await refreshIncidentBadges().catch(console.error);
         await (ui.reload || openIncidentCase)(incident.id);
       } catch (error) {
-        setIncidentFeedback(
-          closureFeedback,
-          error.message || String(error),
-          true
-        );
+        setIncidentFeedback(error.message || String(error), true);
       } finally {
         close.disabled = false;
       }
     };
-    section.append(reason, closureFeedback, close);
+    section.append(reason, close);
   }
   if (decision.closedAt && incident.canReview)
     section.appendChild(
@@ -314,35 +302,19 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
   process.type = 'button';
   process.onclick = async () => {
     if (!['SUBSTANTIATED', 'NOT_SUBSTANTIATED'].includes(finding.value)) {
-      setIncidentFeedback(
-        ui.feedback || document.getElementById('ir-case-feedback'),
-        'Select an evaluation finding.',
-        true
-      );
+      setIncidentFeedback('Select an evaluation finding.', true);
       return;
     }
     if (finding.value === 'SUBSTANTIATED' && !severity.value) {
-      setIncidentFeedback(
-        ui.feedback || document.getElementById('ir-case-feedback'),
-        'Select the violation severity.',
-        true
-      );
+      setIncidentFeedback('Select the violation severity.', true);
       return;
     }
     if (finding.value === 'SUBSTANTIATED' && !recommendation.value.trim()) {
-      setIncidentFeedback(
-        ui.feedback || document.getElementById('ir-case-feedback'),
-        'Enter the corrective action.',
-        true
-      );
+      setIncidentFeedback('Enter the corrective action.', true);
       return;
     }
     if (!decisionPad?.toDataURL()) {
-      setIncidentFeedback(
-        ui.feedback || document.getElementById('ir-case-feedback'),
-        'Add the authorized HR signature.',
-        true
-      );
+      setIncidentFeedback('Add the authorized HR signature.', true);
       return;
     }
     if (
@@ -385,11 +357,7 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
       await refreshIncidentBadges();
       await (ui.reload || openIncidentCase)(incident.id);
     } catch (error) {
-      setIncidentFeedback(
-        ui.feedback || document.getElementById('ir-case-feedback'),
-        error.message || String(error),
-        true
-      );
+      setIncidentFeedback(error.message || String(error), true);
       process.disabled = false;
     }
   };

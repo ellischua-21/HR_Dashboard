@@ -10,8 +10,7 @@
   let employeeEmail = '';
   let page = 1;
 
-  const feedback = (id, message, error = false) =>
-    ui.feedback(byId(id), message, error);
+  const feedback = (message, error = false) => ui.feedback(message, error);
   const canSearchHistory = () =>
     session?.role === 'HR' && (session.perms || []).includes('emp.read');
 
@@ -89,10 +88,9 @@
         if (data.canManage) (data.matrix || []).forEach(addMatrixRow);
       }
       renderMatrix();
-      feedback('ir-coc-feedback', '');
     } catch (error) {
       if (ticket === guideRequest && owner === session?.email)
-        feedback('ir-coc-feedback', error.message || String(error), true);
+        feedback(error.message || String(error), true);
     }
   }
 
@@ -126,11 +124,10 @@
         `Page ${data.page} of ${data.pages} · ${data.total} record${data.total === 1 ? '' : 's'}`;
       byId('ir-violation-previous').disabled = data.page <= 1;
       byId('ir-violation-next').disabled = data.page >= data.pages;
-      feedback('ir-violation-feedback', '');
     } catch (error) {
       if (ticket === historyRequest && owner === session?.email) {
         byId('ir-violation-rows').replaceChildren();
-        feedback('ir-violation-feedback', error.message || String(error), true);
+        feedback(error.message || String(error), true);
       }
     }
   }
@@ -175,11 +172,7 @@
     event.preventDefault();
     employeeEmail = employeeSearch.getSelection()?.email || '';
     if (!employeeEmail) {
-      feedback(
-        'ir-violation-feedback',
-        'Select an employee from the suggestions.',
-        true
-      );
+      feedback('Select an employee from the suggestions.', true);
       return;
     }
     page = 1;
@@ -206,13 +199,13 @@
     event.preventDefault();
     const button = byId('ir-coc-save');
     button.disabled = true;
-    feedback('ir-coc-save-feedback', '');
+
     try {
       await api('saveIncidentMatrix', readMatrix());
       await loadGuide(true);
-      feedback('ir-coc-save-feedback', 'Saved successfully.');
+      feedback('Saved successfully.');
     } catch (error) {
-      feedback('ir-coc-save-feedback', error.message || String(error), true);
+      feedback(error.message || String(error), true);
     } finally {
       button.disabled = false;
     }

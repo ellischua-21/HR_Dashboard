@@ -237,6 +237,7 @@ function createBrowser() {
   document.getElementById = (id) => nodes.get(id) || null;
   document.querySelectorAll = (selector) =>
     document.body.querySelectorAll(selector);
+  document.querySelector = (selector) => document.body.querySelector(selector);
   document.addEventListener = () => {};
   const context = vm.createContext({
     document,
@@ -272,6 +273,11 @@ function createBrowser() {
       fs.readFileSync(path.join(root, 'public/index.html'), 'utf8'),
       document.body
     );
+    const index = fs.readFileSync(path.join(root, 'public/index.html'), 'utf8');
+    for (const [, script] of index.matchAll(
+      /<script\b[^>]*\bsrc="(js\/[^"?]+\.js)(?:\?[^\"]*)?"/g
+    ))
+      if (script !== 'js/ui-loader.js') load('public/' + script);
     const loader = fs.readFileSync(
       path.join(root, 'public/js/ui-loader.js'),
       'utf8'

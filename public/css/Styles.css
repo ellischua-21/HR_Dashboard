@@ -1017,20 +1017,6 @@ legend {
   border: 1px solid var(--rule);
   border-radius: 4px;
 }
-.login-tabs {
-  display: flex;
-  gap: 8px;
-}
-.login-tab {
-  flex: 1;
-  background: transparent;
-  color: var(--brand);
-  border: 1px solid var(--rule);
-}
-.login-tab.active {
-  background: var(--brand);
-  color: #fff;
-}
 .account-heading {
   display: flex;
   align-items: center;
@@ -1980,8 +1966,7 @@ legend {
 #view-incident-history > .panel {
   max-width: none;
 }
-.incident-archive-filters,
-.incident-coc-filters {
+.incident-archive-filters {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;

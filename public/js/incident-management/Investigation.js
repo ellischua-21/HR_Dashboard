@@ -71,14 +71,10 @@
               await ui.readEvidenceFiles(files.files)
             );
             await controls.reload(incident.id);
-            ui.feedback(controls.feedback, 'Information submitted.');
+            ui.feedback('Information submitted.');
             await window.refreshIncidentBadges();
           } catch (error) {
-            ui.feedback(
-              controls.feedback,
-              error.message || String(error),
-              true
-            );
+            ui.feedback(error.message || String(error), true);
           } finally {
             submit.disabled = false;
           }
@@ -207,7 +203,7 @@
       try {
         await api('requestIncidentInformationBatch', incident.id, requests);
         await controls.reload(incident.id);
-        ui.feedback(controls.feedback, 'Requests sent.');
+        ui.feedback('Requests sent.');
         await window.refreshInboxBadge().catch(() => {});
       } catch (error) {
         AppErrors.show(error.message || String(error));

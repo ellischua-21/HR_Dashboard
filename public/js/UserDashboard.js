@@ -1260,11 +1260,7 @@ async function loadFormsForReview(scope = activeReviewScope) {
   const dateFrom = dateFromInput.value;
   const dateTo = dateToInput.value;
   if (dateFrom && dateTo && dateFrom > dateTo) {
-    AppUI.feedback(
-      $('uf_review_feedback'),
-      'The start date must be on or before the end date.',
-      true
-    );
+    AppUI.feedback('The start date must be on or before the end date.', true);
     return;
   }
   const result = await api('listFormsForReview', activeReviewScope, {
@@ -1272,7 +1268,7 @@ async function loadFormsForReview(scope = activeReviewScope) {
     dateTo
   });
   if (request !== reviewLoadVersion || owner !== session.email) return;
-  AppUI.feedback($('uf_review_feedback'), '');
+
   formsForReview = result.forms;
   const prefix = 'uf_review';
   $(`${prefix}_total`).textContent = String(result.summary.total);

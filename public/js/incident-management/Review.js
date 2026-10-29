@@ -117,7 +117,6 @@
       if (ticket !== listRequest || owner !== session?.email) return;
       const summaryReady = renderCases(data);
       ui.feedback(
-        byId('ir-review-feedback'),
         summaryReady
           ? ''
           : 'Review analytics are outdated. Restart the Node.js server to load the latest counts.',
@@ -125,11 +124,7 @@
       );
     } catch (error) {
       if (ticket === listRequest && owner === session?.email)
-        ui.feedback(
-          byId('ir-review-feedback'),
-          error.message || String(error),
-          true
-        );
+        ui.feedback(error.message || String(error), true);
       throw error;
     } finally {
       if (ticket === listRequest)
@@ -201,11 +196,7 @@
     try {
       await fetchList();
     } catch (error) {
-      ui.feedback(
-        byId('ir-review-feedback'),
-        error.message || String(error),
-        true
-      );
+      ui.feedback(error.message || String(error), true);
     } finally {
       polling = false;
     }

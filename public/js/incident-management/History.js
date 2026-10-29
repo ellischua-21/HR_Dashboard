@@ -14,8 +14,7 @@
   let owner = '',
     request = 0;
   const allowed = () => ['STAFF', 'HEAD'].includes(session?.role);
-  const feedback = (text, error = false) =>
-    ui.feedback(byId('ir-history-feedback'), text, error);
+  const feedback = (text, error = false) => ui.feedback(text, error);
 
   async function open(id) {
     try {
@@ -62,7 +61,6 @@
         `Page ${data.page} of ${data.pages} · ${data.total} case${data.total === 1 ? '' : 's'}`;
       byId('ir-history-previous').disabled = data.page <= 1;
       byId('ir-history-next').disabled = data.page >= data.pages;
-      feedback('');
     } catch (error) {
       if (ticket === request && session?.email === account)
         feedback(error.message || String(error), true);

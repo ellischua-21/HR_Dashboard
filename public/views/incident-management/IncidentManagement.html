@@ -78,7 +78,6 @@
       The reported employee’s and assigned Head’s signatures acknowledge receipt
       of this report; they do not indicate admission of wrongdoing.
     </p>
-    <p id="ir-file-feedback" role="status" hidden></p>
     <div class="actions">
       <button id="ir-submit" type="submit">Submit Incident Report</button>
     </div>
@@ -110,7 +109,6 @@
       ></div>
     </div>
     <p id="ir-track-empty" class="note" hidden>No Incident Reports to track.</p>
-    <p id="ir-track-feedback" role="status" aria-live="polite" hidden></p>
   </section>
   <section
     id="ir-track-progress-panel"
@@ -123,12 +121,6 @@
     hidden
   >
     <div id="ir-track-content"></div>
-    <p
-      id="ir-track-action-feedback"
-      role="status"
-      aria-live="polite"
-      hidden
-    ></p>
     <div id="ir-track-actions" class="actions incident-track-actions"></div>
   </section>
 </section>
@@ -178,7 +170,6 @@
         </button>
       </div>
     </form>
-    <p id="ir-history-feedback" role="status" hidden></p>
     <p id="ir-history-empty" class="note" hidden>No matching closed cases.</p>
     <div class="tablewrap">
       <table>
@@ -287,7 +278,6 @@
       </div>
     </div>
     <p id="ir-review-results" class="note" role="status" aria-live="polite"></p>
-    <p id="ir-review-feedback" role="status" hidden></p>
     <p id="ir-review-empty" class="note" hidden>
       No matching Incident Reports.
     </p>
@@ -308,7 +298,6 @@
 </section>
 
 <section id="view-incident-code-of-conduct" class="view" hidden>
-  <p id="ir-coc-feedback" role="status" hidden></p>
   <div class="incident-coc-columns">
     <section
       class="panel incident-coc-guide"
@@ -348,7 +337,6 @@
           My records
         </button>
       </form>
-      <p id="ir-violation-feedback" role="status" hidden></p>
       <p id="ir-violation-empty" class="note" hidden>
         No finalized violations.
       </p>
@@ -401,7 +389,6 @@
       <div class="actions">
         <button id="ir-coc-save" type="submit">Save changes</button>
       </div>
-      <p id="ir-coc-save-feedback" role="status" hidden></p>
     </form>
   </section>
 </section>
@@ -412,5 +399,4 @@
     <button id="ir-case-close" class="ghost" type="button">Close</button>
   </div>
   <div id="ir-case-body"></div>
-  <p id="ir-case-feedback" role="status" hidden></p>
 </dialog>

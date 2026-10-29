@@ -185,7 +185,7 @@ test('COC matrix editing adds and saves rows without PDF or publishing controls'
   assert.equal(saves, 1);
   assert.equal(document.getElementById('ir-coc-matrix').rows.length, 2);
   assert.equal(
-    document.getElementById('ir-coc-save-feedback').textContent,
+    document.querySelector('.feedback-popup').querySelector('span').textContent,
     'Saved successfully.'
   );
   assert.equal(document.getElementById('ir-coc-pdf'), null);
@@ -307,12 +307,9 @@ test('case closure validates visibly and reloads its calling view', async () => 
   const notes = parent.querySelector('textarea');
   await close.click();
   assert.equal(calls.length, 0);
-  assert.ok(
-    parent
-      .querySelectorAll('p')
-      .some(
-        (p) => !p.hidden && p.textContent.includes('Enter the completion notes')
-      )
+  assert.match(
+    document.querySelector('.feedback-popup').textContent,
+    /Enter the completion notes/
   );
   notes.value = 'Delivery and administrative completion confirmed.';
   await close.click();
@@ -337,7 +334,6 @@ test('investigation actions are shared and available only to reviewers on active
   };
   const parent = document.createElement('section');
   context.IncidentInvestigation.render(parent, incident, {
-    feedback: document.createElement('p'),
     reload: async () => {}
   });
   await Promise.resolve();
@@ -545,7 +541,7 @@ test('evaluation corrective action is filled from severity and prior finalized v
   assert.equal(correctiveAction.readOnly, true);
 });
 
-test('Track supplies its reload and visible feedback to decision controls', async () => {
+test('Track supplies its reload callback without inline feedback elements', async () => {
   const browser = createBrowser();
   browser.loadDashboard();
   const { context, document } = browser;
@@ -580,10 +576,8 @@ test('Track supplies its reload and visible feedback to decision controls', asyn
     controls = view;
   };
   await context.IncidentTrack.select(9);
-  assert.equal(
-    controls.feedback,
-    document.getElementById('ir-track-action-feedback')
-  );
+  assert.equal(Object.hasOwn(controls, 'feedback'), false);
+  assert.equal(document.getElementById('ir-track-action-feedback'), null);
   assert.equal(controls.reload, context.IncidentTrack.select);
 });
 

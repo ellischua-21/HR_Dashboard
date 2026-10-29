@@ -82,31 +82,31 @@ const KPIS = [
   ['departments', 'Departments'],
   ['locations', 'Work locations']
 ];
-// Navigation: [id, label, permission, built?]. Visibility only; the server enforces every permission.
+// Navigation: [id, label, permission]. Visibility only; the server enforces every permission.
 const NAV = [
-  ['dashboard', 'Dashboard', 'dash.view', true],
-  ['inbox', 'Inbox', 'inbox.read', true],
-  ['employees', 'Employee Master List', 'emp.read', true],
-  ['register', 'Employee Registration', 'emp.write', true],
-  ['attendance', 'Attendance', 'emp.read', true],
-  ['executive', 'Executive Summary', 'exec.view', true],
-  ['reports', 'HR Reports', 'report.run', true],
-  ['audit', 'Audit Logs', 'audit.read', true],
-  ['announcements', 'Create Announcement', 'announcements.manage', true],
-  ['accounts', 'Accounts', 'admin.manage', true],
-  ['account-requests', 'Account Requests', 'admin.manage', true],
-  ['account-settings', 'Change Password', 'account.password', true]
+  ['dashboard', 'Dashboard', 'dash.view'],
+  ['inbox', 'Inbox', 'inbox.read'],
+  ['employees', 'Employee Master List', 'emp.read'],
+  ['register', 'Employee Registration', 'emp.write'],
+  ['attendance', 'Attendance', 'emp.read'],
+  ['executive', 'Executive Summary', 'exec.view'],
+  ['reports', 'HR Reports', 'report.run'],
+  ['audit', 'Audit Logs', 'audit.read'],
+  ['announcements', 'Create Announcement', 'announcements.manage'],
+  ['accounts', 'Accounts', 'admin.manage'],
+  ['account-requests', 'Account Requests', 'admin.manage'],
+  ['account-settings', 'Change Password', 'account.password']
 ];
 const USER_NAV = [
-  ['user-dashboard', 'Submitted Forms', 'forms.self', true],
-  ['inbox', 'Inbox', 'inbox.read', true],
-  ['user-forms', 'Forms', 'forms.self', true],
-  ['account-settings', 'Change Password', 'account.password', true]
+  ['user-dashboard', 'Submitted Forms', 'forms.self'],
+  ['inbox', 'Inbox', 'inbox.read'],
+  ['user-forms', 'Forms', 'forms.self'],
+  ['account-settings', 'Change Password', 'account.password']
 ];
 const FORM_NAV = [
-  ['user-forms', 'Fill Out', 'forms.self', true],
-  ['user-dashboard', 'My Submissions', 'forms.self', true],
-  ['leave-requests', 'Review Requests', 'forms.review', true]
+  ['user-forms', 'Fill Out', 'forms.self'],
+  ['user-dashboard', 'My Submissions', 'forms.self'],
+  ['leave-requests', 'Review Requests', 'forms.review']
 ];
 const PALETTE = [
   '#6b2638',
@@ -254,7 +254,7 @@ async function init() {
       n[0] === 'leave-requests' ? canManageForms : session.perms.includes(n[2])
     ).map((item) =>
       session.role === 'ADMIN' && item[0] === 'leave-requests'
-        ? [item[0], 'Manage Forms', item[2], item[3]]
+        ? [item[0], 'Manage Forms', item[2]]
         : item
     );
     const visibleNavItems = navItems.filter((n) =>

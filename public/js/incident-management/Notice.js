@@ -145,8 +145,6 @@ function renderIncidentNte(parent, incident, ui = {}) {
       'note',
       `Authorized HR signatory: ${incident.currentUserEmail}`
     );
-    const feedback = incidentElement('p');
-    feedback.hidden = true;
     const values = async () => ({
       allegation: allegation.value,
       issuanceDate: issueDate.value,
@@ -162,12 +160,9 @@ function renderIncidentNte(parent, incident, ui = {}) {
       try {
         await api('saveIncidentNteDraft', incident.id, await values());
         await (ui.reload || openIncidentCase)(incident.id);
-        setIncidentFeedback(
-          ui.feedback || document.getElementById('ir-case-feedback'),
-          'NTE draft saved.'
-        );
+        setIncidentFeedback('NTE draft saved.');
       } catch (error) {
-        setIncidentFeedback(feedback, error.message || String(error), true);
+        setIncidentFeedback(error.message || String(error), true);
       } finally {
         save.disabled = false;
       }
@@ -189,7 +184,7 @@ function renderIncidentNte(parent, incident, ui = {}) {
           evidence: [...evidence.files].map((file) => ({ fileName: file.name }))
         });
       } catch (error) {
-        setIncidentFeedback(feedback, error.message || String(error), true);
+        setIncidentFeedback(error.message || String(error), true);
       }
     };
     const issue = incidentElement('button', '', 'Issue NTE');
@@ -216,11 +211,10 @@ function renderIncidentNte(parent, incident, ui = {}) {
         await refreshIncidentBadges();
         await (ui.reload || openIncidentCase)(incident.id);
         setIncidentFeedback(
-          ui.feedback || document.getElementById('ir-case-feedback'),
           `NTE issued. Deadline: ${DateUtils.formatDate(result.deadlineDate)}.`
         );
       } catch (error) {
-        setIncidentFeedback(feedback, error.message || String(error), true);
+        setIncidentFeedback(error.message || String(error), true);
       } finally {
         issue.disabled = false;
       }
@@ -235,8 +229,7 @@ function renderIncidentNte(parent, incident, ui = {}) {
       evidence,
       currentUser,
       signatureCanvas,
-      signatureControls,
-      feedback
+      signatureControls
     );
     section.append(toggleEditor, editor);
   }
@@ -267,8 +260,6 @@ function renderIncidentNte(parent, incident, ui = {}) {
       item.appendChild(link);
       draftFiles.appendChild(item);
     });
-    const feedback = incidentElement('p');
-    feedback.hidden = true;
     const saveDraft = incidentElement('button', 'ghost', 'Save draft');
     saveDraft.type = 'button';
     saveDraft.onclick = async () => {
@@ -281,12 +272,9 @@ function renderIncidentNte(parent, incident, ui = {}) {
           await readIncidentEvidenceFiles(attachments.files)
         );
         await (ui.reload || openIncidentCase)(incident.id);
-        setIncidentFeedback(
-          ui.feedback || document.getElementById('ir-case-feedback'),
-          'Explanation draft saved.'
-        );
+        setIncidentFeedback('Explanation draft saved.');
       } catch (error) {
-        setIncidentFeedback(feedback, error.message || String(error), true);
+        setIncidentFeedback(error.message || String(error), true);
       } finally {
         saveDraft.disabled = false;
       }
@@ -313,7 +301,7 @@ function renderIncidentNte(parent, incident, ui = {}) {
         await refreshIncidentBadges();
         await (ui.reload || openIncidentCase)(incident.id);
       } catch (error) {
-        setIncidentFeedback(feedback, error.message || String(error), true);
+        setIncidentFeedback(error.message || String(error), true);
       } finally {
         submit.disabled = false;
       }
@@ -323,7 +311,6 @@ function renderIncidentNte(parent, incident, ui = {}) {
       incidentElement('label', '', 'Supporting evidence'),
       attachments,
       draftFiles,
-      feedback,
       saveDraft,
       submit
     );
@@ -415,16 +402,9 @@ function renderIncidentNte(parent, incident, ui = {}) {
           await readIncidentEvidenceFiles(files.files)
         );
         await (ui.reload || openIncidentCase)(incident.id);
-        setIncidentFeedback(
-          ui.feedback || document.getElementById('ir-case-feedback'),
-          'Additional statement submitted.'
-        );
+        setIncidentFeedback('Additional statement submitted.');
       } catch (error) {
-        setIncidentFeedback(
-          ui.feedback || document.getElementById('ir-case-feedback'),
-          error.message || String(error),
-          true
-        );
+        setIncidentFeedback(error.message || String(error), true);
       } finally {
         submit.disabled = false;
       }

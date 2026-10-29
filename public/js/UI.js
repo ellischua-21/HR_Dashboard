@@ -18,11 +18,7 @@ window.AppUI = {
   dateTime(value, empty = '') {
     return DateUtils.formatDateTime(value, empty);
   },
-  feedback(element, message, isError = false) {
-    if (element) {
-      element.textContent = '';
-      element.hidden = true;
-    }
+  feedback(message, isError = false) {
     if (message) AppFeedback.show(message, isError ? 'error' : 'success');
   },
   download(name, text, type) {
