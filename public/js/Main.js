@@ -91,6 +91,7 @@ const NAV = [
   ['inbox', 'Inbox', 'inbox.read', true],
   ['employees', 'Employee Master List', 'emp.read', true],
   ['register', 'Employee Registration', 'emp.write', true],
+  ['attendance', 'Attendance', 'emp.read', true],
   ['executive', 'Executive Summary', 'exec.view', true],
   ['reports', 'HR Reports', 'report.run', true],
   ['audit', 'Audit Logs', 'audit.read', true],
@@ -246,6 +247,7 @@ async function init() {
       const groupedItems = new Set([
         'employees',
         'register',
+        'attendance',
         'executive',
         'reports',
         'audit',
@@ -256,7 +258,7 @@ async function init() {
       ]);
       const groupItems = (ids) =>
         visibleNavItems.filter((n) => ids.includes(n[0]));
-      addNavGroup('Employees', groupItems(['employees', 'register']));
+      addNavGroup('Employees', groupItems(['employees', 'register', 'attendance']));
       addNavGroup(
         'Reports',
         groupItems(['executive', 'reports', 'audit', 'announcements'])

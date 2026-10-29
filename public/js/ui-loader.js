@@ -12,6 +12,7 @@ if (stylesheet)
   const fragments = [
     ['dashboard-fragment', 'views/Dashboard.html'],
     ['employees-fragment', 'views/Employees.html'],
+    ['attendance-fragment', 'views/Attendance.html'],
     ['reports-fragment', 'views/Reports.html'],
     ['accounts-fragment', 'views/Accounts.html'],
     ['account-settings-fragment', 'views/AccountSettings.html'],
@@ -42,6 +43,7 @@ if (stylesheet)
     'js/EmployeeSearch.js',
     'js/Main.js',
     'js/Employees.js',
+    'js/Attendance.js',
     'js/Reports.js',
     'js/Accounts.js',
     'js/UserDashboard.js',

@@ -7,6 +7,7 @@ const { ROLE_PERMS } = require('./config/Permissions');
 const { getSession } = require('./middleware/Auth');
 const dashboard = require('./services/DashboardService');
 const employees = require('./services/EmployeeService');
+const attendance = require('./services/AttendanceService');
 const reports = require('./services/ReportService');
 const imports = require('./services/ImportService');
 const audit = require('./services/AuditService');
@@ -115,6 +116,8 @@ const methods = {
   getExecutiveSummary: (req, filters) =>
     dashboard.getExecutiveSummary(req, filters),
   listEmployees: (req, params) => employees.listEmployees(req, params),
+  getAttendanceContext: (req) => attendance.getAttendanceContext(req),
+  listAttendance: (req, filters) => attendance.listAttendance(req, filters),
   getEmployee: (req, recordId) => employees.getEmployee(req, recordId),
   getFormOptions: (req) => employees.getFormOptions(req),
   getFormMeta: (req) => employees.getFormMeta(req),
