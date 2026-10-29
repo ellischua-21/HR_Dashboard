@@ -164,7 +164,8 @@ const methods = {
     userForms.submitUserForm(req, templateKey, data),
   updateMyForm: (req, formId, templateKey, data) =>
     userForms.updateMyForm(req, formId, templateKey, data),
-  listFormsForReview: (req, scope) => userForms.listFormsForReview(req, scope),
+  listFormsForReview: (req, scope, filters) =>
+    userForms.listFormsForReview(req, scope, filters),
   getFormReviewSummary: (req, scope) =>
     userForms.getFormReviewSummaryForUser(req, scope),
   reviewUserForm: (req, formId, decision, notes, signature, hrFields) =>

@@ -43,7 +43,8 @@ const {
 const crypto = require('crypto');
 const {
   manilaDate: currentManilaDate,
-  workingDaysBetween
+  workingDaysBetween,
+  formatDate
 } = require('../../shared/DateUtils');
 
 const FILING_ROLES = new Set(['HEAD', 'HR', 'ADMIN']);
@@ -985,7 +986,7 @@ async function issueIncidentNte(req, incidentId, input = {}) {
       user,
       incident,
       'NTE_ISSUED',
-      `NTE issued with ${nte.deadlineDate} explanation deadline.`,
+      `NTE issued with ${formatDate(nte.deadlineDate)} explanation deadline.`,
       { documentReference: 'NTE:' + nte.nteId }
     );
     await recordIncidentActivity(
@@ -1806,7 +1807,7 @@ async function extendIncidentDeadline(req, incidentId, newDeadline, reason) {
       user,
       incident,
       'DEADLINE_EXTENDED',
-      `Deadline extended to ${date}: ${details}`
+      `Deadline extended to ${formatDate(date)}: ${details}`
     );
     await notifyAccount(
       connection,

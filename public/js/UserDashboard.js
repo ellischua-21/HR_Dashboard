@@ -4,6 +4,7 @@ let formToSign = null;
 let formToApprove = null;
 let formBeingEdited = null;
 let activeReviewScope = 'HR';
+let reviewLoadVersion = 0;
 let employeeProfile = {};
 
 const APPLICANT_IDENTITY_FIELDS = new Set([
@@ -63,7 +64,7 @@ function leaveLabel(form) {
 
 function leaveRange(form) {
   const data = form.form_data;
-  return `${data.dateFrom} to ${data.dateTo}`;
+  return `${DateUtils.formatDate(data.dateFrom)} to ${DateUtils.formatDate(data.dateTo)}`;
 }
 
 function formTemplate(templateKey) {
@@ -88,7 +89,10 @@ function formSummary(form) {
         data[field.name] !== undefined
     )
     .slice(0, 3)
-    .map((field) => `${field.label}: ${String(data[field.name]).slice(0, 80)}`)
+    .map(
+      (field) =>
+        `${field.label}: ${String(DateUtils.formatField(data[field.name], field.type)).slice(0, 80)}`
+    )
     .join(' · ');
 }
 
@@ -197,8 +201,8 @@ function buildLeaveSheet(data, metadata = {}) {
     leaveLabel({ form_data: data }),
     'wide'
   );
-  appendFormField(leave, 'FROM', data.dateFrom);
-  appendFormField(leave, 'TO', data.dateTo);
+  appendFormField(leave, 'FROM', DateUtils.formatDate(data.dateFrom));
+  appendFormField(leave, 'TO', DateUtils.formatDate(data.dateTo));
   appendFormField(leave, 'NO. OF DAYS', data.days);
   appendFormField(leave, 'REASON', data.reason, 'wide');
   appendFormField(leave, 'WITH PAY', data.payType === 'WITH_PAY' ? 'X' : '');
@@ -478,7 +482,10 @@ function getTimeRecordRows(formData, field) {
   if (hasLegacyRow) {
     return [
       Object.fromEntries(
-        field.columns.map((column) => [column.name, formData[column.name] || ''])
+        field.columns.map((column) => [
+          column.name,
+          formData[column.name] || ''
+        ])
       )
     ];
   }
@@ -488,7 +495,8 @@ function getTimeRecordRows(formData, field) {
 function createTimeRecordEditor(field, formData) {
   const section = document.createElement('section');
   section.className = 'time-record-editor';
-  if (field.showRowNumber) section.classList.add('property-accountability-editor');
+  if (field.showRowNumber)
+    section.classList.add('property-accountability-editor');
   section.dataset.timeRecords = field.name;
   const heading = document.createElement('h3');
   heading.textContent = field.label;
@@ -830,7 +838,7 @@ function buildGenericFormSheet(formData, metadata, template) {
         ? formData[field.name]
           ? 'Acknowledged'
           : 'Not acknowledged'
-        : formData[field.name];
+        : DateUtils.formatField(formData[field.name], field.type);
     appendFormField(
       fields,
       field.label.toUpperCase(),
@@ -856,9 +864,7 @@ function buildGenericFormSheet(formData, metadata, template) {
 
   const signatures = document.createElement('div');
   signatures.className = 'leave-sheet-signatures';
-  const signatureFields = [
-    ['Employee Signature', formData.signature]
-  ];
+  const signatureFields = [['Employee Signature', formData.signature]];
   if (template.headSignatureRequired !== false)
     signatureFields.push(['Head Signature', metadata.headSignature]);
   if (template.hrSignatureRequired !== false)
@@ -902,7 +908,8 @@ function appendTimeRecordsToSheet(sheet, records, field) {
   scroll.className = 'time-record-print-scroll';
   const table = document.createElement('table');
   table.className = 'time-record-print-table';
-  if (field.showRowNumber) table.classList.add('property-accountability-print-table');
+  if (field.showRowNumber)
+    table.classList.add('property-accountability-print-table');
   const thead = document.createElement('thead');
   const header = document.createElement('tr');
   field.columns.forEach((column) => {
@@ -926,7 +933,8 @@ function appendTimeRecordsToSheet(sheet, records, field) {
     }
     field.columns.forEach((column) => {
       const cell = document.createElement('td');
-      cell.textContent = record[column.name] || '';
+      cell.textContent =
+        DateUtils.formatField(record[column.name], column.type) || '';
       row.appendChild(cell);
     });
     tbody.appendChild(row);
@@ -1265,8 +1273,30 @@ async function signAndApproveForm(event) {
 }
 
 async function loadFormsForReview(scope = activeReviewScope) {
+  const request = ++reviewLoadVersion;
+  const owner = session.email;
   activeReviewScope = 'ALL';
-  const result = await api('listFormsForReview', activeReviewScope);
+  const dateFromInput = $('uf_review_date_from');
+  const dateToInput = $('uf_review_date_to');
+  for (const input of [dateFromInput, dateToInput]) {
+    if (input.reportValidity && !input.reportValidity()) return;
+  }
+  const dateFrom = dateFromInput.value;
+  const dateTo = dateToInput.value;
+  if (dateFrom && dateTo && dateFrom > dateTo) {
+    AppUI.feedback(
+      $('uf_review_feedback'),
+      'The start date must be on or before the end date.',
+      true
+    );
+    return;
+  }
+  const result = await api('listFormsForReview', activeReviewScope, {
+    dateFrom,
+    dateTo
+  });
+  if (request !== reviewLoadVersion || owner !== session.email) return;
+  AppUI.feedback($('uf_review_feedback'), '');
   formsForReview = result.forms;
   const prefix = 'uf_review';
   $(`${prefix}_total`).textContent = String(result.summary.total);
@@ -1295,7 +1325,9 @@ function renderFormsForReview() {
     userEmptyRow(
       body,
       7,
-      'No forms are available for your review permissions.'
+      $('uf_review_date_from').value || $('uf_review_date_to').value
+        ? 'No forms match the selected filters.'
+        : 'No forms are available for your review permissions.'
     );
     return;
   }
@@ -1333,13 +1365,13 @@ async function submitTemplateForm(event) {
           : values.get(field.name) || '';
     });
     form.querySelectorAll('[data-time-records]').forEach((editor) => {
-      const records = Array.from(
-        editor.querySelectorAll('tbody tr'),
-        (row) =>
-          Object.fromEntries(
-            Array.from(row.querySelectorAll('[data-time-record-field]'),
-              (input) => [input.dataset.timeRecordField, input.value])
+      const records = Array.from(editor.querySelectorAll('tbody tr'), (row) =>
+        Object.fromEntries(
+          Array.from(
+            row.querySelectorAll('[data-time-record-field]'),
+            (input) => [input.dataset.timeRecordField, input.value]
           )
+        )
       );
       data[editor.dataset.timeRecords] = records;
       if (
@@ -1490,10 +1522,10 @@ async function loadPendingAnnouncementsPopup() {
     message.textContent = reminder.overdueAt
       ? `${reminder.caseNumber}: your explanation is overdue. Please respond as soon as possible.`
       : days > 0
-        ? `${reminder.caseNumber}: ${days} working day${days === 1 ? '' : 's'} remaining. Deadline: ${reminder.deadlineDate}.`
+        ? `${reminder.caseNumber}: ${days} working day${days === 1 ? '' : 's'} remaining. Deadline: ${DateUtils.formatDate(reminder.deadlineDate)}.`
         : reminder.dueToday
-          ? `${reminder.caseNumber}: your explanation is due today (${reminder.deadlineDate}).`
-          : `${reminder.caseNumber}: 0 working days remaining. Deadline: ${reminder.deadlineDate}.`;
+          ? `${reminder.caseNumber}: your explanation is due today (${DateUtils.formatDate(reminder.deadlineDate)}).`
+          : `${reminder.caseNumber}: 0 working days remaining. Deadline: ${DateUtils.formatDate(reminder.deadlineDate)}.`;
     const open = document.createElement('button');
     open.type = 'button';
     open.textContent = ['HR', 'ADMIN'].includes(session.role)
@@ -1558,6 +1590,13 @@ $('uf_history_search').oninput = renderMyForms;
 $('uf_review_status').onchange = renderFormsForReview;
 $('uf_review_type').onchange = renderFormsForReview;
 $('uf_review_search').oninput = renderFormsForReview;
+$('uf_review_date_from').onchange = guard(() => loadFormsForReview('ALL'));
+$('uf_review_date_to').onchange = guard(() => loadFormsForReview('ALL'));
+$('uf_review_clear_dates').onclick = guard(async () => {
+  $('uf_review_date_from').value = '';
+  $('uf_review_date_to').value = '';
+  await loadFormsForReview('ALL');
+});
 $('leave-form').elements.leaveType.onchange = setOtherLeaveVisibility;
 $('leave-form').onsubmit = submitLeaveRequest;
 $('uf_cancel_leave').onclick = () => {

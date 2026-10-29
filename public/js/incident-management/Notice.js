@@ -27,7 +27,7 @@ function renderIncidentNte(parent, incident, ui = {}) {
       incidentElement(
         'p',
         'note',
-        `Issued ${nte.issuanceDate}. Receipt documented ${nte.receiptDate}. Deadline: ${nte.deadlineDate}${nte.overdueAt ? ' · Overdue' : ''}.`
+        `Issued ${DateUtils.formatDate(nte.issuanceDate)}. Receipt documented ${DateUtils.formatDate(nte.receiptDate)}. Deadline: ${DateUtils.formatDate(nte.deadlineDate)}${nte.overdueAt ? ' · Overdue' : ''}.`
       )
     );
     const view = incidentElement('button', 'ghost', 'View NTE');
@@ -217,7 +217,7 @@ function renderIncidentNte(parent, incident, ui = {}) {
         await (ui.reload || openIncidentCase)(incident.id);
         setIncidentFeedback(
           ui.feedback || document.getElementById('ir-case-feedback'),
-          `NTE issued. Deadline: ${result.deadlineDate}.`
+          `NTE issued. Deadline: ${DateUtils.formatDate(result.deadlineDate)}.`
         );
       } catch (error) {
         setIncidentFeedback(feedback, error.message || String(error), true);
@@ -340,7 +340,7 @@ function renderIncidentNte(parent, incident, ui = {}) {
         incidentElement(
           'p',
           'note',
-          `${record.source === 'OTHER_CHANNEL' ? `Received through ${record.otherChannel}` : 'Submitted through HRIS'} · ${new Date(record.submittedAt).toLocaleString()}`
+          `${record.source === 'OTHER_CHANNEL' ? `Received through ${record.otherChannel}` : 'Submitted through HRIS'} · ${DateUtils.formatDateTime(record.submittedAt)}`
         ),
         incidentElement('p', 'incident-case-text', record.explanation)
       );
@@ -364,7 +364,7 @@ function renderIncidentNte(parent, incident, ui = {}) {
         incidentElement(
           'p',
           'note',
-          `Submitted ${new Date(addendum.submittedAt).toLocaleString()}`
+          `Submitted ${DateUtils.formatDateTime(addendum.submittedAt)}`
         ),
         incidentElement('p', 'incident-case-text', addendum.statement)
       );

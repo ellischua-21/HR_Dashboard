@@ -10,6 +10,7 @@ const { normalizeEmployeeFilters } = require('../utils/EmployeeFilters');
 const { httpError } = require('../utils/HttpError');
 const { requirePerm } = require('../middleware/Auth');
 const { logAudit } = require('./AuditService');
+const { formatField } = require('../../shared/DateUtils');
 const {
   filterRows,
   tally,
@@ -127,6 +128,7 @@ async function buildReport(id, filters, user) {
     }
     return {
       columns: keys.map(label),
+      columnTypes: keys.map((key) => F.get(key)?.[2] || 'text'),
       rows: rows.map((employee) =>
         keys.map(
           (key) =>
@@ -273,6 +275,7 @@ async function runReport(req, id, filters, options) {
   return {
     title: REPORTS[id].t,
     columns: report.columns,
+    columnTypes: report.columnTypes || [],
     total: report.rows.length,
     page,
     pageSize,
@@ -299,7 +302,13 @@ async function exportReportCsv(req, id, filters) {
   return {
     filename: id + '_' + date + '.csv',
     csv: [report.columns]
-      .concat(report.rows)
+      .concat(
+        report.rows.map((row) =>
+          row.map((value, index) =>
+            formatField(value, report.columnTypes?.[index])
+          )
+        )
+      )
       .map((row) => row.map(escape).join(','))
       .join('\n')
   };

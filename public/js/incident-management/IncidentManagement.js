@@ -291,7 +291,7 @@ function renderIncidentSignature(
       incidentElement(
         'p',
         'note',
-        `Signed by ${signature.signerEmail} · ${new Date(signature.signedAt).toLocaleString()}`
+        `Signed by ${signature.signerEmail} · ${DateUtils.formatDateTime(signature.signedAt)}`
       )
     );
   } else if (canSignIncidentAs(incident, role)) {
@@ -353,7 +353,7 @@ function renderIncidentReport(body, incident) {
     ['Reported By', incident.reporterName],
     ['Department', incident.department],
     ['Position', incident.position],
-    ['Date of Report', incident.dateReported]
+    ['Date of Report', DateUtils.formatDate(incident.dateReported)]
   ]);
   appendIncidentFieldGroup(body, 'Reported Employee Details', [
     ['Employee Being Reported', incident.reportedEmployeeName],
@@ -365,9 +365,9 @@ function renderIncidentReport(body, incident) {
   appendIncidentFieldGroup(body, 'Incident Details', [
     ['Status', incident.status],
     ['Subject', incident.subject],
-    ['Date of Incident', incident.incidentDate],
+    ['Date of Incident', DateUtils.formatDate(incident.incidentDate)],
     ['Location', incident.location],
-    ['Time', String(incident.incidentTime).slice(0, 5)]
+    ['Time', DateUtils.formatTime(incident.incidentTime)]
   ]);
 
   const narrative = incidentElement('section', 'incident-case-section');
@@ -561,10 +561,12 @@ async function openIncidentCase(incidentId, options = {}) {
           reference.documentType +
             ': ' +
             (reference.version
-              ? reference.version + ' · Effective ' + reference.effectiveDate
+              ? reference.version +
+                ' · Effective ' +
+                DateUtils.formatDate(reference.effectiveDate)
               : 'Captured working configuration (unpublished)') +
             ' · ' +
-            new Date(reference.capturedAt).toLocaleString()
+            DateUtils.formatDateTime(reference.capturedAt)
         )
       );
     body.appendChild(references);
@@ -621,7 +623,7 @@ async function openIncidentCase(incidentId, options = {}) {
       const item = incidentElement(
         'li',
         '',
-        `${entry.action.replaceAll('_', ' ')} — ${entry.details} · ${entry.actorEmail} · ${new Date(entry.createdAt).toLocaleString()}`
+        `${entry.action.replaceAll('_', ' ')} — ${entry.details} · ${entry.actorEmail} · ${DateUtils.formatDateTime(entry.createdAt)}`
       );
       if (
         entry.previousStatus &&

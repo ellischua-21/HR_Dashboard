@@ -89,10 +89,10 @@ body {
   float: none;
   margin-left: auto;
 }
-#nav .incident-nav-group > summary {
+#nav .notification-nav-group > summary {
   position: relative;
 }
-#nav .incident-nav-group > summary .incident-notification-dot {
+#nav .notification-nav-group > summary .nav-notification-dot {
   position: fixed;
   z-index: 1000;
   width: 8px;
@@ -483,6 +483,33 @@ button.ghost {
   background: #fff;
   border: 1px solid var(--rule);
   border-radius: 6px;
+}
+.date-time-entry {
+  display: inline-flex;
+  position: relative;
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+  min-width: 9rem;
+}
+.date-time-entry > input[type='text'] {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+}
+.date-time-entry-picker {
+  flex: 0 0 32px;
+  padding: 4px;
+  font-size: 18px;
+}
+.date-time-entry-source {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  opacity: 0;
+  clip-path: inset(50%);
+  pointer-events: none;
 }
 table {
   border-collapse: collapse;
@@ -891,10 +918,18 @@ legend {
 .form-filters {
   margin: 14px 0;
 }
-.form-filters label {
+.form-filters,
+.attendance-filters {
+  align-items: flex-end;
+}
+.form-filters label,
+.attendance-filters label {
   align-items: flex-start;
   flex-direction: column;
   gap: 3px;
+}
+#attendance-feedback {
+  margin: 0 0 12px;
 }
 .form-filters .form-search {
   flex: 1;

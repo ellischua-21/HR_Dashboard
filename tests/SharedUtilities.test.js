@@ -3,7 +3,12 @@ const assert = require('node:assert/strict');
 const {
   manilaDate,
   addWorkingDays,
-  workingDaysBetween
+  workingDaysBetween,
+  formatDate,
+  formatTime,
+  formatDateTime,
+  formatField,
+  parseInput
 } = require('../shared/DateUtils');
 const { normalizePagination } = require('../server/utils/Pagination');
 const { sendAttachment } = require('../server/utils/AttachmentResponse');
@@ -22,6 +27,47 @@ test('shared deadline calendar handles weekends, year boundaries, and invalid in
   assert.equal(workingDaysBetween('invalid', '2026-11-06'), 0);
   assert.equal(addWorkingDays('2026-02-30', 5), '');
   assert.equal(addWorkingDays('2026-10-30', Infinity), '');
+});
+
+test('display dates preserve calendar dates and convert timestamps to Manila consistently', () => {
+  assert.equal(formatDate('2026-10-09'), '10/09/2026');
+  assert.equal(formatDate('2024/02/29'), '02/29/2024');
+  assert.equal(formatDate('10/09/2026'), '10/09/2026');
+  assert.equal(formatDateTime('2026-12-31T16:05:00Z'), '01/01/2027 12:05 AM');
+  assert.equal(formatDateTime('2026-10-29 17:14:00'), '10/29/2026 5:14 PM');
+  assert.equal(formatDateTime('2026-10-09'), '10/09/2026');
+  assert.equal(formatDate('2026-02-30'), '2026-02-30');
+  assert.equal(formatDateTime(null, 'Not reached'), 'Not reached');
+});
+
+test('display times distinguish noon, midnight and durations without changing stored values', () => {
+  assert.equal(formatTime('00:00:00'), '12:00 AM');
+  assert.equal(formatTime('12:00'), '12:00 PM');
+  assert.equal(formatTime('17:14'), '5:14 PM');
+  assert.equal(formatTime('5:14 pm'), '5:14 PM');
+  assert.equal(formatTime('25:00'), '25:00');
+  assert.equal(formatField('08:00', 'text'), '08:00');
+  assert.equal(formatField('2026-10-09', 'date'), '10/09/2026');
+  assert.equal(
+    formatField('2026-10-29T17:14', 'datetime-local'),
+    '10/29/2026 5:14 PM'
+  );
+});
+
+test('explicit date/time entry converts MM/DD/YYYY and AM/PM into native values', () => {
+  assert.equal(parseInput('11/03/2026', 'date'), '2026-11-03');
+  assert.equal(parseInput('03/11/2026', 'date'), '2026-03-11');
+  assert.equal(parseInput('02/29/2024', 'date'), '2024-02-29');
+  assert.equal(parseInput('02/29/2026', 'date'), '');
+  assert.equal(parseInput('29/10/2026', 'date'), '');
+  assert.equal(parseInput('12:00 AM', 'time'), '00:00');
+  assert.equal(parseInput('12:00 PM', 'time'), '12:00');
+  assert.equal(parseInput('5:14 pm', 'time'), '17:14');
+  assert.equal(
+    parseInput('11/03/2026 5:14 PM', 'datetime-local'),
+    '2026-11-03T17:14'
+  );
+  assert.equal(parseInput('', 'date'), '');
 });
 
 test('pagination rejects invalid SQL limits and preserves configured size caps', () => {

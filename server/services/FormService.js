@@ -227,8 +227,7 @@ function validateUserForm(templateKey, data = {}) {
       });
       records.push(cleanRecord);
     });
-    if (!records.length)
-      errors.push('Add at least one completed row.');
+    if (!records.length) errors.push('Add at least one completed row.');
     if (
       templateKey === 'time-in-out' &&
       !records.some((record) =>
@@ -314,7 +313,8 @@ async function searchFormEmployees(req, query) {
 
 function validateApprovalSignature(isHead, decision, signature, templateKey) {
   const template = FORM_TEMPLATES.find((item) => item.key === templateKey);
-  const signatureRequired = !template ||
+  const signatureRequired =
+    !template ||
     (isHead
       ? template.headSignatureRequired !== false
       : template.hrSignatureRequired !== false);
@@ -706,7 +706,7 @@ async function getFormReviewSummary(reviewer, scope = null, builtScope = null) {
   };
 }
 
-async function listFormsForReview(req, scope = 'HR') {
+async function listFormsForReview(req, scope = 'HR', filters = {}) {
   const current = await getCurrentUser(req);
   if (!current) await requirePerm(req, 'forms.review');
   const normalizedScope = String(scope).toUpperCase();
@@ -725,6 +725,27 @@ async function listFormsForReview(req, scope = 'HR') {
   }
   const reviewScopeName = isCombinedQueue ? 'ALL' : isHead ? 'HEAD' : 'HR';
   const reviewScope = buildReviewScope(reviewer, reviewScopeName);
+  if (!filters || typeof filters !== 'object' || Array.isArray(filters))
+    throw httpError('Choose valid submission dates.', 400);
+  const dateFrom = filters.dateFrom || '';
+  const dateTo = filters.dateTo || '';
+  if (
+    (dateFrom && !isValidDate(dateFrom)) ||
+    (dateTo && !isValidDate(dateTo)) ||
+    (dateFrom && dateTo && dateFrom > dateTo)
+  ) {
+    throw httpError('Choose a valid submission date range.', 400);
+  }
+  const dateClauses = [];
+  const dateValues = [];
+  if (dateFrom) {
+    dateClauses.push('f.submitted_at >= ?');
+    dateValues.push(`${dateFrom} 00:00:00`);
+  }
+  if (dateTo) {
+    dateClauses.push('f.submitted_at < DATE_ADD(?, INTERVAL 1 DAY)');
+    dateValues.push(`${dateTo} 00:00:00`);
+  }
   const summary = await getFormReviewSummary(
     reviewer,
     reviewScopeName,
@@ -740,9 +761,9 @@ async function listFormsForReview(req, scope = 'HR') {
      FROM user_forms f
      LEFT JOIN user_roles u ON u.email = f.user_email
      LEFT JOIN user_roles reviewer ON reviewer.email = f.reviewed_by
-     WHERE ${reviewScope.whereSql}
+     WHERE ${reviewScope.whereSql}${dateClauses.length ? ' AND ' + dateClauses.join(' AND ') : ''}
      ORDER BY f.submitted_at DESC, f.id DESC LIMIT 500`,
-    reviewScope.whereValues
+    [...reviewScope.whereValues, ...dateValues]
   );
   return {
     forms: rows.map(parseForm),
@@ -821,8 +842,7 @@ async function reviewUserForm(
       (item) => item.key === rows[0].template_key
     );
     const isHead =
-      rows[0].review_stage === 'HEAD' &&
-      template?.headReviewRequired !== false;
+      rows[0].review_stage === 'HEAD' && template?.headReviewRequired !== false;
     if (isHead) {
       await requirePerm(req, 'forms.review');
       const mayReviewAsHead =

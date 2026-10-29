@@ -97,8 +97,15 @@ async function runRep() {
   }
   r.rows.forEach((row) => {
     const t = el('tr');
-    row.forEach((v) =>
-      t.appendChild(el('td', v === null || v === undefined ? '' : v))
+    row.forEach((v, index) =>
+      t.appendChild(
+        el(
+          'td',
+          v === null || v === undefined
+            ? ''
+            : DateUtils.formatField(v, r.columnTypes?.[index])
+        )
+      )
     );
     b.appendChild(t);
   });
@@ -152,7 +159,9 @@ function drawChart(id, type, data, horizontal) {
   xch[id] = new Chart($(id), {
     type: type,
     data: {
-      labels: data.map((x) => x.label),
+      labels: data.map((x) =>
+        id === 'hiringTrend' ? DateUtils.formatMonth(x.label) : x.label
+      ),
       datasets: [
         {
           data: data.map((x) => x.value),
@@ -197,7 +206,10 @@ async function loadExec() {
   const d = await api('getExecutiveSummary', readF('ex_filters')),
     c = d.current;
   $('ex_period').textContent =
-    'Reporting date ' + c.asOf + ' · compared with ' + d.prior.asOf;
+    'Reporting date ' +
+    DateUtils.formatDate(c.asOf) +
+    ' · compared with ' +
+    DateUtils.formatDate(d.prior.asOf);
   const k = $('ex_kpis');
   k.innerHTML = '';
   XK.forEach(([key, label], i) => {
@@ -280,7 +292,9 @@ async function loadAuditLogs() {
   b.innerHTML = '';
   rows.forEach((r) => {
     const t = el('tr');
-    r.forEach((v) => t.appendChild(el('td', v)));
+    r.forEach((v, index) =>
+      t.appendChild(el('td', index === 0 ? DateUtils.formatDateTime(v) : v))
+    );
     b.appendChild(t);
   });
   if (!rows.length) {
@@ -331,8 +345,8 @@ function renderInbox() {
     card.appendChild(el('p', item.message, 'announcement-message'));
     const detail =
       item.type === 'ANNOUNCEMENT'
-        ? `From ${item.createdBy} · ${new Date(item.createdAt).toLocaleString()}`
-        : `Received ${new Date(item.createdAt).toLocaleString()}`;
+        ? `From ${item.createdBy} · ${DateUtils.formatDateTime(item.createdAt)}`
+        : `Received ${DateUtils.formatDateTime(item.createdAt)}`;
     card.appendChild(el('p', detail, 'note'));
 
     if (item.type === 'ANNOUNCEMENT' && item.status === 'NEW') {
@@ -396,7 +410,7 @@ async function loadAnnouncementsForManagement() {
     card.appendChild(
       el(
         'p',
-        `Published by ${announcement.created_by_name} · ${new Date(announcement.created_at).toLocaleString()}`,
+        `Published by ${announcement.created_by_name} · ${DateUtils.formatDateTime(announcement.created_at)}`,
         'note'
       )
     );

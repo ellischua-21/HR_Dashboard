@@ -27,7 +27,7 @@
   };
   const label = (status) => labels[status] || status;
   const dateTime = (value) =>
-    value ? new Date(value).toLocaleString() : 'Not reached';
+    value ? DateUtils.formatDateTime(value) : 'Not reached';
 
   function render(root, incident) {
     const el = window.IncidentCaseUI.element;

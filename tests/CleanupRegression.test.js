@@ -4,6 +4,7 @@ const { pool } = require('../server/db/database');
 const { LISTS } = require('../server/config/EmployeeSchema');
 const { importEmployees } = require('../server/services/ImportService');
 const { assignAccountHead } = require('../server/services/AccountService');
+const { listFormsForReview } = require('../server/services/FormService');
 const {
   saveIncidentEvaluation
 } = require('../server/services/IncidentService');
@@ -27,6 +28,56 @@ test('COC matrix selects the matching offense count and caps at the final config
     '4 days Suspension'
   );
   assert.equal(matrixActionForOccurrence(matrix, 'Grave', 1), null);
+});
+
+test('form review date filters apply before the row limit and preserve the authorized queue and badge totals', async (t) => {
+  const calls = [];
+  let role = 'HR';
+  t.mock.method(pool, 'execute', async (sql, values) => {
+    calls.push({ sql, values });
+    if (/^SELECT email, full_name, role/.test(sql))
+      return [[{ email: 'hr@example.com', role, active: 1 }]];
+    if (sql.includes('SELECT COUNT(*) AS total'))
+      return [[{ total: 12, pending: 8, approved: 3, rejected: 1 }]];
+    if (sql.includes('SELECT f.id, f.control_no')) return [[]];
+    if (sql.includes('INSERT INTO audit_logs')) return [{ affectedRows: 1 }];
+    throw new Error('Unexpected query');
+  });
+  const req = { session: { userEmail: 'hr@example.com' } };
+  const result = await listFormsForReview(req, 'ALL', {
+    dateFrom: '2026-10-01',
+    dateTo: '2026-10-29'
+  });
+  const list = calls.find((call) =>
+    call.sql.includes('SELECT f.id, f.control_no')
+  );
+  assert.ok(list.sql.includes('f.user_email <> ?'));
+  assert.match(
+    list.sql,
+    /f.submitted_at >= \?[\s\S]*f.submitted_at < DATE_ADD\(\?, INTERVAL 1 DAY\)[\s\S]*LIMIT 500/
+  );
+  assert.deepEqual(list.values, [
+    'hr@example.com',
+    '2026-10-01 00:00:00',
+    '2026-10-29 00:00:00'
+  ]);
+  assert.equal(result.summary.pending, 8);
+  const summary = calls.find((call) =>
+    call.sql.includes('SELECT COUNT(*) AS total')
+  );
+  assert.ok(!summary.values.includes('2026-10-01 00:00:00'));
+  await assert.rejects(
+    listFormsForReview(req, 'ALL', {
+      dateFrom: '2026-10-30',
+      dateTo: '2026-10-01'
+    }),
+    { status: 400 }
+  );
+  role = 'STAFF';
+  await assert.rejects(
+    listFormsForReview(req, 'ALL', { dateFrom: '2026-10-01' }),
+    { status: 403 }
+  );
 });
 
 test('saving the COC matrix immediately changes the guide for all roles', async (t) => {

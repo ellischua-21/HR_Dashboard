@@ -20,11 +20,11 @@ function createNteDocumentHtml(incident, nte) {
   return `<!doctype html><html><head><meta charset="utf-8"><title>Notice to Explain — ${escapeIncidentHtml(incident.caseNumber)}</title>
   <style>@page{size:letter;margin:22mm}body{font:14px Arial,sans-serif;color:#172033;line-height:1.5;max-width:780px;margin:24px auto}h1{text-align:center;font-size:22px}h2{font-size:16px;border-bottom:1px solid #999;padding-bottom:5px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:8px}.label{font-weight:700}pre{font:inherit;white-space:pre-wrap}.signature{max-width:240px;max-height:80px}button{padding:8px 14px}@media print{button{display:none}body{margin:0}}</style></head><body>
   <button onclick="window.print()">Print / Save as PDF</button><h1>NOTICE TO EXPLAIN</h1>
-  <div class="meta"><div><span class="label">Case Number:</span> ${escapeIncidentHtml(incident.caseNumber)}</div><div><span class="label">Date Issued:</span> ${escapeIncidentHtml(nte.issuanceDate)}</div>
+  <div class="meta"><div><span class="label">Case Number:</span> ${escapeIncidentHtml(incident.caseNumber)}</div><div><span class="label">Date Issued:</span> ${escapeIncidentHtml(DateUtils.formatDate(nte.issuanceDate))}</div>
   <div><span class="label">Directed to:</span> ${escapeIncidentHtml(incident.reportedEmployeeName)} (${escapeIncidentHtml(incident.reportedEmployeeEmail)})</div><div><span class="label">Employee ID:</span> ${escapeIncidentHtml(incident.reportedEmployeeId)}</div>
   <div><span class="label">Department:</span> ${escapeIncidentHtml(incident.reportedEmployeeDepartment)}</div><div><span class="label">Position:</span> ${escapeIncidentHtml(incident.reportedEmployeePosition)}</div>
-  <div><span class="label">Date of Receipt:</span> ${escapeIncidentHtml(nte.receiptDate)}</div><div><span class="label">Response Period:</span> ${escapeIncidentHtml(nte.responseWorkingDays)} working days</div><div><span class="label">Explanation Deadline:</span> ${escapeIncidentHtml(nte.deadlineDate)}</div></div>
-  <h2>Incident Details</h2><div class="meta"><div><span class="label">Subject:</span> ${escapeIncidentHtml(incident.subject)}</div><div><span class="label">Date:</span> ${escapeIncidentHtml(incident.incidentDate)}</div><div><span class="label">Location:</span> ${escapeIncidentHtml(incident.location)}</div><div><span class="label">Time:</span> ${escapeIncidentHtml(String(incident.incidentTime).slice(0, 5))}</div></div><pre>${escapeIncidentHtml(incident.description)}</pre>
+  <div><span class="label">Date of Receipt:</span> ${escapeIncidentHtml(DateUtils.formatDate(nte.receiptDate))}</div><div><span class="label">Response Period:</span> ${escapeIncidentHtml(nte.responseWorkingDays)} working days</div><div><span class="label">Explanation Deadline:</span> ${escapeIncidentHtml(DateUtils.formatDate(nte.deadlineDate))}</div></div>
+  <h2>Incident Details</h2><div class="meta"><div><span class="label">Subject:</span> ${escapeIncidentHtml(incident.subject)}</div><div><span class="label">Date:</span> ${escapeIncidentHtml(DateUtils.formatDate(incident.incidentDate))}</div><div><span class="label">Location:</span> ${escapeIncidentHtml(incident.location)}</div><div><span class="label">Time:</span> ${escapeIncidentHtml(DateUtils.formatTime(incident.incidentTime))}</div></div><pre>${escapeIncidentHtml(incident.description)}</pre>
   ${nte.provisionCode || nte.provisionTitle || nte.provisionText ? `<h2>Code of Conduct Reference</h2><p><strong>${escapeIncidentHtml([nte.provisionCode, nte.provisionTitle].filter(Boolean).join(' — '))}</strong></p><pre>${escapeIncidentHtml(nte.provisionText || '')}</pre>` : ''}<h2>Explanation of the Allegation</h2><pre>${escapeIncidentHtml(nte.allegation)}</pre>
   <h2>Supporting Evidence</h2><ul>${evidence || '<li>None attached</li>'}</ul>
   <h2>Authorized HR Signatory</h2><p>${escapeIncidentHtml(nte.signerName)} (${escapeIncidentHtml(nte.signerEmail)})</p>${nte.signature ? `<img class="signature" src="${nte.signature}" alt="HR signature">` : ''}
@@ -49,7 +49,7 @@ function createIncidentReportDocumentHtml(incident) {
         ? `<img class="signature" src="${item.signature}" alt="${escapeIncidentHtml(item.role)} signature">`
         : 'Not signed';
       const labels = { EMPLOYEE: 'Employee', HEAD: 'Assigned Head', HR: 'HR' };
-      return `<tr><td>${escapeIncidentHtml(labels[item.role] || item.role)}</td><td>${signature}</td><td>${escapeIncidentHtml(item.signerEmail)}</td><td>${escapeIncidentHtml(item.signedAt)}</td></tr>`;
+      return `<tr><td>${escapeIncidentHtml(labels[item.role] || item.role)}</td><td>${signature}</td><td>${escapeIncidentHtml(item.signerEmail)}</td><td>${escapeIncidentHtml(DateUtils.formatDateTime(item.signedAt))}</td></tr>`;
     })
     .join('');
   const participants = (type) =>
@@ -67,9 +67,9 @@ function createIncidentReportDocumentHtml(incident) {
     ['Position', incident.position],
     ['Reported Employee', incident.reportedEmployeeName],
     ['Employee ID', incident.reportedEmployeeId],
-    ['Date Reported', incident.dateReported],
-    ['Incident Date', incident.incidentDate],
-    ['Incident Time', String(incident.incidentTime).slice(0, 5)],
+    ['Date Reported', DateUtils.formatDate(incident.dateReported)],
+    ['Incident Date', DateUtils.formatDate(incident.incidentDate)],
+    ['Incident Time', DateUtils.formatTime(incident.incidentTime)],
     ['Location', incident.location],
     ['Subject', incident.subject]
   ]
@@ -100,8 +100,8 @@ function createDecisionDocumentHtml(incident, decision) {
     <style>@page{size:letter;margin:22mm}body{font:14px Arial,sans-serif;color:#172033;line-height:1.5;max-width:780px;margin:24px auto}h1{text-align:center;font-size:22px}h2{font-size:16px;border-bottom:1px solid #999;padding-bottom:5px}pre{font:inherit;white-space:pre-wrap}.signature{max-width:240px;max-height:80px}button{padding:8px 14px}@media print{button{display:none}body{margin:0}}</style></head><body>
     <button onclick="window.print()">Print / Save as PDF</button><h1>FINAL DECISION</h1>
     <p><strong>Case Number:</strong> ${escapeIncidentHtml(incident.caseNumber)}</p><p><strong>Employee:</strong> ${escapeIncidentHtml(incident.reportedEmployeeName)} (${escapeIncidentHtml(incident.reportedEmployeeId)})</p>
-    <p><strong>Decision issued:</strong> ${escapeIncidentHtml(decision.issuedAt)}</p><h2>Evaluation Findings</h2><p><strong>Finding:</strong> ${decision.outcome === 'NO_VIOLATION' ? 'No Violation Established' : 'Violation Established'}</p><pre>${escapeIncidentHtml(decision.evaluationFindings || '')}</pre>
+    <p><strong>Decision issued:</strong> ${escapeIncidentHtml(DateUtils.formatDateTime(decision.issuedAt))}</p><h2>Evaluation Findings</h2><p><strong>Finding:</strong> ${decision.outcome === 'NO_VIOLATION' ? 'No Violation Established' : 'Violation Established'}</p><pre>${escapeIncidentHtml(decision.evaluationFindings || '')}</pre>
     ${decision.outcome !== 'NO_VIOLATION' ? `<p><strong>Violation:</strong> ${escapeIncidentHtml([decision.violationTitle, decision.codeReference, decision.severity].filter(Boolean).join(' · '))}</p>` : ''}
     <h2>Approved Decision</h2><p><strong>Outcome:</strong> ${escapeIncidentHtml(decision.outcomeLabel || decision.outcome.replaceAll('_', ' '))}</p>${decision.finalAction ? `<p><strong>Corrective action:</strong> ${escapeIncidentHtml(decision.finalAction)}</p>` : ''}<pre>${escapeIncidentHtml(decision.decisionReason)}</pre>
-    <h2>Authorized Approval</h2><p>${escapeIncidentHtml(decision.approverName)} (${escapeIncidentHtml(decision.approverEmail)})</p>${signature}<p><strong>Delivered:</strong> ${escapeIncidentHtml(decision.deliveredAt)}</p></body></html>`;
+    <h2>Authorized Approval</h2><p>${escapeIncidentHtml(decision.approverName)} (${escapeIncidentHtml(decision.approverEmail)})</p>${signature}<p><strong>Delivered:</strong> ${escapeIncidentHtml(DateUtils.formatDateTime(decision.deliveredAt))}</p></body></html>`;
 }

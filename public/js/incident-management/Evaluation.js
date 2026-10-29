@@ -17,12 +17,12 @@ function renderIncidentDecision(parent, incident, ui = {}) {
     incidentElement(
       'p',
       '',
-      `Issued: ${new Date(decision.issuedAt).toLocaleString()}`
+      `Issued: ${DateUtils.formatDateTime(decision.issuedAt)}`
     ),
     incidentElement(
       'p',
       '',
-      `Delivered to employee inbox: ${new Date(decision.deliveredAt).toLocaleString()}`
+      `Delivered to employee inbox: ${DateUtils.formatDateTime(decision.deliveredAt)}`
     ),
     incidentElement('h4', '', 'Evaluation findings'),
     incidentElement(
@@ -118,7 +118,7 @@ function renderIncidentDecision(parent, incident, ui = {}) {
       incidentElement(
         'p',
         'note',
-        `Case closed ${new Date(decision.closedAt).toLocaleString()}: ${decision.closureReason || ''}`
+        `Case closed ${DateUtils.formatDateTime(decision.closedAt)}: ${decision.closureReason || ''}`
       )
     );
   parent.appendChild(section);
@@ -175,7 +175,7 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
         incidentElement(
           'li',
           '',
-          `${item.finalizedAt ? new Date(item.finalizedAt).toLocaleDateString() : ''} · ${item.violationTitle} · ${item.severity} · ${item.correctiveAction}`
+          `${item.finalizedAt ? DateUtils.formatDate(item.finalizedAt) : ''} · ${item.violationTitle} · ${item.severity} · ${item.correctiveAction}`
         )
       )
     );

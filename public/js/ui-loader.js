@@ -36,6 +36,7 @@ if (stylesheet)
     '../shared/FormTemplates.js',
     '../shared/FormStatus.js',
     '../shared/DateUtils.js',
+    'js/DateTimeInputs.js',
     'js/incident-management/Navigation.js',
     'js/SignaturePad.js',
     'js/UI.js',

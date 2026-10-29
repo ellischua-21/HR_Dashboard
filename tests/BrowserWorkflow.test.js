@@ -25,6 +25,131 @@ test('all browser controllers initialize in the declared asset order', () => {
   assert.equal(typeof browser.context.IncidentInvestigation.render, 'function');
 });
 
+test('form previews and incident documents share date/time formatting while input values stay ISO', () => {
+  const browser = createBrowser();
+  browser.loadDashboard();
+  browser.evaluate("session = { email: 'employee@example.com' }");
+  const values = { name: 'Sample Employee', date: '2026-10-29', time: '17:14' };
+  const sheet = browser.context.buildGenericFormSheet(
+    values,
+    { submittedAt: '2026-10-29T09:14:00Z', status: 'PENDING' },
+    {
+      title: 'Sample form',
+      fields: [
+        { name: 'date', type: 'date', label: 'Date' },
+        { name: 'time', type: 'time', label: 'Time' }
+      ],
+      headSignatureRequired: false,
+      hrSignatureRequired: false
+    }
+  );
+  assert.ok(sheet.textContent.includes('10/29/2026'));
+  assert.ok(sheet.textContent.includes('5:14 PM'));
+  assert.equal(values.date, '2026-10-29');
+  assert.equal(values.time, '17:14');
+  const report = browser.context.createIncidentReportDocumentHtml({
+    dateReported: '2026-10-29',
+    incidentDate: '2026-10-28',
+    incidentTime: '00:00:00'
+  });
+  assert.ok(report.includes('10/28/2026'));
+  assert.ok(report.includes('12:00 AM'));
+  const input = browser.document.getElementById('ir-incident-date');
+  input.value = '2026-10-28';
+  assert.equal(input.value, '2026-10-28');
+});
+
+test('formatted date entry retains canonical values, calendar access, and change events', async () => {
+  const browser = createBrowser();
+  browser.load('shared/DateUtils.js');
+  const { document, context } = browser;
+  const create = document.createElement.bind(document);
+  const Base = create('input').constructor;
+  class Input extends Base {
+    get parentNode() {
+      return this.parentElement;
+    }
+    get value() {
+      return this.nativeValue || '';
+    }
+    set value(value) {
+      this.nativeValue = String(value ?? '');
+    }
+    hasAttribute(name) {
+      return this.getAttribute(name) !== null;
+    }
+    setCustomValidity(message) {
+      this.error = message;
+    }
+    get validity() {
+      return {
+        valid: !this.error && (!this.required || Boolean(this.value)),
+        rangeUnderflow: false,
+        rangeOverflow: false,
+        stepMismatch: false
+      };
+    }
+    reportValidity() {
+      return this.validity.valid;
+    }
+    dispatchEvent(event) {
+      for (const listener of this.listeners.get(event.type) || [])
+        listener(event);
+      this['on' + event.type]?.(event);
+      return true;
+    }
+  }
+  document.createElement = (tag) =>
+    tag === 'input' ? new Input(tag) : create(tag);
+  context.HTMLInputElement = Input;
+  context.Event = class {
+    constructor(type) {
+      this.type = type;
+    }
+  };
+  let observe;
+  context.MutationObserver = class {
+    constructor(callback) {
+      observe = callback;
+    }
+    observe() {}
+  };
+  browser.load('public/js/DateTimeInputs.js');
+  const source = document.createElement('input');
+  source.type = 'date';
+  source.name = 'dateFrom';
+  source.value = '2026-10-29';
+  source.required = true;
+  let changes = 0;
+  let picks = 0;
+  source.onchange = () => ++changes;
+  source.showPicker = () => ++picks;
+  document.body.appendChild(source);
+  observe([{ type: 'childList', addedNodes: [source] }]);
+  const display = source.parentElement.children.find(
+    (child) => child !== source && child.tagName === 'INPUT'
+  );
+  const picker = source.parentElement.children.find(
+    (child) => child.tagName === 'BUTTON'
+  );
+  assert.equal(display.value, '10/29/2026');
+  assert.equal(source.value, '2026-10-29');
+  assert.equal(source.type, 'date');
+  display.value = '11/03/2026';
+  display.dispatchEvent(new context.Event('change'));
+  assert.equal(source.value, '2026-11-03');
+  assert.equal(changes, 1);
+  display.value = '02/30/2026';
+  display.dispatchEvent(new context.Event('input'));
+  assert.equal(source.value, '');
+  assert.equal(source.reportValidity(), false);
+  source.value = '2026-12-31';
+  assert.equal(display.value, '12/31/2026');
+  assert.equal(source.reportValidity(), true);
+  await picker.click();
+  assert.equal(picks, 1);
+});
+
 test('COC matrix editing adds and saves rows without PDF or publishing controls', async () => {
   const browser = createBrowser();
   browser.loadDashboard();

@@ -43,12 +43,6 @@
     if (values.includes(selected)) select.value = selected;
   }
 
-  function formatDate(value) {
-    if (!value) return '';
-    const [year, month, day] = value.split('-');
-    return year && month && day ? `${month}-${day}-${year}` : value;
-  }
-
   function drawTable(rows, emptyMessage) {
     const header = document.createElement('tr');
     columns.forEach(([, label]) => {
@@ -71,7 +65,10 @@
     rows.forEach((record) => {
       const row = document.createElement('tr');
       columns.forEach(([key]) => {
-        const value = key === 'date' ? formatDate(record[key]) : record[key];
+        let value = record[key];
+        if (key === 'date') value = DateUtils.formatDate(value);
+        else if (['time', 'timeIn', 'timeOut'].includes(key))
+          value = DateUtils.formatTime(value);
         row.appendChild(AppUI.tableCell(value || '—'));
       });
       body.appendChild(row);
@@ -135,7 +132,9 @@
     if (pending || !configured) return;
     const picker = $('attendance-date');
     if (!picker.reportValidity()) return;
-    picker.valueAsNumber += offset * 86400000;
+    picker.value = new Date(picker.valueAsNumber + offset * 86400000)
+      .toISOString()
+      .slice(0, 10);
     loadRecords(currentFilters());
   }
   $('attendance-previous-day').onclick = () => changeDay(-1);

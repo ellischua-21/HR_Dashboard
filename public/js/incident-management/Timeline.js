@@ -10,7 +10,7 @@
     const list = el('ol');
     for (const entry of incident.timeline) {
       const item = el('li');
-      const time = el('time', '', new Date(entry.createdAt).toLocaleString());
+      const time = el('time', '', DateUtils.formatDateTime(entry.createdAt));
       time.dateTime = new Date(entry.createdAt).toISOString();
       item.append(
         el('strong', '', entry.label),

@@ -17,7 +17,7 @@
   let refreshing = false;
 
   const dateTime = (value) =>
-    value ? new Date(value).toLocaleString() : 'Not reached';
+    value ? DateUtils.formatDateTime(value) : 'Not reached';
   const label = (item) =>
     `${item.caseNumber} · ${item.subject} · ${item.reportedEmployeeName}`;
   const statusLabel = (value) =>

@@ -16,9 +16,7 @@ window.AppUI = {
     body.appendChild(row);
   },
   dateTime(value, empty = '') {
-    if (!value) return empty;
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+    return DateUtils.formatDateTime(value, empty);
   },
   feedback(element, message, isError = false) {
     element.textContent = message;

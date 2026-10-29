@@ -125,24 +125,41 @@ let charts = {},
   session = null;
 let activeIncidentCaseCount = 0;
 
-function positionIncidentNotificationDot() {
-  const dot = document.getElementById('incident-management-count');
-  const summary = dot?.closest('summary');
+function positionNavigationNotificationDots() {
   const sidebar = document.getElementById('side');
-  if (!dot || !summary || !sidebar || dot.hidden) return;
-  const summaryRect = summary.getBoundingClientRect();
+  if (!sidebar) return;
   const sidebarRect = sidebar.getBoundingClientRect();
-  dot.style.left = `${sidebarRect.right}px`;
-  dot.style.top = `${summaryRect.top + 7}px`;
+  document.querySelectorAll('#nav .nav-notification-dot').forEach((dot) => {
+    const summary = dot.closest('summary');
+    if (!summary || dot.hidden) return;
+    const summaryRect = summary.getBoundingClientRect();
+    dot.style.left = `${sidebarRect.right}px`;
+    dot.style.top = `${summaryRect.top + 7}px`;
+  });
+}
+
+function updateNavigationNotificationDot(id, hasNotifications) {
+  const dot = document.getElementById(id);
+  if (!dot) return;
+  const group = dot.closest('details');
+  dot.hidden = !hasNotifications || Boolean(group?.open);
+  positionNavigationNotificationDots();
+}
+
+function updateFormsNotificationDot() {
+  const badge = document.getElementById('hr-review-count');
+  updateNavigationNotificationDot(
+    'forms-notification-dot',
+    Boolean(badge && !badge.hidden)
+  );
 }
 
 window.updateIncidentNotificationDot = (activeCount) => {
-  const dot = document.getElementById('incident-management-count');
-  if (!dot) return;
   activeIncidentCaseCount = Number(activeCount) || 0;
-  const group = dot.closest('details');
-  dot.hidden = activeIncidentCaseCount === 0 || Boolean(group?.open);
-  if (!dot.hidden) positionIncidentNotificationDot();
+  updateNavigationNotificationDot(
+    'incident-management-count',
+    activeIncidentCaseCount > 0
+  );
 };
 
 async function init() {
@@ -209,16 +226,23 @@ async function init() {
       const title = document.createElement('span');
       title.textContent = label;
       summary.appendChild(title);
-      if (label === 'Incident Management') {
-        group.classList.add('incident-nav-group');
+      if (label === 'Incident Management' || isForms) {
+        group.classList.add('notification-nav-group');
         const count = document.createElement('span');
-        count.id = 'incident-management-count';
-        count.className = 'nav-count incident-notification-dot';
+        count.id = isForms
+          ? 'forms-notification-dot'
+          : 'incident-management-count';
+        count.className = 'nav-count nav-notification-dot';
         count.hidden = true;
-        count.setAttribute('aria-label', 'active incident cases');
+        count.setAttribute(
+          'aria-label',
+          isForms ? 'pending form reviews' : 'active incident cases'
+        );
         summary.appendChild(count);
         group.addEventListener('toggle', () =>
-          window.updateIncidentNotificationDot(activeIncidentCaseCount)
+          isForms
+            ? updateFormsNotificationDot()
+            : window.updateIncidentNotificationDot(activeIncidentCaseCount)
         );
       }
       group.appendChild(summary);
@@ -258,7 +282,10 @@ async function init() {
       ]);
       const groupItems = (ids) =>
         visibleNavItems.filter((n) => ids.includes(n[0]));
-      addNavGroup('Employees', groupItems(['employees', 'register', 'attendance']));
+      addNavGroup(
+        'Employees',
+        groupItems(['employees', 'register', 'attendance'])
+      );
       addNavGroup(
         'Reports',
         groupItems(['executive', 'reports', 'audit', 'announcements'])
@@ -288,10 +315,10 @@ async function init() {
       );
       visibleNavItems.forEach(addNavLink);
     }
-    $('nav').addEventListener('scroll', positionIncidentNotificationDot, {
+    $('nav').addEventListener('scroll', positionNavigationNotificationDots, {
       passive: true
     });
-    window.addEventListener('resize', positionIncidentNotificationDot);
+    window.addEventListener('resize', positionNavigationNotificationDots);
     $('menuBtn').onclick = () => document.body.classList.toggle('open');
     $('logoutBtn').onclick = async () => {
       try {
@@ -520,6 +547,7 @@ function setSubmittedFormsCount(count, scope = 'HR') {
   const pending = Number(count) || 0;
   badge.textContent = pending > 99 ? '99+' : String(pending);
   badge.hidden = pending === 0;
+  updateFormsNotificationDot();
   const link = badge.parentElement;
   link.setAttribute('aria-label', `Manage Forms, ${pending} pending`);
   link.title = `${pending} pending form${pending === 1 ? '' : 's'}`;
@@ -623,7 +651,9 @@ function render(d) {
     charts[c[0]] = new Chart(box, {
       type: c[2],
       data: {
-        labels: data.map((x) => x.label),
+        labels: data.map((x) =>
+          c[0] === 'hiringTrend' ? DateUtils.formatMonth(x.label) : x.label
+        ),
         datasets: [
           {
             data: data.map((x) => x.value),
@@ -660,7 +690,10 @@ function render(d) {
     $('obs').appendChild(li);
   });
   $('asof').textContent =
-    'Reporting date ' + d.asOf + ' · new hires counted from ' + d.from;
+    'Reporting date ' +
+    DateUtils.formatDate(d.asOf) +
+    ' · new hires counted from ' +
+    DateUtils.formatDate(d.from);
   const q = d.quality,
     box = $('quality');
   box.innerHTML = '';

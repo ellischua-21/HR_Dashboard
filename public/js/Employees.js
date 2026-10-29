@@ -310,7 +310,14 @@ async function showProfile(id) {
         return;
       }
       dl.appendChild(el('dt', f.label));
-      dl.appendChild(el('dd', CUR[k] === '' || CUR[k] == null ? '–' : CUR[k]));
+      dl.appendChild(
+        el(
+          'dd',
+          CUR[k] === '' || CUR[k] == null
+            ? '–'
+            : DateUtils.formatField(CUR[k], f.type)
+        )
+      );
     });
     if (!dl.childElementCount && !tabs.length) return;
     body.appendChild(el('h3', title));

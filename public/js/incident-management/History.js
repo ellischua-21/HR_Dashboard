@@ -42,9 +42,9 @@
         [
           incident.caseNumber,
           incident.subject,
-          incident.dateFiled,
+          DateUtils.formatDate(incident.dateFiled),
           incident.closedAt
-            ? new Date(incident.closedAt).toLocaleString()
+            ? DateUtils.formatDateTime(incident.closedAt)
             : 'Not recorded',
           window.IncidentProgress.label(incident.outcome)
         ].forEach((value) => row.appendChild(el('td', '', value)));

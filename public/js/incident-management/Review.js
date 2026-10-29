@@ -15,8 +15,7 @@
   let polling = false;
   const visible = () => !byId('view-incident-review').hidden;
   const allowed = () => ['HR', 'ADMIN'].includes(session?.role);
-  const formatDate = (value) =>
-    value ? new Date(value).toLocaleString() : '—';
+  const formatDate = (value) => (value ? DateUtils.formatDateTime(value) : '—');
 
   function syncFilters() {
     byId('ir-review-search').value = state.search;
@@ -70,7 +69,7 @@
       for (const [label, value] of [
         ['Reported employee', incident.reportedEmployeeName],
         ['Reported by', incident.reporterName],
-        ['Date filed', incident.dateFiled],
+        ['Date filed', DateUtils.formatDate(incident.dateFiled)],
         ['Last updated', formatDate(incident.updatedAt)]
       ]) {
         const pair = el('div');

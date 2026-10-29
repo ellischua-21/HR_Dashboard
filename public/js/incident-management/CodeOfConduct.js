@@ -108,13 +108,13 @@
       data.records.forEach((record) => {
         const row = el('tr');
         [
-          record.violationDate,
+          DateUtils.formatDate(record.violationDate),
           record.caseNumber,
           record.violationTitle,
           record.severity,
           record.occurrenceNumber,
           record.correctiveAction,
-          new Date(record.decisionDate).toLocaleString(),
+          DateUtils.formatDateTime(record.decisionDate),
           record.status
         ].forEach((value) =>
           row.appendChild(el('td', '', String(value ?? '—')))
