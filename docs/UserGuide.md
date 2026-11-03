@@ -2,9 +2,6 @@
 
 Updated: 11/02/2026
 
-This guide explains where to find each feature and how to use it. Your account
-determines which menus, records, and actions you can see.
-
 ## Contents
 
 - [1. Sign in and get started](#1-sign-in-and-get-started)
@@ -34,11 +31,11 @@ or cannot remember your password, contact HR or the system administrator.
 
 ## 2. Find your menus
 
-| Account | Main features                                                                                                                                                                                       |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| STAFF   | Fill out forms, check personal submissions, track incidents involving you, view case history and the Code of Conduct, read the Inbox, and change your password.                                     |
-| HEAD    | STAFF features, plus review assigned form requests and file Incident Reports.                                                                                                                       |
-| HR      | Dashboard, employee records, attendance, reports, announcements, personal forms, form reviews, and incident filing and review.                                                                      |
+| Account | Main features |
+| ------- | ------------- |
+| STAFF   | Fill out forms, check personal submissions, track incidents involving you, view case history and the Code of Conduct, read the Inbox, and change your password. |
+| HEAD    | STAFF features, plus review assigned form requests and file Incident Reports.  |
+| HR      | Dashboard, employee records, attendance, reports, announcements, personal forms, form reviews, and incident filing and review. |
 | ADMIN   | Dashboard, employee records, attendance, reports, announcements, form reviews, incident management, account approvals, and account assignments. ADMIN does not have personal form submission pages. |
 
 **Head HR is an HR account with an extra assignment.** It keeps the normal HR
@@ -46,79 +43,50 @@ features and can also review forms submitted by other HR accounts.
 
 ### Where to go
 
-| You want to…                                       | Open…                                                             |
-| -------------------------------------------------- | ----------------------------------------------------------------- |
-| Submit a form                                      | **Forms → Fill Out**                                              |
-| Check a form you submitted                         | **Forms → My Submissions**                                        |
-| Review forms assigned to you                       | **Forms → Review Requests**; ADMIN uses **Manage Forms** directly |
-| Find an employee                                   | **Employees → Employee Master List**                              |
-| Register an employee                               | **Employees → Employee Registration**                             |
-| Check scanner attendance                           | **Employees → Attendance**                                        |
+| You want to… | Open… |
+| ------------ | ----- |
+| Submit a form                                      | **Forms → Fill Out** |
+| Check a form you submitted                         | **Forms → My Submissions** |
+| Review forms assigned to you                       | **Forms → Review Requests** |
+| Find an employee                                   | **Employees → Employee Master List** |
+| Register an employee                               | **Employees → Employee Registration** |
+| Check scanner attendance                           | **Employees → Attendance** |
 | File an incident                                   | **Incident Management → File**; available to HEAD, HR, and ADMIN  |
-| Open a case and its available actions              | **Incident Management → Track**                                   |
-| Find incidents awaiting HR attention               | **Incident Management → Review**; HR and ADMIN                    |
-| Find completed personal cases                      | **Incident Management → History**; STAFF and HEAD                 |
-| View the disciplinary matrix and violation history | **Incident Management → Code of Conduct**                         |
-| Create an announcement                             | **Reports → Create Announcement**; HR and ADMIN                   |
-| Approve account requests                           | **Manage Accounts → Account Requests**; ADMIN                     |
-
-HR and ADMIN find **Inbox** below the Incident Management group. Other accounts
-also have an Inbox entry in their menu.
+| Open a case and its available actions              | **Incident Management → Track** |
+| Find incidents awaiting HR attention               | **Incident Management → Review**; HR and ADMIN |
+| Find completed personal cases                      | **Incident Management → History**; STAFF and HEAD |
+| View the disciplinary matrix and violation history | **Incident Management → Code of Conduct** |
+| Create an announcement                             | **Reports → Create Announcement**; HR and ADMIN |
+| Approve account requests                           | **Manage Accounts → Account Requests**; ADMIN |
 
 ## 3. Use common controls
 
 ### Dates, times, and search
 
-- Enter dates as **MM/DD/YYYY**, for example **11/02/2026**. You can also use the
-  calendar button.
-- Enter clock times with **AM or PM**, for example **8:30 AM** or **5:15 PM**.
-  Displayed dates and times follow Philippine time.
-- When an employee search shows suggestions, **select the correct suggestion**.
-  Typing the name alone does not select an employee.
+- Enter dates as **MM/DD/YYYY**. You can also use the calendar button.
+- Enter clock times with **AM or PM**. Displayed dates and times follow Philippine time.
 - Use filters to narrow a list. Check for an old filter if you cannot find a record.
-- Use **Previous** and **Next** when a list has more than one page.
-- A field filled from your employee record may be locked. Ask HR to correct the
-  employee record if those details are wrong.
+- A field filled from your employee record may be locked. Ask HR to correct the employee record if those details are wrong.
 
 ### Signatures and confirmations
 
-Draw your signature in the signature box using a mouse, finger, or stylus. Use
-**Clear signature** to start again, then select **Sign** or the form's submit
-button. Only sign while using your own account.
-
-Some actions open a confirmation window. Read the message, then confirm the action
-or select **Cancel**.
-
-### Loading and feedback
-
-A small rotating circle means a request is running. In Attendance, it appears
-beside **Refresh**. Wait for the request to finish before trying again.
-
-Success, information, and error messages appear at the top of the screen. They
-disappear after **1.5 seconds**, or you can close them using **×**. If an entry is
-rejected, correct it and try again.
+Draw your signature in the signature box using a mouse. Use **Clear signature** to start again, then select **Sign** or the form's submit button. Only sign while using your own account.
 
 ### Notification marks
 
-- The **Inbox number** shows unseen items. Opening Inbox clears its unseen count;
-  the messages remain available.
-- Numbers beside form reviews or incident pages indicate pending requests or
-  active cases. Reading an Inbox message does not resolve those requests.
+- The **Inbox number** shows unseen items. Opening Inbox clears its count.
+- Numbers beside form reviews or incident pages indicate pending requests or active cases. Reading an Inbox message does not resolve those requests.
 - A small **yellow dot** on a closed Forms or Incident Management group means a
-  page inside has a notification badge. Opening the group hides the dot while its
-  individual badges are visible.
+  page inside has a notification badge.
 - Use the **↑** button to return to the top of a long page.
 
 ## 4. Submit and review forms
 
 ### Fill out a form
 
-**Available to:** STAFF, HEAD, and HR.
-
 1. Open **Forms → Fill Out** and choose a form.
 2. Check your automatically filled employee details.
-3. Complete the remaining fields. Dates intended to record today's date are
-   filled automatically.
+3. Complete the remaining fields. Dates intended to record today's date are filled automatically.
 4. Tick the confirmation and any form-specific acknowledgment boxes.
 5. Draw your signature and select **Submit for review**.
 6. Open **Forms → My Submissions** to check the saved request and serial number.
@@ -130,13 +98,7 @@ rejected, correct it and try again.
 | Time-In/Out Correction Request     | Dates and the time entries that need correction.                                                                         |
 | Official Business / Travel Request | Business or travel details and the requested schedule.                                                                   |
 | Overtime Request                   | The overtime schedule and reason.                                                                                        |
-| Time In/Out Record                 | Daily time and break records.                                                                                            |
-| Company Property Accountability    | Company property descriptions, quantities, and other available property details, plus the responsibility acknowledgment. |
-
-**Adding daily or property records:** use **Add row** for each additional day or
-item. The time forms have columns for the date, time in, AM break out/in, lunch
-break out/in, PM break out/in, and time out. Complete the required fields in every
-row you keep.
+| Time In/Out Record                 | Daily time and break records.                                                                              
 
 ### Understand where a form goes
 
@@ -145,48 +107,27 @@ row you keep.
   forms directly to HR.
 - HR forms go to the designated Head HR. The Head HR's own forms go to another
   eligible HR reviewer.
-- **Company Property Accountability goes directly to HR review.** It does not
-  require Head review or a Head/HR signature; the employee supplies the signature.
-
-The dashboard shows the actions available to each reviewer. Some forms require a
-reviewer's signature, while others use an **Approve** button without a signature.
 
 ### Check or edit your submissions
 
 Open **Forms → My Submissions**. Filter by status or form type, or search using the
 serial number or details.
 
-- **View form** opens the saved form.
-- **Print / Save PDF** opens the print options.
-- **Review reason** shows the reviewer's recorded reason when available.
 - **Edit** appears only while editing is allowed. Generally, this is while the
   form is still pending with its assigned Head. Editing requires a new signature.
 
-Once a request has moved beyond the editable stage or been rejected, contact HR
-for the next step instead of trying to change the saved request.
-
 ### Review a form request
-
-**Available to:** HEAD, HR, and ADMIN, according to the request's assignment.
 
 1. Open **Forms → Review Requests**, or **Manage Forms** for ADMIN.
 2. Use status, form type, search, and submission-date filters to find the request.
-   **Clear dates** removes the date filter.
 3. Select **View form** and read the request.
-4. Select **Sign** when a signature is required, or **Approve** when it is not.
-   Head approval normally forwards the request to HR.
+4. Select **Sign** when a signature is required, or **Approve** when it is not. Head approval normally forwards the request to HR.
 5. To reject a request, select **Reject** and enter the reason.
 
 When reviewing a Leave Application, HR can complete the **For HR Use Only**
 details in the approval or rejection window. Select **Refresh** to reload the queue.
 
-The summary boxes count the requests available to your account. Filtering the table
-does not change those overall counts.
-
 ## 5. Manage employee records
-
-**Available to:** HR and ADMIN. Some personal information is limited by account
-permissions.
 
 ### Find, view, and update an employee
 
@@ -197,8 +138,7 @@ permissions.
 4. Select **Edit**, make the changes, then select **Review and save**.
 5. Check the preview and select **Save employee**.
 
-Use **Print** from the profile when a printed copy is needed. Authorized accounts
-can also export the employee list using its export button.
+Authorized accounts can also export the employee list using its export button.
 
 **Archive** removes a record from normal active lists without permanently deleting
 it. Read the confirmation before archiving an employee.
@@ -242,39 +182,18 @@ accounts appear in the same list, grouped by department.
 4. Select **Refresh** to request the latest records.
 5. Use **Previous page** and **Next page** for additional records.
 
-| Column                                        | Meaning                                                                                                                     |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| First Name / Last Name / ID                   | The employee details supplied by the scanner system.                                                                        |
-| Department                                    | The department supplied with the attendance record. New departments appear in the filter when their records are loaded.     |
-| Date / Time                                   | The date and time of that individual scan. One person may have several rows for the same day.                               |
-| Time in / Time out                            | Daily clock-in and clock-out information supplied by the attendance system, with available scan records used as a fallback. |
-| Work hours                                    | The duration calculated by the attendance system.                                                                           |
-| Weekday                                       | The day of the week for the scan.                                                                                           |
-| Data Source / Device Name / Device Serial No. | Information identifying where the record came from.                                                                         |
-| Status                                        | The attendance system's result, such as Normal, Late, Early departure, Absent, or Leave, when available.                    |
-
-**Not calculated** means the attendance result is unavailable; it does not mean
-the employee is automatically late or absent. A blank value means that detail was
-not supplied. Employees with no scan may not appear in this transaction list.
-
 Attendance is for viewing. To request a correction, use the appropriate time form
 or contact HR. Scanner-account connections are managed by the system administrator.
 
 ## 7. Use Incident Management
 
-An Incident Report records an event and its review. Being reported does not mean
-that a violation has already been established.
-
 ### File an Incident Report
-
-**Available to:** HEAD, HR, and ADMIN.
 
 1. Open **Incident Management → File**.
 2. Check your automatically filled reporter details.
 3. Search for the **Employee Being Reported** and select the correct suggestion.
 4. Enter the subject, incident date, time, location, and description.
-5. Add people involved, witnesses, and comments where applicable. Select people
-   from the suggestions.
+5. Add people involved, witnesses, and comments where applicable. Select people from the suggestions.
 6. Attach supporting files if needed, then select **Submit Incident Report**.
 7. Use the assigned IR number to find the case in **Track**.
 
@@ -298,21 +217,20 @@ case.
 
 ### Understand the stages
 
-| Stage               | What it means                                                                    |
-| ------------------- | -------------------------------------------------------------------------------- |
-| Pending Signature   | Required employee or Head acknowledgments are incomplete.                        |
+| Stage               | What it means |
+| ------------------- | ------------- |
+| Pending Signature   | Required employee or Head acknowledgments are incomplete. |
 | Signed              | Required acknowledgments are complete; HR has not yet started its signed review. |
-| Under Review        | HR has signed and is reviewing the report.                                       |
-| Under Investigation | HR is collecting or assessing additional information.                            |
-| NTE Issued          | A Notice to Explain has been issued to the reported employee.                    |
-| Explanation Sent    | The employee has submitted their explanation.                                    |
-| Evaluation          | HR is evaluating the case and preparing the decision.                            |
-| Decision Issued     | The approved final decision has been issued.                                     |
-| Closed              | The case has been completed or closed at an earlier stage.                       |
+| Under Review        | HR has signed and is reviewing the report. |
+| Under Investigation | HR is collecting or assessing additional information. |
+| NTE Issued          | A Notice to Explain has been issued to the reported employee. |
+| Explanation Sent    | The employee has submitted their explanation. |
+| Evaluation          | HR is evaluating the case and preparing the decision. |
+| Decision Issued     | The approved final decision has been issued. |
+| Closed              | The case has been completed or closed at an earlier stage. |
 
 Not every case goes through every stage. A case closed early shows its actual
-closure point and reason. A case that completes the full process keeps **Decision
-Issued** as its final tracking milestone.
+closure point and reason.
 
 ### HR: find and review cases
 
@@ -400,78 +318,22 @@ violation is added to the employee's violation history.
 After delivery and administrative completion, enter the completion notes and
 select **Complete delivery and close case**. Confirm to close the case.
 
-### Find completed cases
-
-- **STAFF and HEAD:** open **Incident Management → History**. Search or filter by
-  case number, outcome, and closure dates, then select **View Details**.
-- **HR and ADMIN:** open **Incident Management → Review → Closed**.
-
-Completed cases are normally read-only. A Head's access is limited to cases they
-reported, were involved in, or were authorized to oversee.
-
 ### Code of Conduct and violation history
 
 Open **Incident Management → Code of Conduct**.
 
 - The left side shows the matrix: **severity**, **occurrence number**, and
-  **corrective action**. The severities are Light, Moderate, Grave, and Intolerable.
+  **corrective action**.
 - The right side shows finalized violation history. Pending allegations and
   unsubstantiated findings are not confirmed violations.
 - HR can search for an employee, select the name suggestion, and select
-  **View records**. Other accounts see their own history.
-
+  **View records**. Other accounts see their ow
 **HR/ADMIN: edit the matrix** in the configuration section. Change existing rows,
 use **Add matrix row** to add one, or **Remove** to remove one. Each severity and
 occurrence combination must be unique. Keep corrective-action text within **191
-characters**, then select **Save changes**. No PDF upload or separate publishing step is
-needed. Saved changes are used for subsequent evaluations; already issued decisions
-retain their recorded action.
+characters**, then select **Save changes**.
 
-## 8. View reports
-
-**Available to:** HR and ADMIN, with Audit Logs limited to authorized accounts.
-
-| Page                        | Purpose and steps                                                                                                                                                                              |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dashboard                   | View employee totals, charts, and observations. Select filters and apply them to focus on a company, department, location, status, or period. Reset the filters to return to the broader view. |
-| Reports → Executive Summary | View the workforce overview and comparisons. Apply the available filters and use **Print / save as PDF** for a copy. Read the notes for limitations and features marked as upcoming.           |
-| Reports → HR Reports        | Choose a report, set filters, and select **Run report**. Select a column heading to sort. Use **Export CSV** or **Print** when available.                                                      |
-| Reports → Audit Logs        | Review recorded system actions. Filter by date/time or exact user email, then select **Apply filters**. **Clear** removes these filters.                                                       |
-
-HR Reports include employee listings, headcount, demographics, tenure, education,
-HMO enrollment, government-information completeness, data quality, and the employee
-directory. The available report list is shown in the report selector.
-
-When printing, choose a printer or your browser's **Save as PDF** option. Printed
-reports show the information available to your account.
-
-## 9. Use the Inbox and announcements
-
-### Read and act on messages
-
-1. Open **Inbox**.
-2. Filter by type or status if needed.
-3. Read the message and use its action button to open the relevant area.
-4. Select **Refresh** for the latest messages.
-
-Incident links open the selected case in **Track**. Form-review links open the
-form-review page. Reading or acting on a message does not remove it from the Inbox.
-
-Some action requests also appear in a notification window. Use its case button to
-open the case. STAFF and HEAD may also receive announcement popups; HR and ADMIN
-read announcements in the Inbox without announcement popups.
-
-An **Acknowledge** button records that you have seen an announcement. It does not
-approve a form or decide an incident case.
-
-### HR/ADMIN: publish an announcement
-
-1. Open **Reports → Create Announcement**.
-2. Enter the title and message.
-3. Select **Publish announcement**.
-4. Check the previous-announcements list to confirm the saved announcement.
-
-## 10. Manage accounts
+## 8. Manage accounts
 
 **Available to:** ADMIN.
 
@@ -489,10 +351,7 @@ before STAFF accounts assigned to that Head.
 
 1. Open **Manage Accounts → Accounts**. The page heading is **Manage Accounts**.
 2. Find the STAFF or HEAD account and change its assignment.
-3. Select the single **Save Changes** button to save all staged changes.
-
-Changing a selection alone does not save it. A HEAD may have no assigned Head;
-STAFF requires a valid Head assignment.
+3. Select **Save Changes** button.
 
 ### Designate the Head HR
 
@@ -504,33 +363,27 @@ When the Head HR changes, pending HR forms assigned to the previous Head HR are
 transferred to the replacement. If pending forms still need a reviewer, the system
 prevents removing the assignment without an eligible replacement.
 
-## 11. Change your password and sign out
-
-For STAFF, HEAD, and HR, open **Change Password**. ADMIN opens **Manage Accounts →
-Change Password**.
+## 9. Change your password
 
 1. Enter your current password.
 2. Enter a different new password with **12–128 characters**.
 3. Enter the same new password again and select **Update Password**.
 
-Use **Sign out** at the bottom of the left menu when finished. This area stays
-available as you scroll.
-
 ## 12. Get help
 
-| What happened?                                      | What to do                                                                                                                                                           |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| I cannot sign in.                                   | Check the email and password. Ask whether your account has been approved and is active. Contact HR or the system administrator for password help.                    |
-| A menu or button is missing.                        | Check that you are using the correct account. Features depend on your role, case involvement, and the request's current stage.                                       |
-| A name was typed but is not accepted.               | Type part of the name again and select the correct suggestion.                                                                                                       |
-| My employee details are wrong and cannot be edited. | Ask HR to correct your employee record.                                                                                                                              |
-| I cannot find a form or case.                       | Clear old filters, check the serial/IR number, and refresh. Your account must be authorized to see it.                                                               |
-| HR cannot continue an investigation.                | Check whether any requested employee responses are still pending.                                                                                                    |
-| Attendance is empty.                                | Check the date, name, department, and status filters, then select Refresh. If it is still empty, ask HR or the system administrator to check the scanner connection. |
-| Attendance shows an error.                          | Note the message and account number, if shown, and contact the system administrator. A failed connected account can prevent the combined list from loading.          |
-| A document preview does not open.                   | Allow popups for the dashboard in your browser and try again.                                                                                                        |
-| The dashboard cannot be reached.                    | Check your connection and ask the system administrator to check that the dashboard services are running.                                                             |
-| A save or submission failed.                        | Correct the stated issue and try again. If the result is uncertain, check the saved list or case before submitting a duplicate.                                      |
+| What happened? | What to do |
+| -------------- | ---------- |
+| I cannot sign in.                                   | Check the email and password. Ask whether your account has been approved and is active. Contact HR or the system administrator for password help. |
+| A menu or button is missing.                        | Check that you are using the correct account. Features depend on your role, case involvement, and the request's current stage. |
+| A name was typed but is not accepted.               | Type part of the name again and select the correct suggestion. |
+| My employee details are wrong and cannot be edited. | Ask HR to correct your employee record. |
+| I cannot find a form or case.                       | Clear old filters, check the serial/IR number, and refresh. Your account must be authorized to see it. |
+| HR cannot continue an investigation.                | Check whether any requested employee responses are still pending. |
+| Attendance is empty.                                | Check the date, name, department, and status filters, then select Refresh. If it is still empty, ask the system administrator to check the scanner connection. |
+| Attendance shows an error.                          | Note the message and account number, if shown, and contact the system administrator. A failed connected account can prevent the combined list from loading. |
+| A document preview does not open.                   | Allow popups for the dashboard in your browser and try again. |
+| The dashboard cannot be reached.                    | Check your connection and ask the system administrator to check that the dashboard services are running. |
+| A save or submission failed.                        | Correct the stated issue and try again. If the result is uncertain, check the saved list or case before submitting a duplicate. |
 
 When requesting help, provide the page name, serial or IR number if applicable,
 the action you selected, and the error message. Never include your password.
