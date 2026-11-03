@@ -146,6 +146,64 @@ test('attendance merges account departments without mixing duplicate employee ID
   assert.equal(filtered.rows[0].timeIn, '09:00');
 });
 
+test('attendance groups daily punches by employee and device while preserving other devices', async () => {
+  const client = {
+    search: async () => ({
+      totalNum: 4,
+      recordList: [
+        ['07:37', 'RAMY_BIO'],
+        ['12:01', 'RAMY_BIO'],
+        ['12:48', 'RAMY_BIO'],
+        ['08:00', 'COTI_BIO']
+      ].map(([time, device], index) => ({
+        deviceTime: `2026-10-31T${time}:00+08:00`,
+        deviceName: device,
+        devSerialNo: `device-event-${index}`,
+        personInfo: {
+          baseInfo: {
+            personCode: '0102142',
+            firstName: 'Marinel',
+            lastName: 'Trevias',
+            groupName: 'Accounting'
+          }
+        }
+      }))
+    }),
+    searchDailySummary: async () => ({
+      moreData: 0,
+      reportDataList: [
+        {
+          personCode: '0102142',
+          date: '2026/10/31',
+          clockInTime: '07:37',
+          clockOutTime: '17:48',
+          workDuration: '09:11',
+          attendanceStatus: 1
+        }
+      ]
+    })
+  };
+  const result = await attendanceWithAccounts([
+    { name: 'Account 1', client }
+  ]).listAttendance({}, { dateFrom: '2026-10-31', dateTo: '2026-10-31' });
+
+  assert.equal(result.total, 2);
+  assert.deepEqual(
+    Array.from(result.rows, (row) => [
+      row.employeeNo,
+      row.date,
+      row.device,
+      row.timeIn,
+      row.timeOut
+    ]),
+    [
+      ['0102142', '2026-10-31', 'RAMY_BIO', '07:37', '17:48'],
+      ['0102142', '2026-10-31', 'COTI_BIO', '07:37', '17:48']
+    ]
+  );
+  assert.ok(result.rows.every((row) => !Object.hasOwn(row, 'time')));
+});
+
 test('a failed account does not return a successful partial attendance list', async () => {
   const client = {
     search: async () => ({ totalNum: 0, recordList: [] }),

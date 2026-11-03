@@ -10,7 +10,6 @@
     ['employeeNo', 'ID'],
     ['department', 'Department'],
     ['date', 'Date'],
-    ['time', 'Time'],
     ['timeIn', 'Time in'],
     ['timeOut', 'Time out'],
     ['workHours', 'Work hours'],
@@ -63,7 +62,7 @@
       columns.forEach(([key]) => {
         let value = record[key];
         if (key === 'date') value = DateUtils.formatDate(value);
-        else if (['time', 'timeIn', 'timeOut'].includes(key))
+        else if (['timeIn', 'timeOut'].includes(key))
           value = DateUtils.formatTime(value);
         row.appendChild(AppUI.tableCell(value || '—'));
       });

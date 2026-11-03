@@ -197,6 +197,50 @@ function normalizeDailySummaries(data) {
   }));
 }
 
+function groupDeviceAttendance(rows) {
+  const grouped = new Map();
+  for (const row of rows) {
+    // A device can record several punches for the same employee on one day.
+    // Keep separate rows when the employee used a different named device.
+    const key = JSON.stringify([row.employeeNo, row.date, row.device]);
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, {
+        ...row,
+        serialNumbers: new Set(row.deviceSerialNo ? [row.deviceSerialNo] : [])
+      });
+      continue;
+    }
+    for (const field of [
+      'firstName',
+      'lastName',
+      'department',
+      'weekday',
+      'timeIn',
+      'timeOut',
+      'workHours',
+      'status'
+    ]) {
+      existing[field] ||= row[field];
+    }
+    if (
+      row.dataSource &&
+      !existing.dataSource.split(', ').includes(row.dataSource)
+    )
+      existing.dataSource = [existing.dataSource, row.dataSource]
+        .filter(Boolean)
+        .join(', ');
+    if (row.deviceSerialNo) existing.serialNumbers.add(row.deviceSerialNo);
+    existing.sortTime = Math.max(existing.sortTime, row.sortTime);
+  }
+  return [...grouped.values()].map((row) => {
+    row.deviceSerialNo = [...row.serialNumbers].join(', ');
+    delete row.serialNumbers;
+    delete row.time;
+    return row;
+  });
+}
+
 // Enrich each account separately: employee IDs are only unique within that account.
 async function loadAccountAttendance(client, query) {
   const allRows = [];
@@ -295,7 +339,7 @@ async function loadAccountAttendance(client, query) {
     row.workHours = summary.workHours || '';
     row.status = summary.status || 'Not calculated';
   }
-  return { rows: allRows, summaryAvailable };
+  return { rows: groupDeviceAttendance(allRows), summaryAvailable };
 }
 
 async function getAttendanceContext(req) {
