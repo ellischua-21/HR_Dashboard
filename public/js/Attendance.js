@@ -9,8 +9,13 @@
     ['lastName', 'Last Name'],
     ['employeeNo', 'ID'],
     ['department', 'Department'],
-    ['date', 'Date'],
     ['timeIn', 'Time in'],
+    ['amBreakOut', 'AM break out'],
+    ['amBreakIn', 'AM break in'],
+    ['lunchOut', 'Lunch out'],
+    ['lunchIn', 'Lunch in'],
+    ['pmBreakOut', 'PM break out'],
+    ['pmBreakIn', 'PM break in'],
     ['timeOut', 'Time out'],
     ['workHours', 'Work hours'],
     ['weekday', 'Weekday'],
@@ -61,8 +66,18 @@
       const row = document.createElement('tr');
       columns.forEach(([key]) => {
         let value = record[key];
-        if (key === 'date') value = DateUtils.formatDate(value);
-        else if (['timeIn', 'timeOut'].includes(key))
+        if (
+          [
+            'timeIn',
+            'amBreakOut',
+            'amBreakIn',
+            'lunchOut',
+            'lunchIn',
+            'pmBreakOut',
+            'pmBreakIn',
+            'timeOut'
+          ].includes(key)
+        )
           value = DateUtils.formatTime(value);
         row.appendChild(AppUI.tableCell(value || '—'));
       });

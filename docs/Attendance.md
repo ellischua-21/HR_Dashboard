@@ -43,3 +43,24 @@ Use the regional API host supplied for the account, not a portal login URL, and 
 Attendance opens on today's transactions. Select one date or use Previous day and Next day to load another day automatically. Employee, department, and status filters narrow the list. Transactions are grouped by department and sorted newest first within each department. Employee numbers and names are displayed as supplied by Hik-Connect. Refresh fetches fresh records for the selected day and filters.
 
 Requests use HTTPS with timeouts and no redirects. Tokens stay in server memory; the browser receives no secrets or tokens. No database changes or new packages are required.
+
+The table shows one row per employee and day within each connected account, with
+device names combined. Time in and time out use the original first and last
+scans, except that time out stays blank when the latest scan completes lunch or
+only one distinct scan exists. Break inference uses a separate chronological
+sequence that collapses
+rescans within two minutes of the first scan in each cluster, even across devices.
+The arrival cluster is excluded from break and lunch pairs. Lunch can use the
+latest scan as its return so lunch remains visible during an ongoing workday.
+Short AM/PM breaks still require a later scan to distinguish them from departure.
+
+Lunch is selected before morning and afternoon breaks. A lunch beginning between
+11:30 AM and 2:30 PM can last 10 to 120 minutes; an earlier lunch beginning between
+10:30 AM and 11:30 AM must last at least 30 minutes. Candidates are ranked by
+their distance from noon, then their distance from a 60-minute duration. AM and
+PM breaks last 5 to 40 minutes, occur before or after lunch, and cannot reuse a
+lunch scan. When no lunch is identified, midday gaps are left unclassified;
+morning breaks must finish before 11:30 AM and afternoon breaks must start after
+2:30 PM. These are timing estimates because the scanned events do not reliably
+label a break's purpose. Work hours and attendance status still use the provider's
+daily summary when available.

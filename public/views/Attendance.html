@@ -1,34 +1,38 @@
 <section id="view-attendance" class="view" hidden>
   <section class="panel">
     <form id="attendance-filters" class="toolbar attendance-filters">
-      <button id="attendance-previous-day" class="ghost" type="button">
-        Previous day
-      </button>
-      <label>Date <input id="attendance-date" type="date" required /></label>
-      <button id="attendance-next-day" class="ghost" type="button">
-        Next day
-      </button>
+      <div class="attendance-day-controls">
+        <button id="attendance-previous-day" class="ghost" type="button">
+          Previous day
+        </button>
+        <label>Date <input id="attendance-date" type="date" required /></label>
+        <button id="attendance-next-day" class="ghost" type="button">
+          Next day
+        </button>
+      </div>
       <label
         >Employee name
         <input id="attendance-employee" type="search" maxlength="100"
       /></label>
-      <label
+      <label class="attendance-department"
         >Department
         <select id="attendance-department">
           <option value="">All</option>
         </select></label
       >
-      <label
+      <label class="attendance-status"
         >Status
         <select id="attendance-status">
           <option value="">All</option>
         </select></label
       >
-      <button id="attendance-load" type="submit">Apply filters</button>
-      <button id="attendance-refresh" class="ghost" type="button">
-        Refresh
-      </button>
-      <span id="attendance-loading" class="loading-slot"></span>
+      <div class="attendance-filter-actions">
+        <button id="attendance-load" type="submit">Apply filters</button>
+        <button id="attendance-refresh" class="ghost" type="button">
+          Refresh
+        </button>
+        <span id="attendance-loading" class="loading-slot"></span>
+      </div>
     </form>
     <div class="tablewrap">
       <table aria-label="Employee attendance transactions">
@@ -36,6 +40,10 @@
         <tbody id="attendance-body"></tbody>
       </table>
     </div>
+    <p class="note">
+      Break times are inferred from scan gaps. A break stays blank when the
+      available scans do not show a matching out-and-in pair.
+    </p>
     <div class="pager">
       <span id="attendance-info" class="note" role="status"></span>
       <button id="attendance-prev" class="ghost" type="button" disabled>

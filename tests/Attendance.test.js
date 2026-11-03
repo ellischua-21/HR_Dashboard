@@ -93,7 +93,7 @@ test('attendance remains sortable when names or departments and daily summaries 
   assert.deepEqual(Array.from(result.departments), ['Office']);
 });
 
-test('attendance merges account departments without mixing duplicate employee IDs', async () => {
+test('attendance keeps account-scoped IDs separate and uses first scan time-in', async () => {
   const account = (name, department, time, status) => ({
     name,
     client: {
@@ -135,7 +135,7 @@ test('attendance merges account departments without mixing duplicate employee ID
     Array.from(result.rows, (row) => [row.department, row.timeIn, row.status]),
     [
       ['Dept A', '08:00', 'Normal'],
-      ['Dept B', '09:00', 'Late']
+      ['Dept B', '08:00', 'Late']
     ]
   );
   const filtered = await service.listAttendance(
@@ -143,18 +143,22 @@ test('attendance merges account departments without mixing duplicate employee ID
     { ...filters, department: 'Dept B' }
   );
   assert.equal(filtered.total, 1);
-  assert.equal(filtered.rows[0].timeIn, '09:00');
+  assert.equal(filtered.rows[0].timeIn, '08:00');
 });
 
-test('attendance groups daily punches by employee and device while preserving other devices', async () => {
+test('attendance infers daily break times across device names and returns one daily row', async () => {
   const client = {
     search: async () => ({
-      totalNum: 4,
+      totalNum: 8,
       recordList: [
         ['07:37', 'RAMY_BIO'],
-        ['12:01', 'RAMY_BIO'],
-        ['12:48', 'RAMY_BIO'],
-        ['08:00', 'COTI_BIO']
+        ['10:22', 'COTI_BIO'],
+        ['10:39', 'RAMY_BIO'],
+        ['12:22', 'RAMY_BIO'],
+        ['13:28', 'COTI_BIO'],
+        ['15:37', 'RAMY_BIO'],
+        ['15:54', 'COTI_BIO'],
+        ['18:30', 'RAMY_BIO']
       ].map(([time, device], index) => ({
         deviceTime: `2026-10-31T${time}:00+08:00`,
         deviceName: device,
@@ -176,8 +180,8 @@ test('attendance groups daily punches by employee and device while preserving ot
           personCode: '0102142',
           date: '2026/10/31',
           clockInTime: '07:37',
-          clockOutTime: '17:48',
-          workDuration: '09:11',
+          clockOutTime: '18:30',
+          workDuration: '09:38',
           attendanceStatus: 1
         }
       ]
@@ -187,21 +191,162 @@ test('attendance groups daily punches by employee and device while preserving ot
     { name: 'Account 1', client }
   ]).listAttendance({}, { dateFrom: '2026-10-31', dateTo: '2026-10-31' });
 
-  assert.equal(result.total, 2);
+  assert.equal(result.total, 1);
   assert.deepEqual(
-    Array.from(result.rows, (row) => [
-      row.employeeNo,
-      row.date,
-      row.device,
-      row.timeIn,
-      row.timeOut
-    ]),
     [
-      ['0102142', '2026-10-31', 'RAMY_BIO', '07:37', '17:48'],
-      ['0102142', '2026-10-31', 'COTI_BIO', '07:37', '17:48']
+      result.rows[0].employeeNo,
+      result.rows[0].date,
+      result.rows[0].device,
+      result.rows[0].timeIn,
+      result.rows[0].amBreakOut,
+      result.rows[0].amBreakIn,
+      result.rows[0].lunchOut,
+      result.rows[0].lunchIn,
+      result.rows[0].pmBreakOut,
+      result.rows[0].pmBreakIn,
+      result.rows[0].timeOut
+    ],
+    [
+      '0102142',
+      '2026-10-31',
+      'RAMY_BIO, COTI_BIO',
+      '07:37',
+      '10:22',
+      '10:39',
+      '12:22',
+      '13:28',
+      '15:37',
+      '15:54',
+      '18:30'
     ]
   );
   assert.ok(result.rows.every((row) => !Object.hasOwn(row, 'time')));
+});
+
+test('missing break punches stay blank and a detected lunch does not invent breaks', async () => {
+  const client = {
+    search: async () => ({
+      totalNum: 4,
+      recordList: ['07:37', '12:01', '12:48', '17:48'].map((time) => ({
+        deviceTime: `2026-10-31T${time}:00+08:00`,
+        deviceName: 'RAMY_BIO',
+        personInfo: {
+          baseInfo: {
+            personCode: '0102142',
+            firstName: 'Marinel',
+            lastName: 'Trevias',
+            groupName: 'Accounting'
+          }
+        }
+      }))
+    }),
+    searchDailySummary: async () => ({
+      moreData: 0,
+      reportDataList: [
+        {
+          personCode: '0102142',
+          date: '2026/10/31',
+          clockInTime: '07:37',
+          clockOutTime: '17:48',
+          attendanceStatus: 1
+        }
+      ]
+    })
+  };
+  const result = await attendanceWithAccounts([
+    { name: 'Account 1', client }
+  ]).listAttendance({}, { dateFrom: '2026-10-31', dateTo: '2026-10-31' });
+
+  assert.equal(result.rows[0].lunchOut, '12:01');
+  assert.equal(result.rows[0].lunchIn, '12:48');
+  for (const field of ['amBreakOut', 'amBreakIn', 'pmBreakOut', 'pmBreakIn'])
+    assert.equal(result.rows[0][field], '');
+});
+
+test('short lunches and repeated boundary scans do not become extra breaks', async (t) => {
+  const cases = [
+    {
+      name: 'a short lunch is shown while its return is the latest available scan',
+      times: ['08:16:21', '12:07:03', '12:26:55'],
+      expected: ['08:16', '', '', '12:07', '12:26', '', '', '']
+    },
+    {
+      name: 'ID 0105250 lunch stays visible before an end-of-day scan exists',
+      times: ['07:48:10', '12:22:26', '12:58:12'],
+      expected: ['07:48', '', '', '12:22', '12:58', '', '', '']
+    },
+    {
+      name: 'a rescan after lunch in does not turn lunch in into time out',
+      times: ['07:48:10', '12:22:26', '12:58:12', '12:58:35'],
+      expected: ['07:48', '', '', '12:22', '12:58', '', '', '']
+    },
+    {
+      name: 'a 19-minute midday lunch takes precedence over an AM break',
+      times: ['08:16', '12:07', '12:26', '18:30'],
+      expected: ['08:16', '', '', '12:07', '12:26', '', '', '18:30']
+    },
+    {
+      name: 'arrival rescans are collapsed across devices and cannot become AM break out',
+      times: [
+        '07:47:00',
+        '07:47:20',
+        '07:58:00',
+        '12:07',
+        '12:26',
+        '18:30:00',
+        '18:31:00'
+      ],
+      expected: ['07:47', '', '', '12:07', '12:26', '', '', '18:31']
+    },
+    {
+      name: 'the lunch-out scan cannot also be AM break in',
+      times: ['08:16', '11:48', '12:07', '12:26', '15:10', '15:25', '18:30'],
+      expected: ['08:16', '', '', '12:07', '12:26', '15:10', '15:25', '18:30']
+    },
+    {
+      name: 'a short gap ending at departure is not a PM break',
+      times: ['08:00', '12:07', '12:26', '18:15', '18:30'],
+      expected: ['08:00', '', '', '12:07', '12:26', '', '', '18:30']
+    },
+    {
+      name: 'a midday gap too short for lunch is left unclassified',
+      times: ['08:00', '12:07', '12:12', '18:30'],
+      expected: ['08:00', '', '', '', '', '', '', '18:30']
+    }
+  ];
+  for (const { name, times, expected } of cases) {
+    await t.test(name, async () => {
+      const client = {
+        search: async () => ({
+          totalNum: times.length,
+          recordList: times.map((time, index) => ({
+            deviceTime: `2026-10-31T${time.length === 5 ? time + ':00' : time}+08:00`,
+            deviceName: index % 2 ? 'COTI_BIO' : 'RAMY_BIO',
+            personInfo: { personCode: 'E-100' }
+          }))
+        }),
+        searchDailySummary: async () => ({ moreData: 0, reportDataList: [] })
+      };
+      const result = await attendanceWithAccounts([
+        { name: 'Account 1', client }
+      ]).listAttendance({}, { dateFrom: '2026-10-31', dateTo: '2026-10-31' });
+      assert.equal(result.total, 1);
+      const row = result.rows[0];
+      assert.deepEqual(
+        [
+          row.timeIn,
+          row.amBreakOut,
+          row.amBreakIn,
+          row.lunchOut,
+          row.lunchIn,
+          row.pmBreakOut,
+          row.pmBreakIn,
+          row.timeOut
+        ],
+        expected
+      );
+    });
+  }
 });
 
 test('a failed account does not return a successful partial attendance list', async () => {

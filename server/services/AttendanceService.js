@@ -14,6 +14,20 @@ const attendanceCache = new Map();
 const PAGE_SIZE = 50;
 const PROVIDER_PAGE_SIZE = 200;
 const MAX_PROVIDER_ROWS = 10000;
+const BREAK_RULES = {
+  lunchStart: 10 * 60 + 30,
+  shortLunchStart: 11 * 60 + 30,
+  lunchEnd: 14 * 60 + 30,
+  lunchDurationMin: 10,
+  earlyLunchDurationMin: 30,
+  lunchDurationMax: 120,
+  breakDurationMin: 5,
+  breakDurationMax: 40,
+  expectedLunch: 12 * 60,
+  expectedMorningBreak: 10 * 60,
+  expectedAfternoonBreak: 15 * 60,
+  repeatScanMinutes: 2
+};
 
 async function requireAttendanceAccess(req) {
   const user = await requirePerm(req, 'emp.read');
@@ -147,6 +161,7 @@ function normalizeRecords(data) {
         dataSource: text(record.dataSource) || 'Device',
         device: text(record.deviceName || record.elementName),
         deviceSerialNo: text(record.devSerialNo || record.serialNo),
+        eventTimestamp: text(timestamp),
         status: 'Not calculated',
         attendanceStatusCode: Number(record.attendanceStatus),
         sortTime: when.sortTime
@@ -197,46 +212,170 @@ function normalizeDailySummaries(data) {
   }));
 }
 
-function groupDeviceAttendance(rows) {
+function minutesOfDay(value) {
+  const match = String(value || '').match(/^(\d{2}):(\d{2})$/);
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+}
+
+function inferDailyAttendance(events, summary = {}) {
+  const ordered = [...events].sort((a, b) => a.sortTime - b.sortTime);
+  // Retain the original first/last scans for the day, but collapse rapid
+  // rescans before looking for breaks, including rescans on another device.
+  const distinct = [];
+  for (const event of ordered) {
+    const previous = distinct.at(-1);
+    if (
+      !previous ||
+      event.sortTime - previous.sortTime > BREAK_RULES.repeatScanMinutes * 60000
+    )
+      distinct.push(event);
+  }
+  const gaps = [];
+  // Arrival cannot be a break-out scan. Keep the latest pair available for
+  // lunch detection: during the workday, the latest scan may be lunch in.
+  for (let index = 1; index < distinct.length - 1; index++) {
+    const start = distinct[index];
+    const end = distinct[index + 1];
+    const duration = (end.sortTime - start.sortTime) / 60000;
+    const startMinute = minutesOfDay(start.time);
+    if (duration > 0 && startMinute !== null) {
+      gaps.push({
+        index,
+        start,
+        end,
+        duration,
+        startMinute,
+        endsAtLatestScan: index + 1 === distinct.length - 1
+      });
+    }
+  }
+
+  const lunchCandidates = gaps.filter(
+    ({ duration, startMinute }) =>
+      duration >= BREAK_RULES.lunchDurationMin &&
+      duration <= BREAK_RULES.lunchDurationMax &&
+      startMinute >= BREAK_RULES.lunchStart &&
+      startMinute <= BREAK_RULES.lunchEnd &&
+      (duration >= BREAK_RULES.earlyLunchDurationMin ||
+        startMinute >= BREAK_RULES.shortLunchStart)
+  );
+  lunchCandidates.sort(
+    (a, b) =>
+      Math.abs(a.startMinute - BREAK_RULES.expectedLunch) -
+        Math.abs(b.startMinute - BREAK_RULES.expectedLunch) ||
+      Math.abs(a.duration - 60) - Math.abs(b.duration - 60)
+  );
+  const lunch = lunchCandidates[0] || null;
+
+  const morningCandidates = gaps.filter((gap) => {
+    const isBeforeLunch = lunch
+      ? gap.index + 1 < lunch.index
+      : minutesOfDay(gap.end.time) < BREAK_RULES.shortLunchStart;
+    return (
+      !gap.endsAtLatestScan &&
+      isBeforeLunch &&
+      gap.duration >= BREAK_RULES.breakDurationMin &&
+      gap.duration <= BREAK_RULES.breakDurationMax
+    );
+  });
+  const afternoonCandidates = gaps.filter((gap) => {
+    const isAfterLunch = lunch
+      ? gap.index > lunch.index + 1
+      : gap.startMinute > BREAK_RULES.lunchEnd;
+    return (
+      !gap.endsAtLatestScan &&
+      isAfterLunch &&
+      gap.duration >= BREAK_RULES.breakDurationMin &&
+      gap.duration <= BREAK_RULES.breakDurationMax
+    );
+  });
+  const closestTo = (candidates, target) =>
+    candidates.sort(
+      (a, b) =>
+        Math.abs(a.startMinute - target) - Math.abs(b.startMinute - target)
+    )[0];
+  const morningBreak = closestTo(
+    morningCandidates,
+    BREAK_RULES.expectedMorningBreak
+  );
+  const afternoonBreak = closestTo(
+    afternoonCandidates,
+    BREAK_RULES.expectedAfternoonBreak
+  );
+
+  return {
+    ...summary,
+    timeIn: ordered[0]?.time || summary.timeIn || '',
+    amBreakOut: morningBreak?.start.time || '',
+    amBreakIn: morningBreak?.end.time || '',
+    lunchOut: lunch?.start.time || '',
+    lunchIn: lunch?.end.time || '',
+    pmBreakOut: afternoonBreak?.start.time || '',
+    pmBreakIn: afternoonBreak?.end.time || '',
+    timeOut:
+      distinct.length < 2 || lunch?.end === distinct.at(-1)
+        ? ''
+        : ordered.at(-1)?.time || summary.timeOut || ''
+  };
+}
+
+function groupDailyAttendance(rows, summaryByEmployeeDay) {
   const grouped = new Map();
   for (const row of rows) {
-    // A device can record several punches for the same employee on one day.
-    // Keep separate rows when the employee used a different named device.
-    const key = JSON.stringify([row.employeeNo, row.date, row.device]);
-    const existing = grouped.get(key);
-    if (!existing) {
-      grouped.set(key, {
+    // Employee IDs are account-scoped; this function runs once per account.
+    const key = JSON.stringify([row.employeeNo, row.date]);
+    let daily = grouped.get(key);
+    if (!daily) {
+      daily = {
         ...row,
-        serialNumbers: new Set(row.deviceSerialNo ? [row.deviceSerialNo] : [])
-      });
-      continue;
+        events: [],
+        devices: new Set(),
+        serialNumbers: new Set(),
+        dataSources: new Set()
+      };
+      grouped.set(key, daily);
     }
-    for (const field of [
-      'firstName',
-      'lastName',
-      'department',
-      'weekday',
-      'timeIn',
-      'timeOut',
-      'workHours',
-      'status'
-    ]) {
-      existing[field] ||= row[field];
+    const eventKey = JSON.stringify([
+      row.device,
+      row.eventTimestamp || row.sortTime
+    ]);
+    if (!daily.eventKeys) daily.eventKeys = new Set();
+    if (!daily.eventKeys.has(eventKey)) {
+      daily.eventKeys.add(eventKey);
+      daily.events.push(row);
     }
-    if (
-      row.dataSource &&
-      !existing.dataSource.split(', ').includes(row.dataSource)
-    )
-      existing.dataSource = [existing.dataSource, row.dataSource]
-        .filter(Boolean)
-        .join(', ');
-    if (row.deviceSerialNo) existing.serialNumbers.add(row.deviceSerialNo);
-    existing.sortTime = Math.max(existing.sortTime, row.sortTime);
+    if (row.device) daily.devices.add(row.device);
+    if (row.deviceSerialNo) daily.serialNumbers.add(row.deviceSerialNo);
+    if (row.dataSource) daily.dataSources.add(row.dataSource);
+    for (const field of ['firstName', 'lastName', 'department', 'weekday'])
+      daily[field] ||= row[field];
+    daily.sortTime = Math.max(daily.sortTime, row.sortTime);
   }
   return [...grouped.values()].map((row) => {
+    const summary =
+      summaryByEmployeeDay.get(JSON.stringify([row.employeeNo, row.date])) ||
+      {};
+    const inferred = inferDailyAttendance(row.events, summary);
+    const identity = {
+      firstName: row.firstName,
+      lastName: row.lastName,
+      department: row.department,
+      weekday: row.weekday,
+      status: row.status
+    };
+    Object.assign(row, inferred);
+    for (const [field, value] of Object.entries(identity)) row[field] ||= value;
+    row.device = [...row.devices].join(', ');
     row.deviceSerialNo = [...row.serialNumbers].join(', ');
+    row.dataSource = [...row.dataSources].join(', ');
+    delete row.events;
+    delete row.eventKeys;
+    delete row.devices;
     delete row.serialNumbers;
+    delete row.dataSources;
     delete row.time;
+    delete row.eventTimestamp;
+    delete row.attendanceStatusCode;
     return row;
   });
 }
@@ -299,47 +438,23 @@ async function loadAccountAttendance(client, query) {
   }
   const summaryByEmployeeDay = new Map(
     summaries.map((summary) => [
-      `${summary.employeeNo}|${summary.date}`,
+      JSON.stringify([summary.employeeNo, summary.date]),
       summary
     ])
   );
-  const punchesByEmployeeDay = new Map();
   for (const row of allRows) {
-    const key = `${row.employeeNo}|${row.date}`;
-    let punches = punchesByEmployeeDay.get(key);
-    if (!punches) {
-      punches = { timeIn: '', timeOut: '' };
-      punchesByEmployeeDay.set(key, punches);
-    }
-    if (
-      row.attendanceStatusCode === 1 &&
-      (!punches.timeIn || row.sortTime < punches.inSortTime)
-    ) {
-      punches.timeIn = row.time;
-      punches.inSortTime = row.sortTime;
-    }
-    if (
-      row.attendanceStatusCode === 2 &&
-      (!punches.timeOut || row.sortTime > punches.outSortTime)
-    ) {
-      punches.timeOut = row.time;
-      punches.outSortTime = row.sortTime;
-    }
-  }
-  for (const row of allRows) {
-    const key = `${row.employeeNo}|${row.date}`;
-    const summary = summaryByEmployeeDay.get(key) || {};
-    const punches = punchesByEmployeeDay.get(key) || {};
+    const summary =
+      summaryByEmployeeDay.get(JSON.stringify([row.employeeNo, row.date])) ||
+      {};
     row.firstName ||= text(summary.firstName);
     row.lastName ||= text(summary.lastName);
     row.department ||= text(summary.department);
     row.weekday ||= text(summary.weekday);
-    row.timeIn = summary.timeIn || punches.timeIn || '';
-    row.timeOut = summary.timeOut || punches.timeOut || '';
-    row.workHours = summary.workHours || '';
-    row.status = summary.status || 'Not calculated';
   }
-  return { rows: groupDeviceAttendance(allRows), summaryAvailable };
+  return {
+    rows: groupDailyAttendance(allRows, summaryByEmployeeDay),
+    summaryAvailable
+  };
 }
 
 async function getAttendanceContext(req) {

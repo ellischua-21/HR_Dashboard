@@ -962,6 +962,75 @@ legend {
 .form-search input {
   width: 100%;
 }
+.attendance-day-controls {
+  display: grid;
+  grid-template-columns: 116px 188px 90px;
+  align-items: end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.attendance-filters > label {
+  min-width: 0;
+  flex: 0 0 160px;
+}
+.attendance-filters > .attendance-department {
+  flex-basis: 170px;
+}
+.attendance-filters > .attendance-status {
+  flex-basis: 130px;
+}
+.attendance-filters input,
+.attendance-filters select,
+.attendance-filters .date-time-entry {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.attendance-filters input,
+.attendance-filters select,
+.attendance-filters button {
+  height: 38px;
+  box-sizing: border-box;
+}
+.attendance-filters button {
+  white-space: nowrap;
+}
+.attendance-filter-actions {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+#attendance-load {
+  width: 108px;
+}
+#attendance-refresh {
+  width: 82px;
+}
+#attendance-loading {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 38px;
+  min-height: 38px;
+}
+@media (max-width: 600px) {
+  .attendance-day-controls {
+    flex-basis: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .attendance-day-controls label {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .attendance-filters > label,
+  .attendance-filters > .attendance-department,
+  .attendance-filters > .attendance-status {
+    flex: 1 1 calc(50% - 8px);
+  }
+  .attendance-filter-actions {
+    flex-basis: 100%;
+  }
+}
 @media print {
   .toolbar,
   .pager {
