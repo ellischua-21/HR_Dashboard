@@ -12,6 +12,10 @@ const {
   getAttendanceContext
 } = require('../server/services/AttendanceService');
 const { pool } = require('../server/db/database');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const { createRequire } = require('node:module');
 
 const env = {
   HIKCONNECT_API_BASE_URL: 'https://api.hikcentralconnect.com',
@@ -27,6 +31,145 @@ const query = {
 const response = (data) => ({
   ok: true,
   json: async () => ({ errorCode: '0', data })
+});
+
+// Exercise the complete merge/sort path without scanner credentials or a database.
+function attendanceWithAccounts(accounts) {
+  const filename = path.resolve(
+    __dirname,
+    '../server/services/AttendanceService.js'
+  );
+  const localRequire = createRequire(filename);
+  const context = {
+    module: { exports: {} },
+    require(name) {
+      if (name === '../middleware/Auth')
+        return { requirePerm: async () => ({ role: 'HR' }) };
+      if (name === '../integrations/HikConnectAccounts')
+        return {
+          createHikConnectAccounts: () => ({
+            accounts,
+            configuration: () => ({ configured: true, missing: [] })
+          })
+        };
+      return localRequire(name);
+    }
+  };
+  vm.runInNewContext(fs.readFileSync(filename, 'utf8'), context, { filename });
+  return context.module.exports;
+}
+
+test('attendance remains sortable when names or departments and daily summaries are missing', async () => {
+  const client = {
+    search: async () => ({
+      totalNum: 3,
+      recordList: [
+        {
+          deviceTime: '2026-11-02T08:00:00+08:00',
+          personInfo: { personCode: '1' }
+        },
+        {
+          deviceTime: '2026-11-02T08:00:00+08:00',
+          personInfo: { personCode: '2' }
+        },
+        {
+          deviceTime: '2026-11-02T08:00:00+08:00',
+          personInfo: { personCode: '3', groupName: 'Office' }
+        }
+      ]
+    }),
+    searchDailySummary: async () => {
+      throw new Error('Summary unavailable');
+    }
+  };
+  const result = await attendanceWithAccounts([
+    { name: 'Account 1', client }
+  ]).listAttendance({}, { dateFrom: '2026-11-02', dateTo: '2026-11-02' });
+  assert.equal(result.total, 3);
+  assert.equal(result.summaryAvailable, false);
+  for (const row of result.rows)
+    for (const field of ['firstName', 'lastName', 'department', 'weekday'])
+      assert.equal(typeof row[field], 'string', field);
+  assert.deepEqual(Array.from(result.departments), ['Office']);
+});
+
+test('attendance merges account departments without mixing duplicate employee IDs', async () => {
+  const account = (name, department, time, status) => ({
+    name,
+    client: {
+      search: async () => ({
+        totalNum: 1,
+        recordList: [
+          {
+            deviceTime: '2026-11-02T08:00:00+08:00',
+            personInfo: {
+              personCode: 'SAME-ID',
+              firstName: name,
+              lastName: 'Employee',
+              groupName: department
+            }
+          }
+        ]
+      }),
+      searchDailySummary: async () => ({
+        moreData: 0,
+        reportDataList: [
+          {
+            personCode: 'SAME-ID',
+            date: '2026/11/02',
+            clockInTime: time,
+            attendanceStatus: status
+          }
+        ]
+      })
+    }
+  });
+  const service = attendanceWithAccounts([
+    account('Account 1', 'Dept A', '08:00', 1),
+    account('Account 2', 'Dept B', '09:00', 2)
+  ]);
+  const filters = { dateFrom: '2026-11-02', dateTo: '2026-11-02' };
+  const result = await service.listAttendance({}, filters);
+  assert.deepEqual(Array.from(result.departments), ['Dept A', 'Dept B']);
+  assert.deepEqual(
+    Array.from(result.rows, (row) => [row.department, row.timeIn, row.status]),
+    [
+      ['Dept A', '08:00', 'Normal'],
+      ['Dept B', '09:00', 'Late']
+    ]
+  );
+  const filtered = await service.listAttendance(
+    {},
+    { ...filters, department: 'Dept B' }
+  );
+  assert.equal(filtered.total, 1);
+  assert.equal(filtered.rows[0].timeIn, '09:00');
+});
+
+test('a failed account does not return a successful partial attendance list', async () => {
+  const client = {
+    search: async () => ({ totalNum: 0, recordList: [] }),
+    searchDailySummary: async () => ({ reportDataList: [], moreData: 0 })
+  };
+  const failed = {
+    search: async () => {
+      throw Object.assign(new Error('Provider unavailable'), { status: 422 });
+    }
+  };
+  const service = attendanceWithAccounts([
+    { name: 'Account 1', client },
+    { name: 'Account 2', client: failed }
+  ]);
+  await assert.rejects(
+    service.listAttendance(
+      {},
+      { dateFrom: '2026-11-02', dateTo: '2026-11-02' }
+    ),
+    {
+      status: 422,
+      message: 'Account 2: Provider unavailable'
+    }
+  );
 });
 
 test('attendance filters reject invalid dates, oversized ranges and invalid pagination', () => {

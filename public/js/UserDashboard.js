@@ -1493,9 +1493,7 @@ async function loadPendingAnnouncementsPopup() {
           : `${reminder.caseNumber}: 0 working days remaining. Deadline: ${DateUtils.formatDate(reminder.deadlineDate)}.`;
     const open = document.createElement('button');
     open.type = 'button';
-    open.textContent = ['HR', 'ADMIN'].includes(session.role)
-      ? 'Open case in Review'
-      : 'Open case in Track';
+    open.textContent = 'Open case in Track';
     open.onclick = async () => {
       $('staff-announcements-dialog').close();
       await window.openIncidentRoute(reminder.incidentId, 'incident-track');

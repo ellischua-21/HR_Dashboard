@@ -286,10 +286,10 @@ async function loadAccountAttendance(client, query) {
     const key = `${row.employeeNo}|${row.date}`;
     const summary = summaryByEmployeeDay.get(key) || {};
     const punches = punchesByEmployeeDay.get(key) || {};
-    row.firstName ||= summary.firstName;
-    row.lastName ||= summary.lastName;
-    row.department ||= summary.department;
-    row.weekday ||= summary.weekday;
+    row.firstName ||= text(summary.firstName);
+    row.lastName ||= text(summary.lastName);
+    row.department ||= text(summary.department);
+    row.weekday ||= text(summary.weekday);
     row.timeIn = summary.timeIn || punches.timeIn || '';
     row.timeOut = summary.timeOut || punches.timeOut || '';
     row.workHours = summary.workHours || '';

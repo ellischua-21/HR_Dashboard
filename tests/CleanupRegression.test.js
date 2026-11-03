@@ -122,9 +122,21 @@ test('COC matrix saves still reject invalid rows and unauthorized users', async 
     correctiveAction: 'Written Warning'
   };
   await assert.rejects(saveIncidentMatrix(req, [row, row]), { status: 400 });
+  await assert.rejects(
+    saveIncidentMatrix(req, [{ ...row, correctiveAction: 'A'.repeat(192) }]),
+    {
+      status: 400,
+      message: 'Corrective actions must be 191 characters or fewer.'
+    }
+  );
   role = 'STAFF';
   await assert.rejects(saveIncidentMatrix(req, [row]), { status: 403 });
   assert.equal(writes, 0);
+  role = 'HR';
+  await saveIncidentMatrix(req, [
+    { ...row, correctiveAction: 'A'.repeat(191) }
+  ]);
+  assert.equal(writes, 1);
 });
 
 test('HR imports share employee cleaning without requiring inaccessible sensitive fields', async (t) => {

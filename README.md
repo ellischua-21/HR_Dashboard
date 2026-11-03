@@ -2,6 +2,12 @@
 
 This version keeps the existing dashboard screens and browser behavior, serves the HTML/CSS/JavaScript through XAMPP Apache, and replaces Apps Script RPC and Google Sheets storage with a local Node.js API and MySQL.
 
+## Using the dashboard
+
+See the [HR Dashboard User Guide](docs/UserGuide.md) for plain-language instructions
+for STAFF, HEAD, HR, and ADMIN, including forms, attendance, incidents, reports,
+notifications, and account management.
+
 ## Requirements
 
 - XAMPP with Apache and MySQL

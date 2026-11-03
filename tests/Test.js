@@ -365,7 +365,7 @@ test('all supplied non-leave form templates accept valid field data', () => {
   const templates = FORM_TEMPLATES.filter(
     (template) => template.key !== 'leave-2026'
   );
-  assert.equal(templates.length, 5);
+  assert.equal(templates.length, 6);
   templates.forEach((template) => {
     const data = Object.fromEntries(
       template.fields.map((field) => [
@@ -377,6 +377,20 @@ test('all supplied non-leave form templates accept valid field data', () => {
             : values[field.type]
       ])
     );
+    for (const field of template.fields.filter(
+      (item) => item.type === 'time-records'
+    )) {
+      data[field.name] = [
+        Object.fromEntries(
+          field.columns.map((column) => [
+            column.name,
+            column.type === 'number'
+              ? String(column.min ?? 1)
+              : values[column.type] || ''
+          ])
+        )
+      ];
+    }
     data.signature = 'data:image/png;base64,iVBORw0KGgo=';
     const result = validateUserForm(template.key, data);
     assert.deepEqual(result.errors, [], template.title);

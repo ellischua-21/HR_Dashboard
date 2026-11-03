@@ -50,7 +50,7 @@
     const action = el('textarea');
     action.value = item.correctiveAction;
     action.rows = 2;
-    action.maxLength = 1000;
+    action.maxLength = 191;
     action.required = true;
     action.setAttribute('aria-label', 'Corrective action');
     [severity, occurrence, action].forEach((control) => {

@@ -181,6 +181,7 @@ test('COC matrix editing adds and saves rows without PDF or publishing controls'
   row.querySelector('select').value = 'Moderate';
   row.querySelector('input').value = '1';
   row.querySelector('textarea').value = 'Written Warning';
+  assert.equal(row.querySelector('textarea').maxLength, 191);
   await document.getElementById('ir-coc-matrix-form').trigger('submit');
   assert.equal(saves, 1);
   assert.equal(document.getElementById('ir-coc-matrix').rows.length, 2);
@@ -190,6 +191,42 @@ test('COC matrix editing adds and saves rows without PDF or publishing controls'
   );
   assert.equal(document.getElementById('ir-coc-pdf'), null);
   assert.equal(document.getElementById('ir-coc-publish-form'), null);
+});
+
+test('NTE reminder buttons direct every role to Track with the matching label', async () => {
+  for (const role of ['STAFF', 'HEAD', 'HR', 'ADMIN']) {
+    const browser = createBrowser();
+    browser.loadDashboard();
+    const { context, document } = browser;
+    browser.evaluate(
+      `session = { role: '${role}', email: 'employee@example.com', perms: [] }`
+    );
+    context.fetch = async (url) => ({
+      ok: true,
+      json: async () =>
+        url.endsWith('listDailyNteReminders')
+          ? [
+              {
+                incidentId: 9,
+                caseNumber: 'IR-9',
+                daysRemaining: 2,
+                deadlineDate: '2026-11-04'
+              }
+            ]
+          : []
+    });
+    let destination;
+    context.openIncidentRoute = async (id, route) => {
+      destination = [id, route];
+    };
+    await context.showPendingAnnouncements();
+    const button = document
+      .getElementById('staff-announcements-list')
+      .querySelector('button');
+    assert.equal(button.textContent, 'Open case in Track', role);
+    await button.click();
+    assert.deepEqual(destination, [9, 'incident-track']);
+  }
 });
 
 test('employee suggestions retain selection, reject stale responses, and reset hidden IDs', async () => {

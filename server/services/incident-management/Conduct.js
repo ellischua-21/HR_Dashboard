@@ -86,6 +86,11 @@ function normalizeMatrix(input) {
     const severity = String(row.severity || ''),
       occurrence = Number(row.occurrence);
     const correctiveAction = String(row.correctiveAction || '').trim();
+    if (correctiveAction.length > 191)
+      throw httpError(
+        'Corrective actions must be 191 characters or fewer.',
+        400
+      );
     const key = `${severity}:${occurrence}`;
     if (
       !['Light', 'Moderate', 'Grave', 'Intolerable'].includes(severity) ||
@@ -93,7 +98,6 @@ function normalizeMatrix(input) {
       occurrence < 1 ||
       occurrence > 1001 ||
       !correctiveAction ||
-      correctiveAction.length > 1000 ||
       keys.has(key)
     )
       throw httpError(
