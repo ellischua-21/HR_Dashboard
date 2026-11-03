@@ -11,11 +11,9 @@ Updated: 11/02/2026
 - [5. Manage employee records](#5-manage-employee-records)
 - [6. View attendance](#6-view-attendance)
 - [7. Use Incident Management](#7-use-incident-management)
-- [8. View reports](#8-view-reports)
-- [9. Use the Inbox and announcements](#9-use-the-inbox-and-announcements)
-- [10. Manage accounts](#10-manage-accounts)
-- [11. Change your password and sign out](#11-change-your-password-and-sign-out)
-- [12. Get help](#12-get-help)
+- [8. Manage accounts](#8-manage-accounts)
+- [9. Change your password](#9-change-your-password-and-sign-out)
+- [10. Get help](#10-get-help)
 
 ## 1. Sign in and get started
 
@@ -369,7 +367,7 @@ prevents removing the assignment without an eligible replacement.
 2. Enter a different new password with **12–128 characters**.
 3. Enter the same new password again and select **Update Password**.
 
-## 12. Get help
+## 10. Get help
 
 | What happened? | What to do |
 | -------------- | ---------- |
