@@ -320,7 +320,7 @@ function inferDailyAttendance(events, summary = {}) {
         (gap) => gap && gap.end === distinct.at(-1)
       )
         ? ''
-        : ordered.at(-1)?.time || summary.timeOut || ''
+        : ordered.at(-1).time
   };
 }
 

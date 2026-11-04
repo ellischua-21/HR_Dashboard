@@ -208,19 +208,7 @@
         }
         let value = record[key];
         if (key === 'firstName' || key === 'lastName') value = formatEmployeeName(value);
-        if (
-          [
-            'timeIn',
-            'amBreakOut',
-            'amBreakIn',
-            'lunchOut',
-            'lunchIn',
-            'pmBreakOut',
-            'pmBreakIn',
-            'timeOut'
-          ].includes(key)
-        )
-          value = DateUtils.formatTime(value);
+        if (timeColumns.has(key)) value = DateUtils.formatTime(value);
         const cell = AppUI.tableCell(value || '—');
         if (['firstName', 'lastName', 'department'].includes(key)) cell.classList.add('attendance-wrap-cell');
         row.appendChild(cell);
