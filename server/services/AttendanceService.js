@@ -11,7 +11,6 @@ const text = (value) =>
     ? String(value).slice(0, 200)
     : '';
 const attendanceCache = new Map();
-const PAGE_SIZE = 50;
 const PROVIDER_PAGE_SIZE = 200;
 const MAX_PROVIDER_ROWS = 10000;
 const BREAK_RULES = {
@@ -47,10 +46,6 @@ function normalizeQuery(input = {}) {
   }
   const days = (Date.parse(dateTo) - Date.parse(dateFrom)) / 86400000 + 1;
   if (days > 31) throw httpError('Select up to 31 days at a time.', 400);
-  const page = input.page ?? 1;
-  if (!Number.isInteger(page) || page < 1 || page > 10000) {
-    throw httpError('Choose a valid page.', 400);
-  }
   if (input.employee !== undefined && typeof input.employee !== 'string') {
     throw httpError('Enter a valid employee name.', 400);
   }
@@ -62,7 +57,6 @@ function normalizeQuery(input = {}) {
   return {
     dateFrom,
     dateTo,
-    page,
     employee: (input.employee || '').trim().slice(0, 100),
     department: (input.department || '').trim().slice(0, 200),
     status: (input.status || '').trim().slice(0, 100)
@@ -525,17 +519,13 @@ async function listAttendance(req, input) {
         a.lastName.localeCompare(b.lastName) ||
         a.firstName.localeCompare(b.firstName)
     );
-  const start = (query.page - 1) * PAGE_SIZE;
   return {
     rows: filtered
-      .slice(start, start + PAGE_SIZE)
       .map(({ sortTime, attendanceStatusCode, ...row }) => row),
     departments: cached.departments,
     statuses: cached.statuses,
     summaryAvailable: cached.summaryAvailable,
-    page: query.page,
     total: filtered.length,
-    hasMore: start + PAGE_SIZE < filtered.length,
     fetchedAt: cached.fetchedAt
   };
 }

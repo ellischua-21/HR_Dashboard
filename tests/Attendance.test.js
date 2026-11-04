@@ -25,7 +25,6 @@ const env = {
 const query = {
   dateFrom: '2026-10-01',
   dateTo: '2026-10-02',
-  page: 1,
   employee: 'Sample'
 };
 const response = (data) => ({
@@ -375,13 +374,11 @@ test('a failed account does not return a successful partial attendance list', as
   );
 });
 
-test('attendance filters reject invalid dates, oversized ranges and invalid pagination', () => {
+test('attendance filters reject invalid dates, oversized ranges and invalid filter types', () => {
   for (const changes of [
     { dateFrom: '2026-02-30' },
     { dateTo: '2026-09-30' },
     { dateTo: '2026-11-02' },
-    { page: 0 },
-    { page: '1' },
     { employee: {} },
     { department: {} },
     { status: [] }

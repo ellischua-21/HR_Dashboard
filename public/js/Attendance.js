@@ -1,8 +1,5 @@
 (function () {
   let configured = false;
-  let activeQuery = null;
-  let page = 1;
-  let hasMore = false;
   let pending = false;
   const columns = [
     ['firstName', 'First Name'],
@@ -18,7 +15,6 @@
     ['pmBreakIn', 'PM In'],
     ['timeOut', 'Time Out'],
     ['workHours', 'Work Hours'],
-    ['weekday', 'Day'],
     ['dataSource', 'Data Source'],
     ['device', 'Device Name'],
     ['deviceSerialNo', 'Device Serial No.'],
@@ -36,8 +32,6 @@
     $('attendance-date').disabled = value || !configured;
     $('attendance-previous-day').disabled = value || !configured;
     $('attendance-next-day').disabled = value || !configured;
-    $('attendance-prev').disabled = value || !activeQuery || page <= 1;
-    $('attendance-next').disabled = value || !activeQuery || !hasMore;
   }
 
   function updateOptions(select, values) {
@@ -45,6 +39,19 @@
     select.replaceChildren(new Option('All', ''));
     values.forEach((value) => select.add(new Option(value, value)));
     if (values.includes(selected)) select.value = selected;
+  }
+
+  function updateAttendanceWeekday() {
+    const input = $('attendance-date');
+    const weekday = $('attendance-weekday');
+    if (!input.value) {
+      weekday.textContent = '';
+      return;
+    }
+    const [year, month, day] = input.value.split('-').map(Number);
+    weekday.textContent = new Intl.DateTimeFormat('en-US', {
+      weekday: 'long'
+    }).format(new Date(year, month - 1, day));
   }
 
   function drawTable(rows, emptyMessage) {
@@ -123,17 +130,12 @@
     setPending(true);
     try {
       const result = await api('listAttendance', { ...query, refresh });
-      activeQuery = { ...query };
-      page = result.page;
-      hasMore = result.hasMore;
       updateOptions($('attendance-department'), result.departments || []);
       updateOptions($('attendance-status'), result.statuses || []);
       drawTable(result.rows);
       $('attendance-info').textContent =
-        `Page ${page} | ${result.total} matching records | Retrieved ${AppUI.dateTime(result.fetchedAt)}`;
+        `${result.total} matching records | Retrieved ${AppUI.dateTime(result.fetchedAt)}`;
     } catch (error) {
-      activeQuery = null;
-      hasMore = false;
       drawTable([], 'Attendance could not be loaded.');
       $('attendance-info').textContent = '';
       AppErrors.show(error.message || 'Could not load attendance.');
@@ -142,14 +144,13 @@
     }
   }
 
-  function currentFilters(pageNumber = 1) {
+  function currentFilters() {
     return {
       dateFrom: $('attendance-date').value,
       dateTo: $('attendance-date').value,
       employee: $('attendance-employee').value.trim(),
       department: $('attendance-department').value,
-      status: $('attendance-status').value,
-      page: pageNumber
+      status: $('attendance-status').value
     };
   }
 
@@ -157,16 +158,13 @@
     event.preventDefault();
     loadRecords(currentFilters());
   });
-  $('attendance-prev').onclick = () =>
-    activeQuery && loadRecords({ ...activeQuery, page: page - 1 });
-  $('attendance-next').onclick = () =>
-    activeQuery && loadRecords({ ...activeQuery, page: page + 1 });
   $('attendance-refresh').onclick = () => {
     if ($('attendance-filters').reportValidity()) {
       loadRecords(currentFilters(), true);
     }
   };
   $('attendance-date').onchange = () => {
+    updateAttendanceWeekday();
     if ($('attendance-date').reportValidity()) loadRecords(currentFilters());
   };
   function changeDay(offset) {
@@ -176,6 +174,7 @@
     picker.value = new Date(picker.valueAsNumber + offset * 86400000)
       .toISOString()
       .slice(0, 10);
+    updateAttendanceWeekday();
     loadRecords(currentFilters());
   }
   $('attendance-previous-day').onclick = () => changeDay(-1);
@@ -185,6 +184,7 @@
     if (!['HR', 'ADMIN'].includes(session.role)) return;
     const today = DateUtils.manilaDate();
     if (!$('attendance-date').value) $('attendance-date').value = today;
+    updateAttendanceWeekday();
     try {
       const context = await api('getAttendanceContext');
       configured = context.configured;

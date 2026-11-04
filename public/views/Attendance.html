@@ -5,7 +5,13 @@
         <button id="attendance-previous-day" class="ghost" type="button">
           Previous day
         </button>
-        <label>Date <input id="attendance-date" type="date" required /></label>
+        <label class="attendance-date-label"
+          >Date
+          <span class="attendance-date-control">
+            <input id="attendance-date" type="date" required />
+            <span id="attendance-weekday" aria-live="polite"></span>
+          </span>
+        </label>
         <button id="attendance-next-day" class="ghost" type="button">
           Next day
         </button>
@@ -34,24 +40,12 @@
         <span id="attendance-loading" class="loading-slot"></span>
       </div>
     </form>
-    <p class="note attendance-table-note">
-      A dash means no scan was recorded for that time. Break times are inferred
-      from scan gaps; a break stays blank when scans do not show an out-and-in pair.
-    </p>
-    <div class="tablewrap attendance-table-scroll" tabindex="0" aria-label="Attendance table. Scroll horizontally to see all columns.">
+    <div class="tablewrap attendance-table-scroll" tabindex="0" aria-label="Attendance table. Scroll inside this area vertically and horizontally to view records and columns.">
       <table class="attendance-table" aria-label="Employee attendance transactions">
         <thead id="attendance-head"></thead>
         <tbody id="attendance-body"></tbody>
       </table>
     </div>
-    <div class="pager">
-      <span id="attendance-info" class="note" role="status"></span>
-      <button id="attendance-prev" class="ghost" type="button" disabled>
-        Previous page
-      </button>
-      <button id="attendance-next" class="ghost" type="button" disabled>
-        Next page
-      </button>
-    </div>
+    <p id="attendance-info" class="note attendance-table-info" role="status"></p>
   </section>
 </section>
