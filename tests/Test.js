@@ -38,6 +38,14 @@ test('form status labels use consistent title case and review-stage wording', ()
   assert.equal(FormStatus.titleCase('REJECTED'), 'Rejected');
   assert.equal(FormStatus.titleCase('ACTION_REQUIRED'), 'Action Required');
   assert.equal(
+    FormStatus.formatFormStatus('PENDING', 'HEAD', 'STAFF'),
+    'Pending Supervisor Signature'
+  );
+  assert.equal(
+    FormStatus.formatFormStatus('PENDING', 'HEAD', 'SUPERVISOR'),
+    'Pending Head Signature'
+  );
+  assert.equal(
     FormStatus.formatFormStatus('PENDING', 'HEAD'),
     'Pending Head Signature'
   );
@@ -63,7 +71,13 @@ test('review lists and summaries share role-specific visibility and pending scop
     'ALL'
   );
   assert.match(headScope.whereSql, /head_reviewer_email = \?/);
-  assert.match(headScope.whereSql, /role IN \('STAFF', 'HEAD'\)/);
+  assert.match(headScope.whereSql, /role = 'SUPERVISOR'/);
+  const supervisorScope = buildReviewScope(
+    { role: 'SUPERVISOR', email: 'supervisor@example.com' },
+    'ALL'
+  );
+  assert.match(supervisorScope.whereSql, /role = 'STAFF'/);
+  assert.deepEqual(supervisorScope.whereValues, ['supervisor@example.com']);
   assert.match(headScope.pendingSql, /review_stage = 'HEAD'/);
   assert.deepEqual(headScope.whereValues, ['head@example.com']);
 
@@ -213,105 +227,141 @@ test('requested account roles map to the intended permission profiles', () => {
   assert.ok(ROLE_PERMS.HR.includes('inbox.read'));
   assert.ok(!ROLE_PERMS.HR.includes('admin.manage'));
   assert.ok(ROLE_PERMS.HEAD.includes('forms.review'));
+  assert.deepEqual(ROLE_PERMS.SUPERVISOR, ROLE_PERMS.HEAD);
+  assert.equal(ACCOUNT_ROLE_MAP.SUPERVISOR, 'SUPERVISOR');
 });
 
-test('Head assignments allow Head-to-Head links without a top role', () => {
+test('staff report to supervisors and supervisors report to heads', () => {
   const accounts = [
-    {
-      email: 'staff@example.com',
-      role: 'STAFF',
-      active: 1,
-      assigned_head_email: null
-    },
-    {
-      email: 'head@example.com',
-      role: 'HEAD',
-      active: 1,
-      assigned_head_email: null
-    },
-    {
-      email: 'senior@example.com',
-      role: 'HEAD',
-      active: 1,
-      assigned_head_email: null
-    },
-    {
-      email: 'inactive@example.com',
-      role: 'HEAD',
-      active: 0,
-      assigned_head_email: null
-    },
-    {
-      email: 'hr@example.com',
-      role: 'HR',
-      active: 1,
-      assigned_head_email: null
-    }
+    { email: 'staff@example.com', role: 'STAFF', active: 1 },
+    { email: 'supervisor@example.com', role: 'SUPERVISOR', active: 1 },
+    { email: 'head@example.com', role: 'HEAD', active: 1 },
+    { email: 'inactive@example.com', role: 'SUPERVISOR', active: 0 }
   ];
   assert.deepEqual(
     validateHeadAssignment(
       'staff@example.com',
       'STAFF',
+      'supervisor@example.com',
+      accounts
+    ),
+    { headEmail: 'supervisor@example.com' }
+  );
+  assert.deepEqual(
+    validateHeadAssignment(
+      'supervisor@example.com',
+      'SUPERVISOR',
       'head@example.com',
       accounts
     ),
     { headEmail: 'head@example.com' }
   );
-  assert.deepEqual(
-    validateHeadAssignment(
-      'head@example.com',
-      'HEAD',
-      'senior@example.com',
-      accounts
-    ),
-    { headEmail: 'senior@example.com' }
-  );
-  assert.deepEqual(
-    validateHeadAssignment('senior@example.com', 'HEAD', '', accounts),
-    { headEmail: null }
-  );
-  assert.equal(
-    validateHeadAssignment('staff@example.com', 'STAFF', '', accounts).error,
-    'Assign a Head to this STAFF account.'
-  );
-  assert.equal(
-    validateHeadAssignment(
-      'head@example.com',
-      'HEAD',
-      'head@example.com',
-      accounts
-    ).error,
-    'An account cannot be assigned to itself.'
-  );
-  assert.equal(
+  assert.match(
     validateHeadAssignment(
       'staff@example.com',
       'STAFF',
-      'hr@example.com',
+      'head@example.com',
       accounts
     ).error,
-    'Choose an active HEAD account.'
+    /SUPERVISOR/
   );
-  assert.equal(
+  assert.match(
     validateHeadAssignment(
       'staff@example.com',
       'STAFF',
       'inactive@example.com',
       accounts
     ).error,
-    'Choose an active HEAD account.'
+    /active SUPERVISOR/
   );
-  accounts[1].assigned_head_email = 'senior@example.com';
-  accounts[2].assigned_head_email = 'head@example.com';
-  assert.deepEqual(
+  assert.match(
     validateHeadAssignment(
-      'staff@example.com',
-      'STAFF',
+      'supervisor@example.com',
+      'SUPERVISOR',
+      'supervisor@example.com',
+      accounts
+    ).error,
+    /itself/
+  );
+  assert.match(
+    validateHeadAssignment('supervisor@example.com', 'SUPERVISOR', '', accounts)
+      .error,
+    /Assign a Head/
+  );
+  assert.match(
+    validateHeadAssignment(
+      'head@example.com',
+      'HEAD',
       'head@example.com',
       accounts
-    ),
-    { headEmail: 'head@example.com' }
+    ).error,
+    /Only STAFF and SUPERVISOR/
   );
+});
+
+test('form review enforces reviewer role and assigned account', async (t) => {
+  const { pool } = require('../server/db/database');
+  const { reviewUserForm } = require('../server/services/FormService');
+  let reviewerRole = 'SUPERVISOR';
+  let submitterRole = 'STAFF';
+  let assignedEmail = 'reviewer@example.com';
+  t.mock.method(pool, 'execute', async () => [
+    [
+      {
+        email: 'reviewer@example.com',
+        role: reviewerRole,
+        active: 1,
+        extra_perms: ''
+      }
+    ]
+  ]);
+  t.mock.method(pool, 'getConnection', async () => ({
+    beginTransaction: async () => {},
+    commit: async () => {},
+    rollback: async () => {},
+    release() {},
+    execute: async (sql) =>
+      sql.includes('SELECT f.id')
+        ? [
+            [
+              {
+                id: 1,
+                control_no: 'TEST-1',
+                status: 'PENDING',
+                review_stage: 'HEAD',
+                head_reviewer_email: assignedEmail,
+                user_email: 'submitter@example.com',
+                submitter_role: submitterRole,
+                template_key: 'leave-2026',
+                form_data: '{}'
+              }
+            ]
+          ]
+        : [{ affectedRows: 1 }]
+  }));
+  const req = { session: { userEmail: 'reviewer@example.com' } };
+  assert.equal(
+    (await reviewUserForm(req, 1, 'REJECTED', 'Reason')).status,
+    'REJECTED'
+  );
+  reviewerRole = 'HEAD';
+  await assert.rejects(reviewUserForm(req, 1, 'REJECTED', 'Reason'), {
+    status: 403
+  });
+  submitterRole = 'SUPERVISOR';
+  assert.equal(
+    (await reviewUserForm(req, 1, 'REJECTED', 'Reason')).status,
+    'REJECTED'
+  );
+  reviewerRole = 'SUPERVISOR';
+  await assert.rejects(reviewUserForm(req, 1, 'REJECTED', 'Reason'), {
+    status: 403
+  });
+  submitterRole = 'STAFF';
+  assignedEmail = 'other@example.com';
+  await assert.rejects(reviewUserForm(req, 1, 'REJECTED', 'Reason'), {
+    status: 403
+  });
 });
 
 test('leave requests validate required dates, leave type, duration, and pay type', () => {
@@ -608,7 +658,7 @@ test('non-leave form submissions enforce required fields and date/time relations
       timeTo: '18:00',
       overtimeHours: '1.1',
       reason: 'Support'
-    }).errors.includes('Overtime hours has an invalid increment.')
+    }).errors.includes('Overtime Hours has an invalid increment.')
   );
 });
 

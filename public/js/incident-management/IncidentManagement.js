@@ -259,7 +259,7 @@ function canSignIncidentAs(incident, role) {
   if (role === 'HEAD')
     return (
       incident.status === 'PENDING SIGNATURE' &&
-      ['HEAD', 'HR'].includes(incident.currentUserRole) &&
+      ['SUPERVISOR', 'HEAD', 'HR'].includes(incident.currentUserRole) &&
       incident.assignedHeadEmail?.toLowerCase() ===
         incident.currentUserEmail.toLowerCase()
     );
@@ -351,7 +351,12 @@ function renderIncidentReport(body, incident) {
     ['Employee ID', incident.reportedEmployeeId],
     ['Employee Department', incident.reportedEmployeeDepartment],
     ['Employee Position', incident.reportedEmployeePosition],
-    ['Assigned Head', incident.assignedHeadEmail || 'None assigned']
+    [
+      incident.assignedReviewerRole === 'SUPERVISOR'
+        ? 'Assigned Supervisor'
+        : 'Assigned Head',
+      incident.assignedHeadEmail || 'None assigned'
+    ]
   ]);
   appendIncidentFieldGroup(body, 'Incident Details', [
     ['Status', incident.status],
@@ -577,7 +582,9 @@ async function openIncidentCase(incidentId, options = {}) {
       signatures,
       incident,
       'HEAD',
-      'Head Supervisor Signature',
+      incident.assignedReviewerRole === 'SUPERVISOR'
+        ? 'Supervisor Signature'
+        : 'Head Signature',
       padSetup,
       ui
     );

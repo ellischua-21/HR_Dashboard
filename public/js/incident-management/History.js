@@ -13,7 +13,7 @@
   };
   let owner = '',
     request = 0;
-  const allowed = () => ['STAFF', 'HEAD'].includes(session?.role);
+  const allowed = () => ['STAFF', 'SUPERVISOR', 'HEAD'].includes(session?.role);
   const feedback = (text, error = false) => ui.feedback(text, error);
 
   async function open(id) {
@@ -25,7 +25,9 @@
   }
   async function fetchCases() {
     if (!allowed())
-      throw new Error('History is available to STAFF and HEAD accounts.');
+      throw new Error(
+        'History is available to STAFF, SUPERVISOR, and HEAD accounts.'
+      );
     const ticket = ++request,
       account = session.email;
     const body = byId('ir-history-rows');
@@ -70,7 +72,9 @@
   }
   async function load(selectedId = null) {
     if (!allowed())
-      throw new Error('History is available to STAFF and HEAD accounts.');
+      throw new Error(
+        'History is available to STAFF, SUPERVISOR, and HEAD accounts.'
+      );
     if (owner !== session.email) {
       owner = session.email;
       ++request;

@@ -47,7 +47,7 @@ const {
   formatDate
 } = require('../../shared/DateUtils');
 
-const FILING_ROLES = new Set(['HEAD', 'HR', 'ADMIN']);
+const FILING_ROLES = new Set(['SUPERVISOR', 'HEAD', 'HR', 'ADMIN']);
 const REVIEW_ROLES = new Set(['HR', 'ADMIN']);
 function requireIncidentRole(user, roles, message) {
   if (!roles.has(user.role)) throw httpError(message, 403);
@@ -96,7 +96,7 @@ async function getIncidentFileContext(req) {
   requireIncidentRole(
     user,
     FILING_ROLES,
-    'Only HEAD, HR, and ADMIN accounts can file an Incident Report.'
+    'Only SUPERVISOR, HEAD, HR, and ADMIN accounts can file an Incident Report.'
   );
   const reporter = await getReporterEmployee(pool, user.email);
   if (!reporter) throw httpError('Your account is not active.', 401);
@@ -119,7 +119,7 @@ async function searchIncidentEmployees(req, query, purpose = 'reported') {
     requireIncidentRole(
       user,
       FILING_ROLES,
-      'Only HEAD, HR, and ADMIN accounts can file an Incident Report.'
+      'Only SUPERVISOR, HEAD, HR, and ADMIN accounts can file an Incident Report.'
     );
   }
   const term = normalizeText(String(query || ''), 'Search text', 100, false)
@@ -218,10 +218,17 @@ async function resolveAssignedHead(connection, employee) {
   if (
     !heads[0] ||
     !heads[0].active ||
-    !['HEAD', 'HR'].includes(heads[0].role)
+    heads[0].role !==
+      (employee.role === 'STAFF'
+        ? 'SUPERVISOR'
+        : employee.role === 'SUPERVISOR'
+          ? 'HEAD'
+          : employee.role === 'HR'
+            ? 'HR'
+            : 'HEAD')
   ) {
     throw httpError(
-      'The reported employee has an inactive or invalid assigned Head. Contact HR before filing.',
+      'The reported employee has an inactive or invalid assigned reviewer. Contact HR before filing.',
       409
     );
   }
@@ -233,7 +240,7 @@ async function submitIncidentReport(req, input = {}) {
   requireIncidentRole(
     user,
     FILING_ROLES,
-    'Only HEAD, HR, and ADMIN accounts can file an Incident Report.'
+    'Only SUPERVISOR, HEAD, HR, and ADMIN accounts can file an Incident Report.'
   );
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw httpError('Enter valid Incident Report details.', 400);
@@ -437,7 +444,7 @@ async function submitIncidentReport(req, input = {}) {
         user,
         { ...createdCase, status: 'PENDING SIGNATURE' },
         'HEAD_SIGNATURE_REQUESTED',
-        'Head acknowledgment requested.'
+        'Assigned reviewer acknowledgment requested.'
       );
     await notifyIncidentParties(
       connection,
@@ -2437,6 +2444,7 @@ async function getIncidentCase(req, incidentId) {
             (SELECT e.department FROM employees e WHERE e.record_id = incident_reports.reported_employee_id LIMIT 1) AS reportedEmployeeDepartment,
             (SELECT e.position FROM employees e WHERE e.record_id = incident_reports.reported_employee_id LIMIT 1) AS reportedEmployeePosition,
             assigned_head_email AS assignedHeadEmail,
+            (SELECT u.role FROM user_roles u WHERE u.email = incident_reports.assigned_head_email LIMIT 1) AS assignedReviewerRole,
             date_reported AS dateReported, subject, incident_date AS incidentDate,
             location, incident_time AS incidentTime, description, comments, status,
             document_version AS documentVersion,
@@ -2834,13 +2842,13 @@ async function signIncidentCase(req, incidentId, signatoryRole, signatureData) {
         'EMPLOYEE_SIGNATURE'
       );
     } else if (signatoryRole === 'HEAD') {
-      if (!['HEAD', 'HR'].includes(user.role))
-        throw httpError('Only an assigned Head can sign this field.', 403);
+      if (!['SUPERVISOR', 'HEAD', 'HR'].includes(user.role))
+        throw httpError('Only the assigned reviewer can sign this field.', 403);
       if (
         !incident.assigned_head_email ||
         incident.assigned_head_email.toLowerCase() !== user.email.toLowerCase()
       )
-        throw httpError('Only the assigned Head can sign this field.', 403);
+        throw httpError('Only the assigned reviewer can sign this field.', 403);
       if (incident.status !== 'PENDING SIGNATURE')
         throw httpError('This case is no longer awaiting signatures.', 409);
       await markNotificationSeen(connection, id, user.email, 'HEAD_SIGNATURE');
@@ -2954,7 +2962,7 @@ async function getIncidentBadgeCounts(req) {
   const user = await requirePerm(req, 'inbox.read');
   await processOverdueIncidentNtes();
   let track = 0;
-  if (['STAFF', 'HEAD'].includes(user.role)) {
+  if (['STAFF', 'SUPERVISOR', 'HEAD'].includes(user.role)) {
     const scope = incidentAccessScope(user);
     const [[row]] = await pool.execute(
       `SELECT COUNT(*) AS count FROM incident_reports WHERE status <> 'CLOSED' AND ${scope.sql}`,

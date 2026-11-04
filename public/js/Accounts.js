@@ -148,16 +148,16 @@ async function loadAccountManagement() {
 }
 
 function renderAccountManagement(result) {
-  const headOptions = result.availableHeads || [];
   [
     ['users', 'am_users', true],
-    ['heads', 'am_heads', true],
+    ['supervisors', 'am_supervisors', true],
+    ['heads', 'am_heads', false],
     ['hr', 'am_hr', 'hr'],
     ['admins', 'am_admins', false]
   ].forEach(([group, id, canAssignHead]) => {
     const body = $(id);
     body.replaceChildren();
-    const accounts = result.accounts[group];
+    const accounts = result.accounts[group] || [];
     if (!accounts.length) {
       appendEmptyRow(
         body,
@@ -184,15 +184,19 @@ function renderAccountManagement(result) {
         const assignmentCell = document.createElement('td');
         const head = document.createElement('select');
         head.className = 'account-head-assignment';
-        head.setAttribute('aria-label', `Assigned Head for ${account.email}`);
+        const reviewerRole = account.role === 'STAFF' ? 'Supervisor' : 'Head';
+        head.setAttribute(
+          'aria-label',
+          `Assigned ${reviewerRole} for ${account.email}`
+        );
         const none = document.createElement('option');
         none.value = '';
-        none.textContent =
-          account.role === 'HEAD'
-            ? 'No assigned Head (optional)'
-            : 'Select a Head';
+        none.textContent = `Select a ${reviewerRole}`;
         head.appendChild(none);
-        headOptions
+        (account.role === 'STAFF'
+          ? result.availableSupervisors || []
+          : result.availableHeads || []
+        )
           .filter((optionAccount) => optionAccount.email !== account.email)
           .forEach((optionAccount) => {
             const option = document.createElement('option');

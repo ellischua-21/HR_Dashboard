@@ -15,7 +15,7 @@ function sameEmail(left, right) {
 
 function canViewIncident(user, incident) {
   if (['HR', 'ADMIN'].includes(user.role)) return true;
-  if (!['STAFF', 'HEAD'].includes(user.role)) return false;
+  if (!['STAFF', 'SUPERVISOR', 'HEAD'].includes(user.role)) return false;
   return [
     incident.reporterEmail ?? incident.reporter_email,
     incident.reportedEmployeeEmail ?? incident.reported_employee_email,
@@ -29,7 +29,7 @@ function incidentAccessScope(user, alias = '') {
     throw new Error('Invalid incident table alias.');
   const prefix = alias ? `${alias}.` : '';
   if (['HR', 'ADMIN'].includes(user.role)) return { sql: '1 = 1', values: [] };
-  if (!['STAFF', 'HEAD'].includes(user.role))
+  if (!['STAFF', 'SUPERVISOR', 'HEAD'].includes(user.role))
     return { sql: '1 = 0', values: [] };
   return {
     sql: `(LOWER(${prefix}reporter_email) = LOWER(?) OR LOWER(${prefix}reported_employee_email) = LOWER(?)

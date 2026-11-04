@@ -48,9 +48,9 @@ async function listAnnouncementsForManagement(req) {
 
 async function listUnseenAnnouncements(req) {
   const user = await requirePerm(req, 'announcements.read');
-  if (!['STAFF', 'HEAD'].includes(user.role)) {
+  if (!['STAFF', 'SUPERVISOR', 'HEAD'].includes(user.role)) {
     throw httpError(
-      'Only STAFF and HEAD accounts can read announcements.',
+      'Only STAFF, SUPERVISOR, and HEAD accounts can read announcements.',
       403
     );
   }
@@ -70,9 +70,9 @@ async function listUnseenAnnouncements(req) {
 
 async function markAnnouncementsSeen(req, announcementIds) {
   const user = await requirePerm(req, 'announcements.read');
-  if (!['STAFF', 'HEAD'].includes(user.role)) {
+  if (!['STAFF', 'SUPERVISOR', 'HEAD'].includes(user.role)) {
     throw httpError(
-      'Only STAFF and HEAD accounts can acknowledge announcements.',
+      'Only STAFF, SUPERVISOR, and HEAD accounts can acknowledge announcements.',
       403
     );
   }

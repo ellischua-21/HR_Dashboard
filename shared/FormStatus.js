@@ -10,13 +10,21 @@
       .replace(/\b\w/g, (letter) => letter.toUpperCase());
   }
 
-  function formatFormStatus(status, reviewStage) {
+  function reviewerLabel(submitterRole) {
+    return submitterRole === 'STAFF'
+      ? 'Supervisor'
+      : submitterRole === 'HR'
+        ? 'Head HR'
+        : 'Head';
+  }
+
+  function formatFormStatus(status, reviewStage, submitterRole) {
     const normalized = String(status || 'PENDING')
       .trim()
       .toUpperCase();
     if (normalized === 'PENDING') {
       return String(reviewStage || '').toUpperCase() === 'HEAD'
-        ? 'Pending Head Signature'
+        ? `Pending ${reviewerLabel(submitterRole)} Signature`
         : 'Pending HR/Admin Review';
     }
     return titleCase(normalized);
@@ -24,12 +32,12 @@
 
   function canEditForm(role, form) {
     return (
-      ['STAFF', 'HEAD', 'HR'].includes(role) &&
+      ['STAFF', 'SUPERVISOR', 'HEAD', 'HR'].includes(role) &&
       form.status === 'PENDING' &&
       form.review_stage === 'HEAD' &&
       Boolean(form.head_reviewer_email)
     );
   }
 
-  return { titleCase, formatFormStatus, canEditForm };
+  return { titleCase, reviewerLabel, formatFormStatus, canEditForm };
 });

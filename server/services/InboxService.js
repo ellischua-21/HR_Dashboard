@@ -18,7 +18,7 @@ async function getInbox(req) {
   const user = await requirePerm(req, 'inbox.read');
   const items = [];
 
-  if (['STAFF', 'HEAD', 'HR', 'ADMIN'].includes(user.role)) {
+  if (['STAFF', 'SUPERVISOR', 'HEAD', 'HR', 'ADMIN'].includes(user.role)) {
     const [announcements] = await pool.execute(
       `SELECT a.id, a.title, a.message, a.created_at,
               COALESCE(NULLIF(u.full_name, ''), a.created_by) AS created_by_name,
@@ -50,7 +50,10 @@ async function getInbox(req) {
   if (['HR', 'ADMIN'].includes(user.role)) {
     targets.push({ target: 'leave-requests', stage: 'HR' });
   }
-  if (user.role === 'HEAD' || (user.role === 'HR' && user.is_hr_head)) {
+  if (
+    ['SUPERVISOR', 'HEAD'].includes(user.role) ||
+    (user.role === 'HR' && user.is_hr_head)
+  ) {
     targets.push({ target: 'leave-requests', stage: 'HEAD' });
   }
   for (const { target, stage } of targets) {

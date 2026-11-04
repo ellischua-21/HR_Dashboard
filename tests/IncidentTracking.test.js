@@ -37,6 +37,17 @@ test('case access recognizes response and database field names, and rejects unre
     false
   );
   assert.equal(
+    canViewIncident({ role: 'SUPERVISOR', email: 'head@example.com' }, report),
+    true
+  );
+  assert.equal(
+    canViewIncident(
+      { role: 'SUPERVISOR', email: 'unrelated@example.com' },
+      report
+    ),
+    false
+  );
+  assert.equal(
     canViewIncident(
       { role: 'STAFF', email: 'employee@example.com' },
       {

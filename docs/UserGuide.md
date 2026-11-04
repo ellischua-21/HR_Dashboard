@@ -32,7 +32,8 @@ or cannot remember your password, contact HR or the system administrator.
 | Account | Main features |
 | ------- | ------------- |
 | STAFF   | Fill out forms, check personal submissions, track incidents involving you, view case history and the Code of Conduct, read the Inbox, and change your password. |
-| HEAD    | STAFF features, plus review assigned form requests and file Incident Reports.  |
+| SUPERVISOR | STAFF features, plus review assigned STAFF form requests and file Incident Reports. |
+| HEAD    | STAFF features, plus review assigned SUPERVISOR form requests and file Incident Reports. |
 | HR      | Dashboard, employee records, attendance, reports, announcements, personal forms, form reviews, and incident filing and review. |
 | ADMIN   | Dashboard, employee records, attendance, reports, announcements, form reviews, incident management, account approvals, and account assignments. ADMIN does not have personal form submission pages. |
 
@@ -49,10 +50,10 @@ features and can also review forms submitted by other HR accounts.
 | Find an employee                                   | **Employees → Employee Master List** |
 | Register an employee                               | **Employees → Employee Registration** |
 | Check scanner attendance                           | **Employees → Attendance** |
-| File an incident                                   | **Incident Management → File**; available to HEAD, HR, and ADMIN  |
+| File an incident                                   | **Incident Management → File**; available to SUPERVISOR, HEAD, HR, and ADMIN  |
 | Open a case and its available actions              | **Incident Management → Track** |
 | Find incidents awaiting HR attention               | **Incident Management → Review**; HR and ADMIN |
-| Find completed personal cases                      | **Incident Management → History**; STAFF and HEAD |
+| Find completed personal cases                      | **Incident Management → History**; STAFF, SUPERVISOR and HEAD |
 | View the disciplinary matrix and violation history | **Incident Management → Code of Conduct** |
 | Create an announcement                             | **Reports → Create Announcement**; HR and ADMIN |
 | Approve account requests                           | **Manage Accounts → Account Requests**; ADMIN |
@@ -100,9 +101,9 @@ Draw your signature in the signature box using a mouse. Use **Clear signature** 
 
 ### Understand where a form goes
 
-- STAFF forms normally go to the assigned Head, then to HR for final review.
-- HEAD forms go to their assigned Head. A HEAD without an assigned Head sends
-  forms directly to HR.
+- STAFF forms go to the assigned Supervisor, then to HR for final review.
+- SUPERVISOR forms go to the assigned Head, then to HR.
+- HEAD forms go directly to HR.
 - HR forms go to the designated Head HR. The Head HR's own forms go to another
   eligible HR reviewer.
 
@@ -112,14 +113,14 @@ Open **Forms → My Submissions**. Filter by status or form type, or search usin
 serial number or details.
 
 - **Edit** appears only while editing is allowed. Generally, this is while the
-  form is still pending with its assigned Head. Editing requires a new signature.
+  form is still pending with its assigned reviewer. Editing requires a new signature.
 
 ### Review a form request
 
 1. Open **Forms → Review Requests**, or **Manage Forms** for ADMIN.
 2. Use status, form type, search, and submission-date filters to find the request.
 3. Select **View form** and read the request.
-4. Select **Sign** when a signature is required, or **Approve** when it is not. Head approval normally forwards the request to HR.
+4. Select **Sign** when a signature is required, or **Approve** when it is not. Supervisor or Head approval normally forwards the request to HR.
 5. To reject a request, select **Reject** and enter the reason.
 
 When reviewing a Leave Application, HR can complete the **For HR Use Only**
@@ -146,14 +147,13 @@ it. Read the confirmation before archiving an employee.
 1. Open **Employees → Employee Registration**.
 2. Complete the employee details, including their employee number and Personal
    Email.
-3. Select the correct **Reports To** suggestion where a Head assignment is needed.
-4. In **Account access request**, choose STAFF, HEAD, or HR. Enter and confirm the
+3. Select the correct **Reports To** suggestion: a Supervisor for STAFF or a Head for SUPERVISOR.
+4. In **Account access request**, choose STAFF, SUPERVISOR, HEAD, or HR. Enter and confirm the
    initial password.
 5. Select **Review and save**, check the preview, and save.
 6. Ask an ADMIN to approve the request in **Manage Accounts → Account Requests**.
 
-A STAFF account needs an assigned Head. If that Head also has a pending account
-request, approve the Head's account first.
+A STAFF account needs an assigned Supervisor, and a SUPERVISOR needs an assigned Head. If the reviewer has a pending account request, approve it first.
 
 ### Import employees from a spreadsheet
 
@@ -208,7 +208,7 @@ selector.
 4. If your signature is requested, draw it in your signature box and select **Sign**.
 5. Use **Refresh status** to reload the selected case.
 
-Employee and Head signatures acknowledge receipt of the report; they are not an
+Employee and assigned reviewer signatures acknowledge receipt of the report; they are not an
 admission of wrongdoing. After the required acknowledgments, HR signs to begin its
 review. You only see information and actions allowed for your involvement in the
 case.
@@ -217,7 +217,7 @@ case.
 
 | Stage               | What it means |
 | ------------------- | ------------- |
-| Pending Signature   | Required employee or Head acknowledgments are incomplete. |
+| Pending Signature   | Required employee or assigned reviewer acknowledgments are incomplete. |
 | Signed              | Required acknowledgments are complete; HR has not yet started its signed review. |
 | Under Review        | HR has signed and is reviewing the report. |
 | Under Investigation | HR is collecting or assessing additional information. |
@@ -338,17 +338,16 @@ characters**, then select **Save changes**.
 ### Approve or reject a new account
 
 1. Open **Manage Accounts → Account Requests**.
-2. Check the name, Personal Email, assigned role, and assigned Head.
+2. Check the name, Personal Email, assigned role, and assigned reviewer.
 3. Select **Approve** or **Reject** and confirm the action.
 4. Use **Refresh** to update the request list.
 
-Approval enables the requested account to sign in. A pending Head must be approved
-before STAFF accounts assigned to that Head.
+Approval enables the requested account to sign in. Approve a pending reviewer before the accounts assigned to them.
 
-### Change Head assignments
+### Change reviewer assignments
 
 1. Open **Manage Accounts → Accounts**. The page heading is **Manage Accounts**.
-2. Find the STAFF or HEAD account and change its assignment.
+2. Find the STAFF or SUPERVISOR account and change its assignment.
 3. Select **Save Changes** button.
 
 ### Designate the Head HR

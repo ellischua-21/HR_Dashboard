@@ -12,6 +12,12 @@
       ['incident-history', 'History'],
       ['incident-code-of-conduct', 'Code of Conduct']
     ],
+    SUPERVISOR: [
+      ['incident-file', 'File'],
+      ['incident-track', 'Track'],
+      ['incident-history', 'History'],
+      ['incident-code-of-conduct', 'Code of Conduct']
+    ],
     HR: [
       ['incident-file', 'File'],
       ['incident-track', 'Track'],

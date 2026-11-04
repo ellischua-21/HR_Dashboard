@@ -170,8 +170,10 @@ async function init() {
     hideLogin();
     $('uemail').textContent = session.email;
     $('urole').textContent = session.role.replaceAll('_', ' ').toUpperCase();
-    const isFormSubmitter = ['STAFF', 'HEAD'].includes(session.role);
-    const isHead = session.role === 'HEAD';
+    const isFormSubmitter = ['STAFF', 'SUPERVISOR', 'HEAD'].includes(
+      session.role
+    );
+    const isHead = ['SUPERVISOR', 'HEAD'].includes(session.role);
     const navItems = isFormSubmitter
       ? USER_NAV.filter(
           (item) => !['user-dashboard', 'user-forms'].includes(item[0])

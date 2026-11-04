@@ -342,7 +342,7 @@ test('single Head assignments reuse bulk assignment validation and preserve HR d
     query: async () => [
       [
         { email: 'staff@example.com', role: 'STAFF', active: 1 },
-        { email: 'head@example.com', role: 'HEAD', active: 1 }
+        { email: 'head@example.com', role: 'SUPERVISOR', active: 1 }
       ]
     ],
     execute: async (sql, values) => {

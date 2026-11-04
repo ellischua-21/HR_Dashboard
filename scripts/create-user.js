@@ -14,7 +14,7 @@ async function main() {
     .toUpperCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error(
-      'Usage: npm run create-user -- person@example.com [STAFF|HEAD|HR|ADMIN]'
+      'Usage: npm run create-user -- person@example.com [STAFF|SUPERVISOR|HEAD|HR|ADMIN]'
     );
   }
   if (!ROLE_PERMS[role]) throw new Error('Unsupported role: ' + role);

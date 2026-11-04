@@ -404,7 +404,10 @@ async function listMyForms(req) {
     [user.email]
   );
   return {
-    forms: rows.map(parseForm),
+    forms: rows.map((row) => ({
+      ...parseForm(row),
+      submitter_role: user.role
+    })),
     employeeProfile: employeeProfile || null,
     assignedHead:
       head && head.email
@@ -446,16 +449,19 @@ async function getSubmissionHead(email, role) {
   }
   const assignedHead = rows[0].assigned_head_email;
   if (!assignedHead) {
-    if (role === 'STAFF')
+    if (role === 'STAFF' || role === 'SUPERVISOR')
       throw httpError(
-        'An Admin must assign a Head to your account before you can submit forms.',
+        `An Admin must assign a ${role === 'STAFF' ? 'Supervisor' : 'Head'} to your account before you can submit forms.`,
         409
       );
     return null;
   }
-  if (rows[0].head_role !== 'HEAD' || !rows[0].head_active) {
+  if (
+    rows[0].head_role !== (role === 'STAFF' ? 'SUPERVISOR' : 'HEAD') ||
+    !rows[0].head_active
+  ) {
     throw httpError(
-      'Your assigned Head is not active. Contact an Admin before submitting.',
+      `Your assigned ${role === 'STAFF' ? 'Supervisor' : 'Head'} is inactive or has an invalid role. Contact an Admin before submitting.`,
       409
     );
   }
@@ -568,7 +574,7 @@ async function updateMyForm(req, formId, templateKey, data = {}) {
     }
     if (!canEditForm(user.role, existingForm)) {
       throw httpError(
-        'This form can no longer be edited. It must still be pending with its assigned Head.',
+        'This form can no longer be edited. It must still be pending with its assigned reviewer.',
         409
       );
     }
@@ -591,7 +597,7 @@ async function updateMyForm(req, formId, templateKey, data = {}) {
       user.email,
       'FORM_UPDATED',
       String(existingForm.id),
-      `${existingForm.control_no} updated before Head approval`,
+      `${existingForm.control_no} updated before reviewer approval`,
       connection
     );
     await connection.commit();
@@ -715,10 +721,10 @@ async function listFormsForReview(req, scope = 'HR', filters = {}) {
   const reviewer = await requirePerm(req, 'forms.review');
   if (
     isHead &&
-    reviewer.role !== 'HEAD' &&
+    !['HEAD', 'SUPERVISOR'].includes(reviewer.role) &&
     !(reviewer.role === 'HR' && reviewer.is_hr_head)
   ) {
-    throw httpError('This account cannot view the Head review queue.', 403);
+    throw httpError('This account cannot view the assigned review queue.', 403);
   }
   if (!isCombinedQueue && !isHead && !['HR', 'ADMIN'].includes(reviewer.role)) {
     throw httpError('This account cannot view the HR review queue.', 403);
@@ -784,11 +790,11 @@ async function getFormReviewSummaryForUser(req, scope = 'HR') {
   if (isHead) {
     const reviewer = await requirePerm(req, 'forms.review');
     if (
-      reviewer.role !== 'HEAD' &&
+      !['HEAD', 'SUPERVISOR'].includes(reviewer.role) &&
       !(reviewer.role === 'HR' && reviewer.is_hr_head)
     ) {
       throw httpError(
-        'Only a designated Head or Head HR can review this queue.',
+        'Only an assigned Supervisor, Head, or Head HR can review this queue.',
         403
       );
     }
@@ -846,14 +852,15 @@ async function reviewUserForm(
     if (isHead) {
       await requirePerm(req, 'forms.review');
       const mayReviewAsHead =
-        (reviewer.role === 'HEAD' &&
-          ['STAFF', 'HEAD'].includes(rows[0].submitter_role)) ||
+        (reviewer.role === 'SUPERVISOR' &&
+          rows[0].submitter_role === 'STAFF') ||
+        (reviewer.role === 'HEAD' && rows[0].submitter_role === 'SUPERVISOR') ||
         (reviewer.role === 'HR' &&
           reviewer.is_hr_head &&
           rows[0].submitter_role === 'HR');
       if (!mayReviewAsHead)
         throw httpError(
-          'Access denied: this form requires its assigned Head.',
+          'Access denied: this form requires its assigned reviewer.',
           403
         );
       if (rows[0].head_reviewer_email !== reviewer.email) {
@@ -913,7 +920,7 @@ async function reviewUserForm(
       template?.headReviewRequired !== false
     ) {
       throw httpError(
-        'This form has not yet been forwarded by its assigned Head.',
+        'This form has not yet been forwarded by its assigned reviewer.',
         409
       );
     }

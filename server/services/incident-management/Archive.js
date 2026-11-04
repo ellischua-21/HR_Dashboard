@@ -38,8 +38,11 @@ function pageInput(input = {}) {
 
 async function listIncidentsForHistory(req, input = {}) {
   const user = await requirePerm(req, 'inbox.read');
-  if (!['STAFF', 'HEAD'].includes(user.role))
-    throw httpError('History is available to STAFF and HEAD accounts.', 403);
+  if (!['STAFF', 'SUPERVISOR', 'HEAD'].includes(user.role))
+    throw httpError(
+      'History is available to STAFF, SUPERVISOR, and HEAD accounts.',
+      403
+    );
   const requestedPage = pageInput(input);
   const search = String(input.search || '').trim();
   const caseNumber = String(input.caseNumber || '').trim();

@@ -11,10 +11,11 @@ const validReport = {
   comments: ''
 };
 
-test('HEAD filing creates a versioned pending case and requests employee and assigned-head signatures', async (t) => {
+test('HEAD and SUPERVISOR can file a case requiring the assigned supervisor signature', async (t) => {
   const { pool } = require('../server/db/database');
   const incidents = require('../server/services/IncidentService');
   const statements = [];
+  let filingRole = 'HEAD';
   t.mock.method(pool, 'execute', async (sql) => {
     if (sql.includes('FROM user_roles'))
       return [
@@ -22,7 +23,7 @@ test('HEAD filing creates a versioned pending case and requests employee and ass
           {
             email: 'head@example.com',
             full_name: 'Reporting Head',
-            role: 'HEAD',
+            role: filingRole,
             active: 1,
             extra_perms: ''
           }
@@ -65,7 +66,9 @@ test('HEAD filing creates a versioned pending case and requests employee and ass
           ]
         ];
       if (sql.includes('WHERE email = ? LIMIT 1'))
-        return [[{ email: 'assigned@example.com', role: 'HEAD', active: 1 }]];
+        return [
+          [{ email: 'assigned@example.com', role: 'SUPERVISOR', active: 1 }]
+        ];
       if (sql.includes('SELECT sequence_value FROM incident_case_sequences'))
         return [[{ sequence_value: 17 }]];
       if (sql.includes('INSERT INTO incident_reports'))
@@ -102,6 +105,12 @@ test('HEAD filing creates a versioned pending case and requests employee and ass
       item.sql.includes("VALUES (?, ?, 'HEAD_SIGNATURE')")
     )
   );
+  filingRole = 'SUPERVISOR';
+  const supervisorResult = await incidents.submitIncidentReport(
+    { session: { userEmail: 'head@example.com' } },
+    validReport
+  );
+  assert.equal(supervisorResult.status, 'PENDING SIGNATURE');
 });
 
 test('STAFF cannot submit an Incident Report through the backend', async (t) => {

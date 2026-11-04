@@ -90,8 +90,14 @@ test('attendance shows time logs and device serial numbers in a dropdown', async
   const row = document.getElementById('attendance-body').children[0];
   assert.equal(row.children[0].textContent, 'Mary Anne');
   assert.equal(row.children[1].textContent, 'O’Neil');
-  assert.equal(row.children[0].classList.contains('attendance-wrap-cell'), true);
-  assert.equal(row.children[1].classList.contains('attendance-wrap-cell'), true);
+  assert.equal(
+    row.children[0].classList.contains('attendance-wrap-cell'),
+    true
+  );
+  assert.equal(
+    row.children[1].classList.contains('attendance-wrap-cell'),
+    true
+  );
   assert.equal(row.children[3].textContent, 'Business Intelligence');
   assert.equal(
     row.children[3].classList.contains('attendance-wrap-cell'),
@@ -400,7 +406,7 @@ test('COC matrix editing adds and saves rows without PDF or publishing controls'
 });
 
 test('NTE reminder buttons direct every role to Track with the matching label', async () => {
-  for (const role of ['STAFF', 'HEAD', 'HR', 'ADMIN']) {
+  for (const role of ['STAFF', 'SUPERVISOR', 'HEAD', 'HR', 'ADMIN']) {
     const browser = createBrowser();
     browser.loadDashboard();
     const { context, document } = browser;
@@ -433,6 +439,16 @@ test('NTE reminder buttons direct every role to Track with the matching label', 
     await button.click();
     assert.deepEqual(destination, [9, 'incident-track']);
   }
+});
+
+test('Supervisor and Head have the same incident navigation', () => {
+  const browser = createBrowser();
+  browser.loadDashboard();
+  const navigation = browser.context.INCIDENT_MANAGEMENT_NAVIGATION;
+  assert.deepEqual(
+    Array.from(navigation.forRole('SUPERVISOR'), (item) => Array.from(item)),
+    Array.from(navigation.forRole('HEAD'), (item) => Array.from(item))
+  );
 });
 
 test('employee suggestions retain selection, reject stale responses, and reset hidden IDs', async () => {
@@ -725,7 +741,7 @@ test('issued NTE identifies the recipient and omits HR response tracking', () =>
       .querySelectorAll('p')
       .some((paragraph) =>
         paragraph.textContent.includes(
-          'Directed to: Reported Employee (employee@example.com)'
+          'Directed To: Reported Employee (employee@example.com)'
         )
       )
   );
@@ -915,7 +931,7 @@ test('Head HR switches preview immediately, discard unsaved visits, and persist 
 });
 
 test('ADMIN and HR see employee violation search while STAFF and HEAD do not', async () => {
-  for (const role of ['ADMIN', 'HR', 'STAFF', 'HEAD']) {
+  for (const role of ['ADMIN', 'HR', 'STAFF', 'SUPERVISOR', 'HEAD']) {
     const browser = createBrowser();
     browser.loadDashboard();
     browser.evaluate(

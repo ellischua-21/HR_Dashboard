@@ -48,7 +48,14 @@ function createIncidentReportDocumentHtml(incident) {
       )
         ? `<img class="signature" src="${item.signature}" alt="${escapeIncidentHtml(item.role)} signature">`
         : 'Not signed';
-      const labels = { EMPLOYEE: 'Employee', HEAD: 'Assigned Head', HR: 'HR' };
+      const labels = {
+        EMPLOYEE: 'Employee',
+        HEAD:
+          incident.assignedReviewerRole === 'SUPERVISOR'
+            ? 'Assigned Supervisor'
+            : 'Assigned Head',
+        HR: 'HR'
+      };
       return `<tr><td>${escapeIncidentHtml(labels[item.role] || item.role)}</td><td>${signature}</td><td>${escapeIncidentHtml(item.signerEmail)}</td><td>${escapeIncidentHtml(DateUtils.formatDateTime(item.signedAt))}</td></tr>`;
     })
     .join('');

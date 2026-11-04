@@ -65,7 +65,11 @@ function publicTimeline(incident, activity, signatures) {
     .filter((entry) => PUBLIC_ACTIONS[entry.action])
     .map((entry) => ({
       action: entry.action,
-      label: PUBLIC_ACTIONS[entry.action],
+      label:
+        incident.assignedReviewerRole === 'SUPERVISOR' &&
+        ['HEAD_SIGNATURE_REQUESTED', 'HEAD_SIGNED'].includes(entry.action)
+          ? PUBLIC_ACTIONS[entry.action].replace('Head', 'Supervisor')
+          : PUBLIC_ACTIONS[entry.action],
       performedBy: signerByAction[entry.action] || entry.actorEmail,
       createdAt: entry.createdAt,
       previousStatus: entry.previousStatus || null,
@@ -86,7 +90,11 @@ function publicTimeline(incident, activity, signatures) {
     if (!timeline.some((entry) => entry.action === action))
       timeline.push({
         action,
-        label: PUBLIC_ACTIONS[action],
+        label:
+          incident.assignedReviewerRole === 'SUPERVISOR' &&
+          action === 'HEAD_SIGNED'
+            ? PUBLIC_ACTIONS[action].replace('Head', 'Supervisor')
+            : PUBLIC_ACTIONS[action],
         performedBy: signature.signerEmail,
         createdAt: signature.signedAt,
         previousStatus: null,

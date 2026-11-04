@@ -10,7 +10,7 @@
             <th>Name</th>
             <th>Personal Email</th>
             <th>Assigned Role</th>
-            <th>Assigned Head</th>
+            <th>Reports To</th>
             <th>Requested</th>
             <th>Actions</th>
           </tr>
@@ -34,13 +34,32 @@
               <th>Name</th>
               <th>Email</th>
               <th>Role</th>
-              <th>Assigned Head</th>
+              <th>Assigned Supervisor</th>
               <th>Status</th>
               <th>Created</th>
               <th>Assignment</th>
             </tr>
           </thead>
           <tbody id="am_users"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>SUPERVISOR</h2>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Assigned Head</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Assignment</th>
+            </tr>
+          </thead>
+          <tbody id="am_supervisors"></tbody>
         </table>
       </div>
     </section>
@@ -53,10 +72,8 @@
               <th>Name</th>
               <th>Email</th>
               <th>Role</th>
-              <th>Assigned Head</th>
               <th>Status</th>
               <th>Created</th>
-              <th>Assignment</th>
             </tr>
           </thead>
           <tbody id="am_heads"></tbody>

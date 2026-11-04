@@ -124,7 +124,7 @@
       'PENDING SIGNATURE':
         'The Incident Report is awaiting the required acknowledgment signatures.',
       SIGNED:
-        'The required employee and Head signatures are complete. The report is awaiting HR review.',
+        'The required employee and reviewer signatures are complete. The report is awaiting HR review.',
       UNDER_REVIEW:
         'HR is currently reviewing the report and permitted supporting documents.',
       'UNDER INVESTIGATION':
@@ -176,7 +176,16 @@
     );
     const required = [
       ['EMPLOYEE', 'Employee Signature'],
-      ...(incident.assignedHeadEmail ? [['HEAD', 'Head Signature']] : []),
+      ...(incident.assignedHeadEmail
+        ? [
+            [
+              'HEAD',
+              incident.assignedReviewerRole === 'SUPERVISOR'
+                ? 'Supervisor Signature'
+                : 'Head Signature'
+            ]
+          ]
+        : []),
       ['HR', 'HR Review Signature']
     ];
     const completion = el('ul', 'incident-track-signatories');

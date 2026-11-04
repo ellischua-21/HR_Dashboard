@@ -215,14 +215,17 @@ function buildLeaveSheet(data, metadata = {}) {
 
   const status = document.createElement('p');
   status.className = 'leave-sheet-status';
-  status.textContent = `Status: ${FormStatus.formatFormStatus(metadata.status, metadata.reviewStage)}`;
+  status.textContent = `Status: ${FormStatus.formatFormStatus(metadata.status, metadata.reviewStage, metadata.submitterRole)}`;
   sheet.appendChild(status);
 
   const signatures = document.createElement('div');
   signatures.className = 'leave-sheet-signatures';
   [
     ['Employee Signature', data.signature],
-    ['Head Signature', metadata.headSignature],
+    [
+      `${FormStatus.reviewerLabel(metadata.submitterRole)} Signature`,
+      metadata.headSignature
+    ],
     ['HR Approval', metadata.hrSignature]
   ].forEach(([label, signature]) => {
     const field = document.createElement('div');
@@ -342,6 +345,7 @@ async function showFormContents(form) {
     submittedAt: form.submitted_at,
     status: form.status,
     reviewStage: form.review_stage,
+    submitterRole: form.submitter_role || session.role,
     headSignature: form.head_signature,
     headSignedBy: form.head_signed_by,
     headSignedAt: form.head_signed_at,
@@ -366,7 +370,7 @@ async function loadMyForms() {
   mySubmittedForms = result.forms;
   const assignedHeadLabel = $('uf_assigned_head');
   if (result.assignedHead) {
-    assignedHeadLabel.textContent = `Your Head: ${result.assignedHead.full_name} (${result.assignedHead.email})${result.assignedHead.active ? '' : ' — inactive'}`;
+    assignedHeadLabel.textContent = `Your ${session.role === 'STAFF' ? 'Supervisor' : session.role === 'HR' ? 'Head HR' : 'Head'}: ${result.assignedHead.full_name} (${result.assignedHead.email})${result.assignedHead.active ? '' : ' — inactive'}`;
     assignedHeadLabel.hidden = false;
   } else if (session.role === 'HR' && session.is_hr_head) {
     assignedHeadLabel.textContent =
@@ -376,8 +380,8 @@ async function loadMyForms() {
     assignedHeadLabel.textContent =
       'Your forms are routed to the designated Head HR.';
     assignedHeadLabel.hidden = false;
-  } else if (session.role === 'STAFF') {
-    assignedHeadLabel.textContent = 'No assigned Head yet';
+  } else if (['STAFF', 'SUPERVISOR'].includes(session.role)) {
+    assignedHeadLabel.textContent = `No assigned ${session.role === 'STAFF' ? 'Supervisor' : 'Head'} yet`;
     assignedHeadLabel.hidden = false;
   } else {
     assignedHeadLabel.textContent = '';
@@ -415,7 +419,13 @@ function renderMyForms() {
       userCell(formTemplate(form.template_key).title),
       userCell(form.days_pending === null ? '—' : form.days_pending),
       userCell(userDate(form.submitted_at)),
-      userCell(FormStatus.formatFormStatus(form.status, form.review_stage))
+      userCell(
+        FormStatus.formatFormStatus(
+          form.status,
+          form.review_stage,
+          form.submitter_role || session.role
+        )
+      )
     );
     const notes = document.createElement('td');
     notes.textContent =
@@ -795,6 +805,7 @@ async function printSavedLeaveForm(form) {
     reviewedByRole: form.reviewed_by_role,
     reviewedAt: form.reviewed_at,
     reviewStage: form.review_stage,
+    submitterRole: form.submitter_role || session.role,
     reviewNotes: form.review_notes
   });
 }
@@ -853,14 +864,17 @@ function buildGenericFormSheet(formData, metadata, template) {
 
   const status = document.createElement('p');
   status.className = 'leave-sheet-status';
-  status.textContent = `Status: ${FormStatus.formatFormStatus(metadata.status, metadata.reviewStage)}`;
+  status.textContent = `Status: ${FormStatus.formatFormStatus(metadata.status, metadata.reviewStage, metadata.submitterRole)}`;
   sheet.appendChild(status);
 
   const signatures = document.createElement('div');
   signatures.className = 'leave-sheet-signatures';
   const signatureFields = [['Employee Signature', formData.signature]];
   if (template.headSignatureRequired !== false)
-    signatureFields.push(['Head Signature', metadata.headSignature]);
+    signatureFields.push([
+      `${FormStatus.reviewerLabel(metadata.submitterRole)} Signature`,
+      metadata.headSignature
+    ]);
   if (template.hrSignatureRequired !== false)
     signatureFields.push(['HR Approval', metadata.hrSignature]);
   signatures.classList.toggle('two-signatures', signatureFields.length === 2);
@@ -958,6 +972,7 @@ async function printSavedForm(form) {
         reviewedByRole: form.reviewed_by_role,
         reviewedAt: form.reviewed_at,
         reviewStage: form.review_stage,
+        submitterRole: form.submitter_role || session.role,
         reviewNotes: form.status === 'REJECTED' ? form.review_notes : ''
       },
       template
@@ -999,7 +1014,13 @@ function reviewRow(form) {
     userCell(formTemplate(form.template_key).title),
     userCell(`${form.applicant_name || ''} (${form.user_email})`),
     userCell(userDate(form.submitted_at)),
-    userCell(FormStatus.formatFormStatus(form.status, form.review_stage)),
+    userCell(
+      FormStatus.formatFormStatus(
+        form.status,
+        form.review_stage,
+        form.submitter_role
+      )
+    ),
     reviewReason
   );
   const actions = document.createElement('td');
@@ -1016,8 +1037,8 @@ function reviewRow(form) {
     ? activeTemplate.headSignatureRequired === false
     : activeTemplate.hrSignatureRequired === false;
   const canReviewStage = isHead
-    ? (session.role === 'HEAD' &&
-        ['STAFF', 'HEAD'].includes(form.submitter_role)) ||
+    ? (session.role === 'SUPERVISOR' && form.submitter_role === 'STAFF') ||
+      (session.role === 'HEAD' && form.submitter_role === 'SUPERVISOR') ||
       (session.role === 'HR' &&
         session.is_hr_head &&
         form.submitter_role === 'HR')
@@ -1060,7 +1081,7 @@ function reviewRow(form) {
     form.status === 'PENDING' &&
     form.review_stage === 'HR' &&
     form.head_reviewer_email === session.email &&
-    session.role === 'HEAD'
+    ['SUPERVISOR', 'HEAD'].includes(session.role)
   ) {
     actions.appendChild(
       document.createTextNode(
@@ -1072,7 +1093,7 @@ function reviewRow(form) {
       form.status === 'APPROVED'
         ? `Approved by ${form.reviewed_by_role === 'ADMIN' ? 'Admin' : 'HR'}: ${form.reviewed_by_name || 'HR/Admin'}`
         : form.status === 'REJECTED'
-          ? `Rejected by ${form.reviewed_by_role === 'HEAD' ? 'Head' : form.reviewed_by_role === 'ADMIN' ? 'Admin' : 'HR'}: ${form.reviewed_by_name || 'reviewer'}`
+          ? `Rejected by ${form.reviewed_by_role === 'SUPERVISOR' ? 'Supervisor' : form.reviewed_by_role === 'HEAD' ? 'Head' : form.reviewed_by_role === 'ADMIN' ? 'Admin' : 'HR'}: ${form.reviewed_by_name || 'reviewer'}`
           : form.reviewed_by_name;
     const reviewDetails = document.createElement('span');
     reviewDetails.textContent = [reviewerAction, userDate(form.reviewed_at)]
@@ -1128,7 +1149,11 @@ function openHeadSignature(form) {
     ? 'Sign and approve HR form'
     : 'Sign and forward form';
   $('head-signature-pad').previousElementSibling.textContent =
-    session.is_hr_head ? 'Head HR signature' : 'Head signature';
+    session.is_hr_head
+      ? 'Head HR signature'
+      : session.role === 'SUPERVISOR'
+        ? 'Supervisor signature'
+        : 'Head signature';
   $('head-signature-form').querySelector('[type="submit"]').textContent =
     'Sign';
   $('head-signature-dialog').showModal();

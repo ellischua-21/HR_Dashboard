@@ -4,7 +4,7 @@ function buildReviewScope(reviewer, requestedScope = null) {
   );
   const defaultScope =
     reviewer &&
-    (reviewer.role === 'HEAD' ||
+    (['SUPERVISOR', 'HEAD'].includes(reviewer.role) ||
       (reviewer.role === 'HR' && reviewer.is_hr_head))
       ? 'HEAD'
       : 'HR';
@@ -18,9 +18,9 @@ function buildReviewScope(reviewer, requestedScope = null) {
   }
 
   if (scope === 'ALL') {
-    if (reviewer.role === 'HEAD') {
+    if (['SUPERVISOR', 'HEAD'].includes(reviewer.role)) {
       addBranch(
-        "f.template_key <> 'nexus-accountability' AND f.head_reviewer_email = ? AND f.user_email IN (SELECT email FROM user_roles WHERE role IN ('STAFF', 'HEAD'))",
+        `f.template_key <> 'nexus-accountability' AND f.head_reviewer_email = ? AND f.user_email IN (SELECT email FROM user_roles WHERE role = '${reviewer.role === 'SUPERVISOR' ? 'STAFF' : 'SUPERVISOR'}')`,
         [reviewer.email],
         'HEAD'
       );
@@ -41,11 +41,22 @@ function buildReviewScope(reviewer, requestedScope = null) {
       );
     }
   } else if (scope === 'HEAD') {
-    addBranch(
-      "f.template_key <> 'nexus-accountability' AND f.head_reviewer_email = ?",
-      [reviewer.email],
-      'HEAD'
-    );
+    if (
+      ['SUPERVISOR', 'HEAD'].includes(reviewer.role) ||
+      (reviewer.role === 'HR' && reviewer.is_hr_head)
+    ) {
+      const submitterRole =
+        reviewer.role === 'SUPERVISOR'
+          ? 'STAFF'
+          : reviewer.role === 'HEAD'
+            ? 'SUPERVISOR'
+            : 'HR';
+      addBranch(
+        `f.template_key <> 'nexus-accountability' AND f.head_reviewer_email = ? AND f.user_email IN (SELECT email FROM user_roles WHERE role = '${submitterRole}')`,
+        [reviewer.email],
+        'HEAD'
+      );
+    }
   } else {
     const excludeOwn = reviewer.role === 'HR';
     addBranch(

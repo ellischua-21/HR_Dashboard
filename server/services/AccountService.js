@@ -50,13 +50,15 @@ function validateHeadAssignment(
   const assignedEmail = String(headEmail || '')
     .trim()
     .toLowerCase();
-  if (!['STAFF', 'HEAD'].includes(accountRole)) {
-    return { error: 'Only STAFF and HEAD accounts can be assigned to a Head.' };
+  if (!['STAFF', 'SUPERVISOR'].includes(accountRole)) {
+    return {
+      error: 'Only STAFF and SUPERVISOR accounts can be assigned a reviewer.'
+    };
   }
   if (!assignedEmail) {
-    return accountRole === 'HEAD'
-      ? { headEmail: null }
-      : { error: 'Assign a Head to this STAFF account.' };
+    return {
+      error: `Assign a ${accountRole === 'STAFF' ? 'Supervisor' : 'Head'} to this ${accountRole} account.`
+    };
   }
   if (ownerEmail === assignedEmail)
     return { error: 'An account cannot be assigned to itself.' };
@@ -67,8 +69,9 @@ function validateHeadAssignment(
   const owner = accountByEmail.get(ownerEmail);
   const head = accountByEmail.get(assignedEmail);
   if (!owner || !owner.active) return { error: 'This account is not active.' };
-  if (!head || !head.active || head.role !== 'HEAD') {
-    return { error: 'Choose an active HEAD account.' };
+  const expectedRole = accountRole === 'STAFF' ? 'SUPERVISOR' : 'HEAD';
+  if (!head || !head.active || head.role !== expectedRole) {
+    return { error: `Choose an active ${expectedRole} account.` };
   }
   return { headEmail: assignedEmail };
 }
@@ -77,16 +80,16 @@ async function listAssignableHeads(req) {
   const user = await requirePerm(req, 'emp.write');
   if (!['HR', 'ADMIN'].includes(user.role)) {
     throw httpError(
-      'Only HR and ADMIN can assign a Head during employee registration.',
+      'Only HR and ADMIN can assign a reviewer during employee registration.',
       403
     );
   }
   const [rows] = await pool.query(
-    `SELECT email, full_name, 'ACTIVE' AS assignment_status
-     FROM user_roles WHERE role = 'HEAD' AND active = 1
+    `SELECT email, full_name, role, 'ACTIVE' AS assignment_status
+     FROM user_roles WHERE role IN ('HEAD', 'SUPERVISOR') AND active = 1
      UNION ALL
-     SELECT email, full_name, 'PENDING' AS assignment_status
-     FROM account_requests WHERE assigned_role = 'HEAD'
+     SELECT email, full_name, assigned_role AS role, 'PENDING' AS assignment_status
+     FROM account_requests WHERE assigned_role IN ('HEAD', 'SUPERVISOR')
        AND email NOT IN (SELECT email FROM user_roles)
      ORDER BY full_name, email`
   );
@@ -112,8 +115,11 @@ async function createEmployeeAccountRequest(
   const password = accountData && accountData.password;
   const email = sanitize(employee.personal_email).toLowerCase();
   const name = sanitize(employee.name);
-  if (!['STAFF', 'HEAD', 'HR'].includes(role)) {
-    throw httpError('Choose STAFF, HEAD, or HR for the account role.', 400);
+  if (!['STAFF', 'SUPERVISOR', 'HEAD', 'HR'].includes(role)) {
+    throw httpError(
+      'Choose STAFF, SUPERVISOR, HEAD, or HR for the account role.',
+      400
+    );
   }
   if (!EMAIL_PATTERN.test(email) || email.length > 191) {
     throw httpError('Enter a valid Personal Email to create an account.', 400);
@@ -128,28 +134,33 @@ async function createEmployeeAccountRequest(
       400
     );
   }
-  if (role === 'STAFF' && !assignedHeadEmail) {
+  if (['STAFF', 'SUPERVISOR'].includes(role) && !assignedHeadEmail) {
     throw httpError(
-      'Assign a Head to this STAFF account using Reports To.',
+      `Assign a ${role === 'STAFF' ? 'Supervisor' : 'Head'} to this ${role} account using Reports To.`,
       400
     );
   }
-  if (role !== 'STAFF' && role !== 'HEAD' && assignedHeadEmail) {
+  if (!['STAFF', 'SUPERVISOR'].includes(role) && assignedHeadEmail) {
     throw httpError(
-      'Only STAFF and HEAD accounts can be assigned to a Head.',
+      'Only STAFF and SUPERVISOR accounts can be assigned a reviewer.',
       400
     );
   }
   if (assignedHeadEmail) {
     const [headRows] = await connection.execute(
-      `SELECT email FROM user_roles WHERE email = ? AND role = 'HEAD' AND active = 1
+      `SELECT email FROM user_roles WHERE email = ? AND role = ? AND active = 1
        UNION
-       SELECT email FROM account_requests WHERE email = ? AND assigned_role = 'HEAD'`,
-      [assignedHeadEmail, assignedHeadEmail]
+       SELECT email FROM account_requests WHERE email = ? AND assigned_role = ?`,
+      [
+        assignedHeadEmail,
+        role === 'STAFF' ? 'SUPERVISOR' : 'HEAD',
+        assignedHeadEmail,
+        role === 'STAFF' ? 'SUPERVISOR' : 'HEAD'
+      ]
     );
     if (!headRows.length || assignedHeadEmail === email) {
       throw httpError(
-        'Choose another active or pending HEAD account in Reports To.',
+        `Choose an active or pending ${role === 'STAFF' ? 'SUPERVISOR' : 'HEAD'} account in Reports To.`,
         400
       );
     }
@@ -176,7 +187,7 @@ async function createEmployeeAccountRequest(
     user.email,
     'ACCOUNT_REQUESTED',
     '',
-    `${email} requested as ${role}${assignedHeadEmail ? `; Head ${assignedHeadEmail}` : ''}`,
+    `${email} requested as ${role}${assignedHeadEmail ? `; Reviewer ${assignedHeadEmail}` : ''}`,
     connection
   );
 }
@@ -201,13 +212,22 @@ async function getAccountManagement(req) {
 
   const userAccounts = [];
   const headAccounts = [];
+  const supervisorAccounts = [];
   const hrAccounts = [];
   const adminAccounts = [];
   const availableHeads = [];
+  const availableSupervisors = [];
   accounts.forEach((account) => {
     if (account.role === 'ADMIN') adminAccounts.push(account);
     else if (account.role === 'HR') hrAccounts.push(account);
-    else if (account.role === 'HEAD') {
+    else if (account.role === 'SUPERVISOR') {
+      supervisorAccounts.push(account);
+      if (account.active)
+        availableSupervisors.push({
+          email: account.email,
+          full_name: account.full_name
+        });
+    } else if (account.role === 'HEAD') {
       headAccounts.push(account);
       if (account.active)
         availableHeads.push({
@@ -222,10 +242,12 @@ async function getAccountManagement(req) {
     accounts: {
       users: userAccounts,
       heads: headAccounts,
+      supervisors: supervisorAccounts,
       hr: hrAccounts,
       admins: adminAccounts
     },
-    availableHeads
+    availableHeads,
+    availableSupervisors
   };
 }
 
@@ -321,7 +343,7 @@ async function saveAccountChanges(req, changes) {
         admin.email,
         'HEAD_ASSIGNED',
         '',
-        `${assignment.email} assigned to Head ${assignment.headEmail || 'none'}`,
+        `${assignment.email} assigned to reviewer ${assignment.headEmail || 'none'}`,
         connection
       );
     }
@@ -403,26 +425,41 @@ async function approveAccountRequest(req, requestId) {
     )
       ? ACCOUNT_ROLE_MAP[accountRequest.assigned_role]
       : null;
-    if (!['STAFF', 'HEAD', 'HR'].includes(role)) {
+    if (!['STAFF', 'SUPERVISOR', 'HEAD', 'HR'].includes(role)) {
       throw httpError(
         'This request has no valid assigned role; reject it and recreate it from Employee Registration.',
         400
       );
     }
-    if (role === 'STAFF' && !accountRequest.assigned_head_email) {
+    if (
+      ['STAFF', 'SUPERVISOR'].includes(role) &&
+      !accountRequest.assigned_head_email
+    ) {
       throw httpError(
-        'This STAFF request has no assigned Head. Reject it and recreate it from Employee Registration.',
+        `This ${role} request has no assigned ${role === 'STAFF' ? 'Supervisor' : 'Head'}. Reject it and recreate it from Employee Registration.`,
+        400
+      );
+    }
+    if (
+      !['STAFF', 'SUPERVISOR'].includes(role) &&
+      accountRequest.assigned_head_email
+    ) {
+      throw httpError(
+        'This request has an invalid reviewer assignment. Reject it and recreate it from Employee Registration.',
         400
       );
     }
     if (accountRequest.assigned_head_email) {
       const [heads] = await connection.execute(
-        `SELECT email FROM user_roles WHERE email = ? AND role = 'HEAD' AND active = 1`,
-        [accountRequest.assigned_head_email]
+        `SELECT email FROM user_roles WHERE email = ? AND role = ? AND active = 1`,
+        [
+          accountRequest.assigned_head_email,
+          role === 'STAFF' ? 'SUPERVISOR' : 'HEAD'
+        ]
       );
       if (!heads.length) {
         throw httpError(
-          'Approve the assigned Head account first, then approve this request.',
+          'Approve the assigned reviewer account first, then approve this request.',
           409
         );
       }

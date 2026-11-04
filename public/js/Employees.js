@@ -4,6 +4,7 @@ let META = null,
   CUR = null,
   IMP = null,
   HEAD_OPTIONS = [];
+let registrationReviewerSearch = null;
 const TABLES = {
   siblings: {
     title: 'Siblings',
@@ -361,6 +362,7 @@ $('p_archive').onclick = guard(async () => {
 
 /* ---------- Registration / update form ---------- */
 VIEWS.register = guard(async () => {
+  registrationReviewerSearch = null;
   await ensureMeta();
   const rec = PENDING;
   PENDING = null;
@@ -440,7 +442,7 @@ VIEWS.register = guard(async () => {
       if (rec && rec[k] !== undefined) inp.value = rec[k];
       if (k === 'reports_to' && !rec) {
         inp.type = 'search';
-        inp.placeholder = 'Search Head name or email';
+        inp.placeholder = 'Search name or email';
         inp.autocomplete = 'off';
         inp.setAttribute('role', 'combobox');
         inp.setAttribute('aria-autocomplete', 'list');
@@ -450,17 +452,22 @@ VIEWS.register = guard(async () => {
         const results = el('div', undefined, 'head-search-results');
         results.id = 'r_assigned_head_results';
         results.hidden = true;
-        window.createEmployeeSearch({
+        registrationReviewerSearch = window.createEmployeeSearch({
           input: inp,
           suggestions: results,
           minLength: 1,
           delay: 0,
           getOwner: () => session?.email,
           search: (query) =>
-            HEAD_OPTIONS.filter((head) =>
-              `${head.full_name} ${head.email}`
-                .toLowerCase()
-                .includes(query.toLowerCase())
+            HEAD_OPTIONS.filter(
+              (head) =>
+                head.role ===
+                  ($('r_account_role').value === 'STAFF'
+                    ? 'SUPERVISOR'
+                    : 'HEAD') &&
+                `${head.full_name} ${head.email}`
+                  .toLowerCase()
+                  .includes(query.toLowerCase())
             )
               .slice(0, 8)
               .map((head) => ({ ...head, name: head.full_name || head.email })),
@@ -502,18 +509,18 @@ VIEWS.register = guard(async () => {
 });
 function updateRegistrationRoleHelp() {
   const role = $('r_account_role').value;
+  if (registrationReviewerSearch) registrationReviewerSearch.reset();
+  const search = $('ff_reports_to');
+  if (search) {
+    search.value = '';
+    search.disabled = !['STAFF', 'SUPERVISOR'].includes(role);
+  }
   $('r_head_assignment_note').textContent =
     role === 'STAFF'
-      ? 'Assign a Head to this STAFF account. Pending Head requests can be selected, but must be approved first.'
-      : role === 'HEAD'
-        ? 'Assigning a Head is optional. If selected, approve that Head account first.'
-        : 'HR accounts do not have an assigned Head.';
-  if (role === 'HR') {
-    const assignedHead = $('ff_assigned_head_email');
-    if (assignedHead) assignedHead.value = '';
-    const results = $('r_assigned_head_results');
-    if (results) results.hidden = true;
-  }
+      ? 'Assign a Supervisor to this STAFF account.'
+      : role === 'SUPERVISOR'
+        ? 'Assign a Head to this SUPERVISOR account.'
+        : 'This role does not need an assigned reviewer.';
 }
 const formData = () => {
   const d = {};
@@ -542,8 +549,15 @@ $('r_preview').onclick = () => {
       .map((f) => f.label);
   if (!CUR || !CUR.record_id) {
     if (!d.personal_email) miss.push('Personal Email');
-    if (d.accountAccess.role === 'STAFF' && !d.accountAccess.assignedHeadEmail)
-      miss.push('Assigned Head');
+    if (
+      ['STAFF', 'SUPERVISOR'].includes(d.accountAccess.role) &&
+      !d.accountAccess.assignedHeadEmail
+    )
+      miss.push(
+        d.accountAccess.role === 'STAFF'
+          ? 'Assigned Supervisor'
+          : 'Assigned Head'
+      );
     if (
       d.accountAccess.password.length < 12 ||
       d.accountAccess.password.length > 128
