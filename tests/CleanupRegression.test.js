@@ -1,18 +1,162 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { pool } = require('../server/db/database');
-const { LISTS } = require('../server/config/EmployeeSchema');
+const { LISTS, EMP_FIELDS } = require('../server/config/EmployeeSchema');
+const {
+  getFormMeta,
+  getEmployee,
+  saveEmployee
+} = require('../server/services/EmployeeService');
+const { getSession } = require('../server/middleware/Auth');
 const { importEmployees } = require('../server/services/ImportService');
 const { assignAccountHead } = require('../server/services/AccountService');
+const {
+  listIncidentViolations
+} = require('../server/services/incident-management/Archive');
 const { listFormsForReview } = require('../server/services/FormService');
 const {
-  saveIncidentEvaluation
+  saveIncidentEvaluation,
+  searchIncidentEmployees
 } = require('../server/services/IncidentService');
 const {
   getIncidentCodeGuide,
   saveIncidentMatrix,
   matrixActionForOccurrence
 } = require('../server/services/incident-management/Conduct');
+
+test('HR and ADMIN can search another employee violation history while STAFF and HEAD cannot', async (t) => {
+  let role = 'ADMIN';
+  t.mock.method(pool, 'execute', async (sql) => {
+    if (sql.includes('FROM user_roles'))
+      return [
+        [
+          {
+            email: 'reviewer@example.com',
+            role,
+            active: 1,
+            extra_perms: 'emp.read'
+          }
+        ]
+      ];
+    if (sql.includes('SELECT COUNT(*)')) return [[{ total: 0 }]];
+    return [[]];
+  });
+  const req = { session: { userEmail: 'reviewer@example.com' } };
+  for (role of ['ADMIN', 'HR']) {
+    assert.equal(
+      (
+        await listIncidentViolations(req, {
+          employeeEmail: 'employee@example.com'
+        })
+      ).total,
+      0
+    );
+    assert.deepEqual(
+      await searchIncidentEmployees(req, 'Employee', 'violation-history'),
+      []
+    );
+  }
+  for (role of ['STAFF', 'HEAD']) {
+    await assert.rejects(
+      listIncidentViolations(req, { employeeEmail: 'employee@example.com' }),
+      { status: 403 }
+    );
+    await assert.rejects(
+      searchIncidentEmployees(req, 'Employee', 'violation-history'),
+      { status: 403 }
+    );
+    assert.equal((await listIncidentViolations(req)).total, 0);
+  }
+});
+
+test('HR and ADMIN share full employee fields, records and updates without a sensitive permission', async (t) => {
+  let role = 'HR';
+  const record = {
+    record_id: 'EMP-000001',
+    emp_no: 'T-1',
+    first_name: 'Test',
+    last_name: 'Employee',
+    company: 'Company A',
+    location: 'Head Office',
+    position: 'Staff',
+    department: 'IT',
+    rank: 'Rank and File',
+    status: 'Active',
+    date_employed: '2026-01-01',
+    fte: 1,
+    birthday: '2000-01-01',
+    address: 'Current Address',
+    salary_structure: 'Monthly',
+    siblings: '[{"name":"Sibling"}]',
+    emergency_name: 'Emergency Contact'
+  };
+  t.mock.method(pool, 'execute', async (sql) => {
+    if (sql.includes('FROM user_roles'))
+      return [
+        [
+          {
+            email: 'employee@example.com',
+            role,
+            active: 1,
+            extra_perms: 'emp.read,emp.write,emp.sensitive'
+          }
+        ]
+      ];
+    if (sql.startsWith('SELECT * FROM employees')) return [[record]];
+    if (sql.includes('INSERT INTO audit_logs')) return [{ affectedRows: 1 }];
+    throw new Error('Unexpected query: ' + sql);
+  });
+  t.mock.method(pool, 'query', async () => [
+    Object.entries(LISTS).flatMap(([list_name, values]) =>
+      values.map((value) => ({ list_name, value }))
+    )
+  ]);
+  const updates = [];
+  t.mock.method(pool, 'getConnection', async () => ({
+    beginTransaction: async () => {},
+    commit: async () => {},
+    rollback: async () => {},
+    release() {},
+    execute: async (sql, values) => {
+      if (sql.startsWith('SELECT record_id')) return [[]];
+      if (sql.startsWith('SELECT * FROM employees')) return [[record]];
+      if (sql.startsWith('UPDATE employees')) {
+        updates.push({ sql, values });
+        return [{ affectedRows: 1 }];
+      }
+      if (sql.includes('INSERT INTO audit_logs')) return [{ affectedRows: 1 }];
+      throw new Error('Unexpected transaction query: ' + sql);
+    }
+  }));
+  const req = { session: { userEmail: 'employee@example.com' } };
+  const expected = EMP_FIELDS.filter(
+    (f) => !f[3].includes('C') && f[0] !== 'docs'
+  ).map((f) => f[0]);
+  for (role of ['HR', 'ADMIN']) {
+    const metadata = await getFormMeta(req);
+    assert.deepEqual(
+      metadata.fields.map((f) => f.key),
+      expected
+    );
+    const employee = await getEmployee(req, record.record_id);
+    assert.equal(employee.birthday, record.birthday);
+    assert.equal(employee.address, record.address);
+    assert.equal(employee.salary_structure, record.salary_structure);
+    assert.equal(employee.siblings, record.siblings);
+    assert.equal(employee.emergency_name, record.emergency_name);
+    assert.equal(
+      (await saveEmployee(req, { ...record, address: 'Updated Address' })).ok,
+      true
+    );
+    assert.ok(updates.at(-1).values.includes('Updated Address'));
+    assert.ok(!(await getSession(req)).perms.includes('emp.sensitive'));
+  }
+  for (role of ['HEAD', 'STAFF']) {
+    await assert.rejects(getFormMeta(req), { status: 403 });
+    await assert.rejects(getEmployee(req, record.record_id), { status: 403 });
+    await assert.rejects(saveEmployee(req, record), { status: 403 });
+  }
+});
 
 test('COC matrix selects the matching offense count and caps at the final configured row', () => {
   const matrix = [
@@ -139,7 +283,7 @@ test('COC matrix saves still reject invalid rows and unauthorized users', async 
   assert.equal(writes, 1);
 });
 
-test('HR imports share employee cleaning without requiring inaccessible sensitive fields', async (t) => {
+test('HR imports validate the same complete employee fields as ADMIN', async (t) => {
   t.mock.method(pool, 'execute', async () => [
     [{ email: 'hr@example.com', role: 'HR', active: 1 }]
   ]);
@@ -172,6 +316,7 @@ test('HR imports share employee cleaning without requiring inaccessible sensitiv
         rank: 'Rank and File',
         status: 'Active',
         date_employed: '2026-01-01',
+        birthday: '2000-01-01',
         fte: 1
       },
       null

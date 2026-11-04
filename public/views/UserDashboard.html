@@ -46,10 +46,10 @@
           <tr>
             <th>Serial Number</th>
             <th>Form</th>
-            <th>Days pending</th>
+            <th>Days Pending</th>
             <th>Submitted</th>
             <th>Status</th>
-            <th>Review reason</th>
+            <th>Review Reason</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -129,7 +129,7 @@
             <th>Applicant</th>
             <th>Submitted</th>
             <th>Status</th>
-            <th>Review reason</th>
+            <th>Review Reason</th>
             <th>Review</th>
           </tr>
         </thead>
@@ -147,14 +147,14 @@
         >Name<input name="name" type="text" maxlength="191" required
       /></label>
       <label
-        >Employee number<input name="employeeNo" type="text" maxlength="191"
+        >Employee Number<input name="employeeNo" type="text" maxlength="191"
       /></label>
       <label>Position<input name="position" maxlength="191" required /></label>
       <label
         >Department<input name="department" maxlength="191" required
       /></label>
       <label
-        >Type of leave
+        >Type Of Leave
         <select name="leaveType" required>
           <option value="">Choose a leave type</option>
           <option>Vacation Leave (VL)</option>
@@ -166,12 +166,12 @@
         </select>
       </label>
       <label id="leave-other-wrap" hidden
-        >Other leave type<input name="otherLeaveType" maxlength="100"
+        >Other Leave Type<input name="otherLeaveType" maxlength="100"
       /></label>
       <label>From<input name="dateFrom" type="date" required /></label>
       <label>To<input name="dateTo" type="date" required /></label>
       <label
-        >No. of days<input
+        >No. Of Days<input
           name="days"
           type="number"
           min="0.5"
@@ -189,7 +189,7 @@
       ></textarea>
     </label>
     <fieldset>
-      <legend>Leave pay</legend>
+      <legend>Leave Pay</legend>
       <label
         ><input name="payType" type="radio" value="WITH_PAY" required /> With
         pay</label
@@ -230,7 +230,7 @@
 
 <dialog id="leave-view-dialog">
   <div class="form-view-header">
-    <h2 id="uf_form_view_title">Submitted form</h2>
+    <h2 id="uf_form_view_title">Submitted Form</h2>
     <button id="uf_close_view" class="ghost" type="button">Close</button>
   </div>
   <div id="uf_form_view"></div>
@@ -268,7 +268,7 @@
 
 <dialog id="head-signature-dialog">
   <form id="head-signature-form">
-    <h2>Sign and forward form</h2>
+    <h2>Sign And Forward Form</h2>
     <p id="head-signature-control" class="note"></p>
     <div class="signature-pad-field">
       <span>Head signature</span>
@@ -293,13 +293,13 @@
 
 <dialog id="hr-signature-dialog">
   <form id="hr-signature-form">
-    <h2>Sign and approve form</h2>
+    <h2>Sign And Approve Form</h2>
     <p id="hr-signature-control" class="note"></p>
     <fieldset id="hr-leave-balances" class="hr-leave-balances" hidden>
-      <legend>For HR use only</legend>
-      <label>VL balance<input name="vlBalance" maxlength="100" /></label>
-      <label>SL balance<input name="slBalance" maxlength="100" /></label>
-      <label>SIL balance<input name="silBalance" maxlength="100" /></label>
+      <legend>For HR Use Only</legend>
+      <label>VL Balance<input name="vlBalance" maxlength="100" /></label>
+      <label>SL Balance<input name="slBalance" maxlength="100" /></label>
+      <label>SIL Balance<input name="silBalance" maxlength="100" /></label>
     </fieldset>
     <div class="signature-pad-field">
       <span>HR/Admin signature</span>
@@ -324,19 +324,19 @@
 
 <dialog id="form-rejection-dialog" class="decision-dialog">
   <form id="form-rejection-form">
-    <h2>Reject form</h2>
+    <h2>Reject Form</h2>
     <p id="form-rejection-control" class="note"></p>
     <fieldset
       id="form-rejection-leave-balances"
       class="hr-leave-balances"
       hidden
     >
-      <legend>For HR use only</legend>
-      <label>VL balance<input name="vlBalance" maxlength="100" /></label>
-      <label>SL balance<input name="slBalance" maxlength="100" /></label>
-      <label>SIL balance<input name="silBalance" maxlength="100" /></label>
+      <legend>For HR Use Only</legend>
+      <label>VL Balance<input name="vlBalance" maxlength="100" /></label>
+      <label>SL Balance<input name="slBalance" maxlength="100" /></label>
+      <label>SIL Balance<input name="silBalance" maxlength="100" /></label>
     </fieldset>
-    <label for="form-rejection-reason">Reason for rejection</label>
+    <label for="form-rejection-reason">Reason For Rejection</label>
     <textarea
       id="form-rejection-reason"
       maxlength="500"

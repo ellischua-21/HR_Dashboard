@@ -1,5 +1,5 @@
 const { pool } = require('../../db/database');
-const { requirePerm } = require('../../middleware/Auth');
+const { requirePerm, requireEmployeeAccess } = require('../../middleware/Auth');
 const { httpError } = require('../../utils/HttpError');
 const { isValidDate } = require('../../utils/Validation');
 const { incidentAccessScope } = require('./Tracking');
@@ -99,14 +99,10 @@ async function listIncidentViolations(req, input = {}) {
   const email = String(input.employeeEmail || user.email)
     .trim()
     .toLowerCase();
-  if (email !== user.email.toLowerCase() && user.role !== 'HR')
-    throw httpError(
-      'Only HR can search another employee’s violation history.',
-      403
-    );
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 191)
     throw httpError('Enter a valid account email.', 400);
-  if (email !== user.email.toLowerCase()) await requirePerm(req, 'emp.read');
+  if (email !== user.email.toLowerCase())
+    await requireEmployeeAccess(req, 'emp.read');
   const where = `LOWER(h.employee_email) = LOWER(?) AND d.status = 'ISSUED'
     AND d.outcome <> 'NO_VIOLATION' AND e.finding = 'SUBSTANTIATED'
     AND i.status IN ('DECISION ISSUED', 'CLOSED')`;

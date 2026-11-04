@@ -13,6 +13,12 @@ function updateAccountSaveButton() {
   const button = $('am_save_changes');
   button.disabled = accountSaveBusy || !hasAccountChanges();
   button.textContent = 'Save Changes';
+  document.querySelectorAll('.hr-head-toggle').forEach((toggle) => {
+    toggle.disabled = accountSaveBusy || toggle.dataset.inactive === 'true';
+  });
+  document.querySelectorAll('.account-head-assignment').forEach((select) => {
+    select.disabled = accountSaveBusy;
+  });
 }
 
 function stagedHrHeadEmail(accounts) {
@@ -27,6 +33,7 @@ async function saveAccountChanges() {
   const button = $('am_save_changes');
   button.textContent = 'Save Changes';
   button.disabled = true;
+  updateAccountSaveButton();
   showErr('');
   try {
     await api('saveAccountChanges', {
@@ -176,6 +183,7 @@ function renderAccountManagement(result) {
         );
         const assignmentCell = document.createElement('td');
         const head = document.createElement('select');
+        head.className = 'account-head-assignment';
         head.setAttribute('aria-label', `Assigned Head for ${account.email}`);
         const none = document.createElement('option');
         none.value = '';
@@ -196,6 +204,7 @@ function renderAccountManagement(result) {
           ? pendingHeadAssignments.get(account.email)
           : account.assigned_head_email || '';
         head.onchange = () => {
+          if (accountSaveBusy) return;
           if (head.value === (account.assigned_head_email || ''))
             pendingHeadAssignments.delete(account.email);
           else pendingHeadAssignments.set(account.email, head.value);
@@ -219,11 +228,14 @@ function renderAccountManagement(result) {
         toggle.setAttribute('aria-pressed', String(selected));
         toggle.setAttribute(
           'aria-label',
-          `${selected ? 'Remove' : 'Designate'} ${account.full_name || account.email} as Head HR`
+          `${selected ? 'Remove' : 'Designate'} ${account.full_name || account.email} as Head HR; Save Changes to apply`
         );
-        toggle.disabled = !account.active;
+        toggle.dataset.inactive = String(!account.active);
+        toggle.disabled = accountSaveBusy || !account.active;
         toggle.onclick = () => {
-          pendingHrHeadEmail = selected ? '' : account.email;
+          if (accountSaveBusy) return;
+          pendingHrHeadEmail =
+            selectedHr === account.email ? '' : account.email;
           hrHeadChanged =
             pendingHrHeadEmail !==
             (result.accounts.hr.find((item) => item.is_hr_head)?.email || '');
@@ -249,7 +261,14 @@ function renderAccountManagement(result) {
   updateAccountSaveButton();
 }
 
-VIEWS.accounts = guard(loadAccountManagement);
+VIEWS.accounts = guard(async () => {
+  // Each visit starts from saved assignments, rather than a previous draft.
+  pendingHeadAssignments.clear();
+  pendingHrHeadEmail = undefined;
+  hrHeadChanged = false;
+  updateAccountSaveButton();
+  await loadAccountManagement();
+});
 VIEWS['account-requests'] = guard(loadAccountRequests);
 $('am_refresh').onclick = async () => {
   await guard(loadAccountRequests)();

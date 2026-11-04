@@ -8,7 +8,10 @@ const {
 const { pool, getLists } = require('../db/database');
 const { requirePerm } = require('../middleware/Auth');
 
-const { manilaDate: todayInManila } = require('../../shared/DateUtils');
+const {
+  manilaDate: todayInManila,
+  ageOnDate
+} = require('../../shared/DateUtils');
 
 const {
   EMPLOYEE_FILTER_KEYS: dims,
@@ -26,9 +29,7 @@ function withCalc(employee, asOf = todayInManila()) {
   const asOfDate = parseDate(asOf);
   const yearsSince = (value) =>
     value ? (asOfDate - parseDate(value)) / (365.25 * 86400000) : '';
-  employee.age = employee.birthday
-    ? Math.floor(yearsSince(employee.birthday))
-    : '';
+  employee.age = ageOnDate(employee.birthday, asOf);
   employee.tenure_years = employee.date_employed
     ? Math.round(yearsSince(employee.date_employed) * 10) / 10
     : '';

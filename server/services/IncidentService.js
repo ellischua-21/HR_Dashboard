@@ -1,6 +1,6 @@
 const { httpError } = require('../utils/HttpError');
 const { pool } = require('../db/database');
-const { requirePerm } = require('../middleware/Auth');
+const { requirePerm, requireEmployeeAccess } = require('../middleware/Auth');
 const { logAudit } = require('./AuditService');
 const {
   normalizeText,
@@ -114,9 +114,7 @@ async function getIncidentFileContext(req) {
 async function searchIncidentEmployees(req, query, purpose = 'reported') {
   const user = await requirePerm(req, 'inbox.read');
   if (purpose === 'violation-history') {
-    if (user.role !== 'HR')
-      throw httpError('Only HR can search violation history by employee.', 403);
-    await requirePerm(req, 'emp.read');
+    await requireEmployeeAccess(req, 'emp.read');
   } else {
     requireIncidentRole(
       user,

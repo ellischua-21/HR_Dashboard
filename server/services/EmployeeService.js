@@ -2,7 +2,7 @@ const { EMP_FIELDS, F } = require('../config/EmployeeSchema');
 const { CFG } = require('../config/Config');
 const { normalizePagination } = require('../utils/Pagination');
 const { pool, getLists, nextSequence, quote } = require('../db/database');
-const { requirePerm } = require('../middleware/Auth');
+const { requireEmployeeAccess } = require('../middleware/Auth');
 const { logAudit } = require('./AuditService');
 const { sanitize, validateEmployee } = require('../utils/Validation');
 const { withCalc, normalizeEmployee } = require('./DashboardService');
@@ -23,7 +23,7 @@ const LIGHT = [
 ];
 
 async function listEmployees(req, params = {}) {
-  await requirePerm(req, 'emp.read');
+  await requireEmployeeAccess(req, 'emp.read');
   const {
     page,
     pageSize: size,
@@ -72,43 +72,32 @@ async function listEmployees(req, params = {}) {
 }
 
 async function getEmployee(req, recordId) {
-  const user = await requirePerm(req, 'emp.read');
+  const user = await requireEmployeeAccess(req, 'emp.read');
   const [rows] = await pool.execute(
     'SELECT * FROM employees WHERE record_id = ? LIMIT 1',
     [recordId]
   );
   if (!rows.length) throw new Error('Employee not found.');
   const employee = normalizeEmployee(rows[0]);
-  const canSeeSensitive = user.perms.includes('emp.sensitive');
-  if (canSeeSensitive)
-    await logAudit(
-      user.email,
-      'VIEW_SENSITIVE',
-      recordId,
-      'Profile viewed with sensitive access'
-    );
-  const result = withCalc(employee);
-  EMP_FIELDS.forEach((field) => {
-    if (F.has(field, 'S') && !canSeeSensitive) result[field[0]] = '';
-  });
-  if (!canSeeSensitive) result._masked = true;
-  return result;
+  await logAudit(
+    user.email,
+    'VIEW_SENSITIVE',
+    recordId,
+    'Employee profile viewed'
+  );
+  return withCalc(employee);
 }
 
 async function getFormOptions(req) {
-  await requirePerm(req, 'emp.read');
+  await requireEmployeeAccess(req, 'emp.read');
   return getLists();
 }
 
 async function getFormMeta(req) {
-  const user = await requirePerm(req, 'emp.read');
-  const canSensitive = user.perms.includes('emp.sensitive');
+  await requireEmployeeAccess(req, 'emp.read');
   return {
     fields: EMP_FIELDS.filter(
-      (field) =>
-        !F.has(field, 'C') &&
-        field[0] !== 'docs' &&
-        (canSensitive || !F.has(field, 'S'))
+      (field) => !F.has(field, 'C') && field[0] !== 'docs'
     ).map((field) => ({
       key: field[0],
       label: field[1],
@@ -117,16 +106,14 @@ async function getFormMeta(req) {
       sensitive: F.has(field, 'S'),
       list: field[4] || ''
     })),
-    lists: await getLists(),
-    canSensitive
+    lists: await getLists()
   };
 }
 
 async function saveEmployee(req, data = {}) {
-  const user = await requirePerm(req, 'emp.write');
-  const canSensitive = user.perms.includes('emp.sensitive');
-  const clean = cleanEmployee(data, canSensitive);
-  const errors = validateEmployee(clean, await getLists(), canSensitive);
+  const user = await requireEmployeeAccess(req, 'emp.write');
+  const clean = cleanEmployee(data);
+  const errors = validateEmployee(clean, await getLists());
   if (errors.length) return { ok: false, errors };
   if (!data.record_id && !data.accountAccess) {
     return {
@@ -172,7 +159,7 @@ async function saveEmployee(req, data = {}) {
         const key = field[0];
         if (key === 'name') next.name = clean.name;
         else if (!Object.prototype.hasOwnProperty.call(data, key)) return;
-        else if (!F.has(field, 'C') && !(F.has(field, 'S') && !canSensitive)) {
+        else if (!F.has(field, 'C')) {
           if (String(old[key]) !== String(clean[key])) changed.push(key);
           next[key] = clean[key];
         }
@@ -251,7 +238,7 @@ async function saveEmployee(req, data = {}) {
 }
 
 async function archiveEmployee(req, recordId) {
-  const user = await requirePerm(req, 'emp.archive');
+  const user = await requireEmployeeAccess(req, 'emp.archive');
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();

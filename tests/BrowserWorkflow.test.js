@@ -2,6 +2,73 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createBrowser } = require('./helpers/Browser');
 
+test('employee registration renders personal details, address fields, and repeatable family sections', async () => {
+  const { EMP_FIELDS, LISTS } = require('../server/config/EmployeeSchema');
+  const browser = createBrowser();
+  browser.loadDashboard();
+  browser.evaluate(
+    "session = { email: 'admin@example.com', role: 'ADMIN', perms: ['emp.write'] }"
+  );
+  browser.context.fetch = async (url) => ({
+    ok: true,
+    json: async () =>
+      url.endsWith('getFormMeta')
+        ? {
+            fields: EMP_FIELDS.filter(
+              (f) => !f[3].includes('C') && f[0] !== 'docs'
+            ).map((f) => ({
+              key: f[0],
+              label: f[1],
+              type: f[2],
+              required: f[3].includes('R'),
+              list: f[4] || ''
+            })),
+            lists: LISTS
+          }
+        : []
+  });
+  await browser.evaluate('VIEWS.register()');
+  const { document } = browser;
+  const birthday = document.getElementById('ff_birthday');
+  assert.ok(birthday?.isConnected);
+  assert.equal(birthday.type, 'date');
+  const age = document.getElementById('ff_age');
+  assert.equal(age.readOnly, true);
+  birthday.value = '2000-01-01';
+  birthday.onchange();
+  assert.equal(
+    Number(age.value),
+    browser.context.DateUtils.ageOnDate('2000-01-01')
+  );
+  birthday.value = '';
+  birthday.oninput();
+  assert.equal(age.value, '');
+  for (const key of ['address', 'permanent_address']) {
+    const field = document.getElementById('ff_' + key);
+    assert.equal(field.tagName, 'TEXTAREA');
+    assert.ok(field.parentElement.classList.contains('employee-address'));
+  }
+  for (const key of [
+    'birth_place',
+    'landline_no',
+    'father_name',
+    'church_has',
+    'emergency_address',
+    'facebook',
+    'gov_deduction',
+    'salary_structure',
+    'fte'
+  ])
+    assert.ok(document.getElementById('ff_' + key)?.isConnected, key);
+  for (const key of ['siblings', 'children', 'orgs']) {
+    const section = document.getElementById('ff_' + key);
+    assert.ok(section?.isConnected, key);
+    const add = section.querySelector('button');
+    add.onclick();
+    assert.equal(section.querySelector('tbody').children.length, 1);
+  }
+});
+
 test('all browser controllers initialize in the declared asset order', () => {
   const browser = createBrowser();
   browser.loadDashboard();
@@ -618,12 +685,27 @@ test('Track supplies its reload callback without inline feedback elements', asyn
   assert.equal(controls.reload, context.IncidentTrack.select);
 });
 
-test('staging Head HR switches updates locally with only one selection', async () => {
+test('Head HR switches preview immediately, discard unsaved visits, and persist only on Save Changes', async () => {
   const browser = createBrowser();
   browser.loadDashboard();
   const { context, document } = browser;
   let reads = 0;
-  context.fetch = async () => {
+  let saved = false;
+  let writes = 0;
+  let failNextSave = true;
+  context.fetch = async (url, options) => {
+    if (url.endsWith('saveAccountChanges')) {
+      const changes = JSON.parse(options.body).args[0];
+      assert.equal(changes.hrHeadChanged, true);
+      assert.equal(changes.hrHeadEmail, 'hr2@example.com');
+      if (failNextSave) {
+        failNextSave = false;
+        return { ok: false, json: async () => ({ error: 'Save failed' }) };
+      }
+      ++writes;
+      saved = true;
+      return { ok: true, json: async () => ({ ok: true }) };
+    }
     ++reads;
     return {
       ok: true,
@@ -635,17 +717,82 @@ test('staging Head HR switches updates locally with only one selection', async (
           heads: [],
           admins: [],
           hr: [
-            { email: 'hr1@example.com', role: 'HR', active: 1, is_hr_head: 1 },
-            { email: 'hr2@example.com', role: 'HR', active: 1, is_hr_head: 0 }
+            {
+              email: 'hr1@example.com',
+              role: 'HR',
+              active: 1,
+              is_hr_head: saved ? 0 : 1
+            },
+            {
+              email: 'hr2@example.com',
+              role: 'HR',
+              active: 1,
+              is_hr_head: saved ? 1 : 0
+            }
           ]
         }
       })
     };
   };
-  await browser.evaluate('loadAccountManagement()');
+  await browser.evaluate('VIEWS.accounts()');
   await document.getElementById('am_hr').querySelectorAll('button')[1].click();
-  const switches = document.getElementById('am_hr').querySelectorAll('button');
+  let switches = document.getElementById('am_hr').querySelectorAll('button');
   assert.equal(switches[0].getAttribute('aria-pressed'), 'false');
   assert.equal(switches[1].getAttribute('aria-pressed'), 'true');
   assert.equal(reads, 1);
+  assert.equal(writes, 0);
+  // Turn the proposed Head off and back on without sending a write.
+  await switches[1].click();
+  switches = document.getElementById('am_hr').querySelectorAll('button');
+  assert.ok(
+    switches.every((button) => button.getAttribute('aria-pressed') === 'false')
+  );
+  await switches[1].click();
+  assert.equal(writes, 0);
+  await browser.evaluate("VIEWS['account-requests']()");
+  await browser.evaluate('VIEWS.accounts()');
+  switches = document.getElementById('am_hr').querySelectorAll('button');
+  assert.equal(switches[0].getAttribute('aria-pressed'), 'true');
+  assert.equal(switches[1].getAttribute('aria-pressed'), 'false');
+  assert.equal(document.getElementById('am_save_changes').disabled, true);
+  assert.equal(writes, 0);
+  await switches[1].click();
+  await document.getElementById('am_save_changes').click();
+  switches = document.getElementById('am_hr').querySelectorAll('button');
+  assert.equal(switches[0].getAttribute('aria-pressed'), 'false');
+  assert.equal(switches[1].getAttribute('aria-pressed'), 'true');
+  assert.equal(document.getElementById('am_save_changes').disabled, false);
+  assert.equal(writes, 0);
+  await document.getElementById('am_save_changes').click();
+  switches = document.getElementById('am_hr').querySelectorAll('button');
+  assert.equal(switches[0].getAttribute('aria-pressed'), 'false');
+  assert.equal(switches[1].getAttribute('aria-pressed'), 'true');
+  assert.equal(writes, 1);
+  assert.equal(document.getElementById('am_save_changes').disabled, true);
+  await browser.evaluate('VIEWS.accounts()');
+  switches = document.getElementById('am_hr').querySelectorAll('button');
+  assert.equal(switches[0].getAttribute('aria-pressed'), 'false');
+  assert.equal(switches[1].getAttribute('aria-pressed'), 'true');
+});
+
+test('ADMIN and HR see employee violation search while STAFF and HEAD do not', async () => {
+  for (const role of ['ADMIN', 'HR', 'STAFF', 'HEAD']) {
+    const browser = createBrowser();
+    browser.loadDashboard();
+    browser.evaluate(
+      `session = {role: '${role}', email: 'user@example.com', perms: ['emp.read']}`
+    );
+    browser.context.fetch = async (url) => ({
+      ok: true,
+      json: async () =>
+        url.endsWith('getIncidentCodeGuide')
+          ? { matrix: [], canManage: false }
+          : { records: [], total: 0, page: 1, pages: 1 }
+    });
+    await browser.context.IncidentConduct.load();
+    assert.equal(
+      browser.document.getElementById('ir-violation-employee-form').hidden,
+      !['ADMIN', 'HR'].includes(role)
+    );
+  }
 });

@@ -146,8 +146,6 @@ const methods = {
   getAccountManagement: (req) => accounts.getAccountManagement(req),
   assignAccountHead: (req, email, headEmail) =>
     accounts.assignAccountHead(req, email, headEmail),
-  setHrHeadAccount: (req, email, isHrHead) =>
-    accounts.setHrHeadAccount(req, email, isHrHead),
   saveAccountChanges: (req, changes) =>
     accounts.saveAccountChanges(req, changes),
   approveAccountRequest: (req, requestId) =>

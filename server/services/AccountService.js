@@ -239,70 +239,6 @@ async function assignAccountHead(req, accountEmail, headEmail) {
   return { ok: true, email, headEmail: assignedHead };
 }
 
-async function setHrHeadAccount(req, accountEmail, isHrHead) {
-  const admin = await requirePerm(req, 'admin.manage');
-  const email = sanitize(accountEmail).toLowerCase();
-  if (!EMAIL_PATTERN.test(email) || typeof isHrHead !== 'boolean') {
-    throw httpError('Choose a valid HR account and Head HR setting.', 400);
-  }
-  const connection = await pool.getConnection();
-  try {
-    await connection.beginTransaction();
-    const [rows] = await connection.execute(
-      'SELECT email, role, active FROM user_roles WHERE email = ? FOR UPDATE',
-      [email]
-    );
-    if (!rows.length || rows[0].role !== 'HR' || !rows[0].active) {
-      throw httpError(
-        'Only an active HR account can be designated as Head HR.',
-        400
-      );
-    }
-    if (isHrHead) {
-      const [currentHeads] = await connection.query(
-        "SELECT email FROM user_roles WHERE role = 'HR' AND is_hr_head = 1 FOR UPDATE"
-      );
-      for (const currentHead of currentHeads) {
-        if (currentHead.email === email) continue;
-        await reassignOrRejectPendingHrForms(
-          connection,
-          currentHead.email,
-          email,
-          'Pending HR forms are assigned to this Head HR. Switch on another HR account to reassign them first.'
-        );
-      }
-      await connection.execute(
-        "UPDATE user_roles SET is_hr_head = 0 WHERE role = 'HR'"
-      );
-    } else {
-      await reassignOrRejectPendingHrForms(
-        connection,
-        email,
-        null,
-        'Pending HR forms are assigned to this Head HR. Switch on another HR account to reassign them first.'
-      );
-    }
-    await connection.execute(
-      'UPDATE user_roles SET is_hr_head = ? WHERE email = ?',
-      [isHrHead ? 1 : 0, email]
-    );
-    await logAudit(
-      admin.email,
-      'HR_HEAD_ASSIGNED',
-      '',
-      `${email} Head HR set to ${isHrHead}`,
-      connection
-    );
-    await connection.commit();
-    return { ok: true, email, isHrHead };
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
-}
-
 async function saveAccountChanges(req, changes) {
   const admin = await requirePerm(req, 'admin.manage');
   const input = changes && typeof changes === 'object' ? changes : {};
@@ -612,7 +548,6 @@ module.exports = {
   approveAccountRequest,
   rejectAccountRequest,
   assignAccountHead,
-  setHrHeadAccount,
   saveAccountChanges,
   validateHeadAssignment,
   changeMyPassword,

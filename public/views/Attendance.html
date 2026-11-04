@@ -11,7 +11,7 @@
         </button>
       </div>
       <label
-        >Employee name
+        >Employee Name
         <input id="attendance-employee" type="search" maxlength="100"
       /></label>
       <label class="attendance-department"
@@ -34,16 +34,16 @@
         <span id="attendance-loading" class="loading-slot"></span>
       </div>
     </form>
-    <div class="tablewrap">
-      <table aria-label="Employee attendance transactions">
+    <p class="note attendance-table-note">
+      A dash means no scan was recorded for that time. Break times are inferred
+      from scan gaps; a break stays blank when scans do not show an out-and-in pair.
+    </p>
+    <div class="tablewrap attendance-table-scroll" tabindex="0" aria-label="Attendance table. Scroll horizontally to see all columns.">
+      <table class="attendance-table" aria-label="Employee attendance transactions">
         <thead id="attendance-head"></thead>
         <tbody id="attendance-body"></tbody>
       </table>
     </div>
-    <p class="note">
-      Break times are inferred from scan gaps. A break stays blank when the
-      available scans do not show a matching out-and-in pair.
-    </p>
     <div class="pager">
       <span id="attendance-info" class="note" role="status"></span>
       <button id="attendance-prev" class="ghost" type="button" disabled>

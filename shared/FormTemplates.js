@@ -5,14 +5,14 @@
 })(typeof window === 'undefined' ? globalThis : window, function () {
   const timeRecordColumns = [
     { name: 'date', label: 'Date', type: 'date', required: true },
-    { name: 'inStart', label: 'Time in', type: 'time' },
-    { name: 'amBreakOut', label: 'AM break out', type: 'time' },
-    { name: 'amBreakIn', label: 'AM break in', type: 'time' },
-    { name: 'lunchBreakOut', label: 'Lunch break out', type: 'time' },
-    { name: 'lunchBreakIn', label: 'Lunch break in', type: 'time' },
-    { name: 'pmBreakOut', label: 'PM break out', type: 'time' },
-    { name: 'pmBreakIn', label: 'PM break in', type: 'time' },
-    { name: 'outEnd', label: 'Time out', type: 'time' }
+    { name: 'inStart', label: 'Time In', type: 'time' },
+    { name: 'amBreakOut', label: 'AM Out', type: 'time' },
+    { name: 'amBreakIn', label: 'AM In', type: 'time' },
+    { name: 'lunchBreakOut', label: 'Lunch Break Out', type: 'time' },
+    { name: 'lunchBreakIn', label: 'Lunch Break In', type: 'time' },
+    { name: 'pmBreakOut', label: 'PM Out', type: 'time' },
+    { name: 'pmBreakIn', label: 'PM In', type: 'time' },
+    { name: 'outEnd', label: 'Time Out', type: 'time' }
   ];
   const legacyTimeRecordFields = timeRecordColumns.map((column) => ({
     ...column,
@@ -31,7 +31,7 @@
     },
     {
       key: 'authority-to-deduct',
-      title: 'Authority to Deduct',
+      title: 'Authority To Deduct',
       source: 'AUTHORITY TO DEDUCT.pdf',
       prefix: 'ATD',
       sequenceWidth: 6,
@@ -40,14 +40,14 @@
       fields: [
         {
           name: 'name',
-          label: 'Employee name',
+          label: 'Employee Name',
           type: 'text',
           required: true,
           maxLength: 191
         },
         {
           name: 'employeeNo',
-          label: 'Employee number',
+          label: 'Employee Number',
           type: 'text',
           required: true,
           maxLength: 191
@@ -104,7 +104,7 @@
       fields: [
         {
           name: 'name',
-          label: 'Employee name',
+          label: 'Employee Name',
           type: 'text',
           required: true,
           maxLength: 191
@@ -118,7 +118,7 @@
         },
         {
           name: 'employeeNo',
-          label: 'Employee number',
+          label: 'Employee Number',
           type: 'text',
           required: true,
           maxLength: 191
@@ -133,13 +133,13 @@
         ...legacyTimeRecordFields,
         {
           name: 'witnessName',
-          label: 'Witness name',
+          label: 'Witness Name',
           type: 'text',
           maxLength: 191
         },
         {
           name: 'timeRecords',
-          label: 'Daily time records',
+          label: 'Daily Time Records',
           type: 'time-records',
           columns: timeRecordColumns
         }
@@ -156,14 +156,14 @@
       fields: [
         {
           name: 'name',
-          label: 'Employee name',
+          label: 'Employee Name',
           type: 'text',
           required: true,
           maxLength: 191
         },
         {
           name: 'employeeNo',
-          label: 'Employee number',
+          label: 'Employee Number',
           type: 'text',
           required: true,
           maxLength: 191
@@ -198,13 +198,13 @@
         },
         {
           name: 'departure',
-          label: 'Date/time of departure',
+          label: 'Date/Time Of Departure',
           type: 'datetime-local',
           required: true
         },
         {
           name: 'return',
-          label: 'Date/time of return',
+          label: 'Date/Time Of Return',
           type: 'datetime-local',
           required: true
         }
@@ -222,14 +222,14 @@
       fields: [
         {
           name: 'name',
-          label: 'Employee name',
+          label: 'Employee Name',
           type: 'text',
           required: true,
           maxLength: 191
         },
         {
           name: 'employeeNo',
-          label: 'Employee number',
+          label: 'Employee Number',
           type: 'text',
           required: true,
           maxLength: 191
@@ -243,32 +243,32 @@
         },
         {
           name: 'regularShiftTime',
-          label: 'Regular shift time',
+          label: 'Regular Shift Time',
           type: 'text',
           required: true,
           maxLength: 100
         },
         {
           name: 'overtimeDate',
-          label: 'Date of authorized overtime',
+          label: 'Date Of Authorized Overtime',
           type: 'date',
           required: true
         },
         {
           name: 'timeFrom',
-          label: 'Authorized time from',
+          label: 'Authorized Time From',
           type: 'time',
           required: true
         },
         {
           name: 'timeTo',
-          label: 'Authorized time to',
+          label: 'Authorized Time To',
           type: 'time',
           required: true
         },
         {
           name: 'overtimeHours',
-          label: 'Overtime hours',
+          label: 'Overtime Hours',
           type: 'number',
           required: true,
           min: 0.25,
@@ -277,7 +277,7 @@
         },
         {
           name: 'reason',
-          label: 'Reason for request',
+          label: 'Reason For Request',
           type: 'textarea',
           required: true,
           maxLength: 500
@@ -295,14 +295,14 @@
       fields: [
         {
           name: 'name',
-          label: 'Employee name',
+          label: 'Employee Name',
           type: 'text',
           required: true,
           maxLength: 191
         },
         {
           name: 'employeeNo',
-          label: 'Employee number',
+          label: 'Employee Number',
           type: 'text',
           required: true,
           maxLength: 191
@@ -317,7 +317,7 @@
         ...legacyTimeRecordFields,
         {
           name: 'timeRecords',
-          label: 'Daily time records',
+          label: 'Daily Time Records',
           type: 'time-records',
           columns: timeRecordColumns
         }
@@ -335,7 +335,7 @@
       fields: [
         {
           name: 'name',
-          label: 'Employee name',
+          label: 'Employee Name',
           type: 'text',
           required: true,
           maxLength: 191
@@ -356,7 +356,7 @@
         },
         {
           name: 'propertyRecords',
-          label: 'Company property',
+          label: 'Company Property',
           type: 'time-records',
           showRowNumber: true,
           columns: [

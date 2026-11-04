@@ -17,7 +17,10 @@ async function getCurrentUser(req) {
   const extra = String(row.extra_perms || '')
     .split(',')
     .map((value) => value.trim())
-    .filter((value) => value && value !== 'forms.head-review');
+    .filter(
+      (value) =>
+        value && !['forms.head-review', 'emp.sensitive'].includes(value)
+    );
   const basePermissions = Object.prototype.hasOwnProperty.call(
     ROLE_PERMS,
     row.role
@@ -59,4 +62,16 @@ async function getSession(req) {
     : { error: 'NOT_AUTHORIZED' };
 }
 
-module.exports = { getCurrentUser, requirePerm, getSession };
+async function requireEmployeeAccess(req, permission) {
+  const user = await requirePerm(req, permission);
+  if (!['HR', 'ADMIN'].includes(user.role))
+    throw httpError('Only HR and ADMIN can access employee records.', 403);
+  return user;
+}
+
+module.exports = {
+  getCurrentUser,
+  requirePerm,
+  requireEmployeeAccess,
+  getSession
+};

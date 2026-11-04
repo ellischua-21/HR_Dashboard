@@ -9,21 +9,25 @@
     ['lastName', 'Last Name'],
     ['employeeNo', 'ID'],
     ['department', 'Department'],
-    ['timeIn', 'Time in'],
-    ['amBreakOut', 'AM break out'],
-    ['amBreakIn', 'AM break in'],
-    ['lunchOut', 'Lunch out'],
-    ['lunchIn', 'Lunch in'],
-    ['pmBreakOut', 'PM break out'],
-    ['pmBreakIn', 'PM break in'],
-    ['timeOut', 'Time out'],
-    ['workHours', 'Work hours'],
-    ['weekday', 'Weekday'],
+    ['timeIn', 'Time In'],
+    ['amBreakOut', 'AM Out'],
+    ['amBreakIn', 'AM In'],
+    ['lunchOut', 'Lunch Out'],
+    ['lunchIn', 'Lunch In'],
+    ['pmBreakOut', 'PM Out'],
+    ['pmBreakIn', 'PM In'],
+    ['timeOut', 'Time Out'],
+    ['workHours', 'Work Hours'],
+    ['weekday', 'Day'],
     ['dataSource', 'Data Source'],
     ['device', 'Device Name'],
     ['deviceSerialNo', 'Device Serial No.'],
     ['status', 'Status']
   ];
+  const timeColumns = new Set([
+    'timeIn', 'amBreakOut', 'amBreakIn', 'lunchOut', 'lunchIn',
+    'pmBreakOut', 'pmBreakIn', 'timeOut'
+  ]);
 
   function setPending(value) {
     pending = value;
@@ -80,6 +84,35 @@
         )
           value = DateUtils.formatTime(value);
         row.appendChild(AppUI.tableCell(value || '—'));
+      });
+      const statusCell = row.lastElementChild;
+      const status = String(record.status || 'Not calculated');
+      const normalizedStatus = status.toLowerCase();
+      const statusBadge = document.createElement('span');
+      statusBadge.className = 'attendance-status-badge';
+      if (normalizedStatus === 'normal')
+        statusBadge.classList.add('is-normal');
+      else if (
+        normalizedStatus.includes('late') ||
+        normalizedStatus.includes('early')
+      )
+        statusBadge.classList.add('is-exception');
+      else if (normalizedStatus === 'absent')
+        statusBadge.classList.add('is-absent');
+      else statusBadge.classList.add('is-neutral');
+      statusBadge.textContent = status;
+      statusCell.replaceChildren(statusBadge);
+      timeColumns.forEach((key) => {
+        const columnIndex = columns.findIndex(
+          ([columnKey]) => columnKey === key
+        );
+        const cell = row.children[columnIndex];
+        cell.classList.add('attendance-time-cell');
+        if (!record[key]) {
+          cell.classList.add('is-missing-scan');
+          cell.title = 'No scan recorded';
+          cell.setAttribute('aria-label', 'No scan recorded');
+        }
       });
       body.appendChild(row);
     });

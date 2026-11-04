@@ -136,9 +136,7 @@ test('required fields and lookup values are validated', () => {
   assert.ok(missing.includes('Company Name is required'));
   const invalid = validateEmployee({ company: 'Unknown' }, lists);
   assert.ok(invalid.includes('Company Name has an invalid value'));
-  assert.ok(
-    !validateEmployee({}, lists, false).includes('Birthday is required')
-  );
+  assert.ok(missing.includes('Birthday is required'));
 });
 
 test('date validation rejects malformed and impossible dates', () => {

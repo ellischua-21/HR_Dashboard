@@ -2,12 +2,12 @@ let OPTS = null,
   RP = { page: 1, sortCol: -1, sortDir: 'asc' },
   xch = {};
 const ALLF = [
-  ['company', 'All companies'],
-  ['department', 'All departments'],
-  ['location', 'All locations'],
-  ['status', 'All statuses'],
-  ['rank', 'All ranks'],
-  ['function_type', 'All function types']
+  ['company', 'All Companies'],
+  ['department', 'All Departments'],
+  ['location', 'All Locations'],
+  ['status', 'All Statuses'],
+  ['rank', 'All Ranks'],
+  ['function_type', 'All Function Types']
 ];
 async function ensureOpts() {
   if (!OPTS) OPTS = await api('getFilterOptions');
@@ -137,21 +137,21 @@ $('rp_export').onclick = guard(async () => {
 
 /* ---------- Executive summary (aggregates only) ---------- */
 const XC = [
-  ['company', 'Headcount by company', 'bar'],
-  ['department', 'Headcount by department', 'bar'],
-  ['location', 'Headcount by work location', 'bar'],
-  ['status', 'Employment status', 'doughnut'],
-  ['age', 'Age groups', 'bar'],
-  ['tenure', 'Tenure distribution', 'bar'],
-  ['hiringTrend', 'Monthly hiring trend', 'line']
+  ['company', 'Headcount By Company', 'bar'],
+  ['department', 'Headcount By Department', 'bar'],
+  ['location', 'Headcount By Work Location', 'bar'],
+  ['status', 'Employment Status', 'doughnut'],
+  ['age', 'Age Groups', 'bar'],
+  ['tenure', 'Tenure Distribution', 'bar'],
+  ['hiringTrend', 'Monthly Hiring Trend', 'line']
 ];
 const XK = [
-  ['headcount', 'Total workforce'],
-  ['active', 'Active workforce'],
+  ['headcount', 'Total Workforce'],
+  ['active', 'Active Workforce'],
   ['fte', 'FTE'],
-  ['newHires', 'New hires'],
-  ['resigned', 'Resigned (status-based)'],
-  ['avgTenureYears', 'Average tenure (years)']
+  ['newHires', 'New Hires'],
+  ['resigned', 'Resigned (Status-Based)'],
+  ['avgTenureYears', 'Average Tenure (Years)']
 ];
 function drawChart(id, type, data, horizontal) {
   if (xch[id]) xch[id].destroy();
@@ -241,9 +241,9 @@ async function loadExec() {
   const t = $('ex_tables');
   t.innerHTML = '';
   [
-    ['company', 'By company'],
-    ['department', 'By department'],
-    ['location', 'By work location']
+    ['company', 'By Company'],
+    ['department', 'By Department'],
+    ['location', 'By Work Location']
   ].forEach(([key, title]) => {
     const p = el('div', undefined, 'panel');
     p.appendChild(el('h2', title));

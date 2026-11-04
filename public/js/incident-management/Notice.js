@@ -14,7 +14,7 @@ function renderIncidentNte(parent, incident, ui = {}) {
     incidentElement(
       'p',
       'note',
-      `Directed to: ${incident.reportedEmployeeName} (${incident.reportedEmployeeEmail})`
+      `Directed To: ${incident.reportedEmployeeName} (${incident.reportedEmployeeEmail})`
     )
   );
   const employeeCanAccess =
@@ -113,10 +113,10 @@ function renderIncidentNte(parent, incident, ui = {}) {
       wrapper.appendChild(input);
       fields.appendChild(wrapper);
     };
-    field('Date of issuance', issueDate);
-    field('Documented date of receipt', receiptDate);
-    field('Response period (working days)', responseDays);
-    field('Explanation deadline (confirm HR policy)', deadline);
+    field('Date Of Issuance', issueDate);
+    field('Documented Date Of Receipt', receiptDate);
+    field('Response Period (Working Days)', responseDays);
+    field('Explanation Deadline (Confirm HR Policy)', deadline);
     const deadlineNote = incidentElement(
       'p',
       'note',
@@ -223,9 +223,9 @@ function renderIncidentNte(parent, incident, ui = {}) {
     editor.append(
       fields,
       deadlineNote,
-      incidentElement('label', '', 'Explanation of the allegation'),
+      incidentElement('label', '', 'Explanation Of The Allegation'),
       allegation,
-      incidentElement('label', '', 'NTE supporting evidence'),
+      incidentElement('label', '', 'NTE Supporting Evidence'),
       evidence,
       currentUser,
       signatureCanvas,
@@ -236,7 +236,7 @@ function renderIncidentNte(parent, incident, ui = {}) {
 
   if (employeeCanAccess && incident.status === 'NTE ISSUED') {
     const form = incidentElement('section', 'incident-case-section');
-    form.appendChild(incidentElement('h4', '', 'Submit your explanation'));
+    form.appendChild(incidentElement('h4', '', 'Submit Your Explanation'));
     const explanation = incidentElement('textarea');
     explanation.rows = 8;
     explanation.maxLength = 20000;
@@ -308,7 +308,7 @@ function renderIncidentNte(parent, incident, ui = {}) {
     };
     form.append(
       explanation,
-      incidentElement('label', '', 'Supporting evidence'),
+      incidentElement('label', '', 'Supporting Evidence'),
       attachments,
       draftFiles,
       saveDraft,
@@ -320,7 +320,7 @@ function renderIncidentNte(parent, incident, ui = {}) {
   if (incident.explanations.length) {
     const records = incidentElement('section', 'incident-case-section');
     records.appendChild(
-      incidentElement('h4', '', 'Submitted explanation record')
+      incidentElement('h4', '', 'Submitted Explanation Record')
     );
     incident.explanations.forEach((record) => {
       records.append(
@@ -344,7 +344,7 @@ function renderIncidentNte(parent, incident, ui = {}) {
   if (incident.explanationAddenda.length) {
     const addendaSection = incidentElement('section', 'incident-case-section');
     addendaSection.appendChild(
-      incidentElement('h4', '', 'Additional statements')
+      incidentElement('h4', '', 'Additional Statements')
     );
     incident.explanationAddenda.forEach((addendum) => {
       addendaSection.append(
@@ -372,7 +372,7 @@ function renderIncidentNte(parent, incident, ui = {}) {
   ) {
     const addendumForm = incidentElement('section', 'incident-case-section');
     addendumForm.appendChild(
-      incidentElement('h4', '', 'Submit an additional statement')
+      incidentElement('h4', '', 'Submit An Additional Statement')
     );
     addendumForm.appendChild(
       incidentElement(

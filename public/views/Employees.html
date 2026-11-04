@@ -15,7 +15,7 @@
     ><button id="e_add">Add employee</button>
   </div>
   <div id="importPanel" class="panel" hidden>
-    <h2>Import employees from Excel or CSV</h2>
+    <h2>Import Employees From Excel Or CSV</h2>
     <div class="toolbar">
       <input type="file" id="i_file" accept=".csv,.xlsx,.xls" /><button
         class="ghost"
@@ -57,62 +57,62 @@
   <!-- Section headings and field order are declared here. Field labels, types, and permissions come from the server form metadata. -->
   <div id="r_form">
     <fieldset hidden>
-      <legend>Personal information</legend>
+      <legend>Personal Information</legend>
       <div
         class="fgrid"
         data-employee-fields="
         last_name first_name middle_name birthday age birth_place gender civil_status education
       "
       ></div>
-      <div data-employee-tables></div>
+      <div data-employee-tables=""></div>
     </fieldset>
     <fieldset hidden>
-      <legend>Employment information</legend>
+      <legend>Employment Information</legend>
       <div
         class="fgrid"
         data-employee-fields="
         emp_no company location position department rank reports_to date_employed status function_type network transfer_eff
       "
       ></div>
-      <div data-employee-tables></div>
+      <div data-employee-tables=""></div>
     </fieldset>
     <fieldset hidden>
-      <legend>Contact information</legend>
+      <legend>Contact Information</legend>
       <div
-        class="fgrid"
+        class="fgrid employee-contact-grid"
         data-employee-fields="
         address permanent_address contact_no landline_no personal_email company_contact_no
       "
       ></div>
-      <div data-employee-tables></div>
+      <div data-employee-tables=""></div>
     </fieldset>
     <fieldset hidden>
-      <legend>Family background</legend>
+      <legend>Family Background</legend>
       <div
         class="fgrid"
         data-employee-fields="
         father_name father_occupation mother_maiden mother_occupation siblings spouse_name children
       "
       ></div>
-      <div data-employee-tables></div>
+      <div data-employee-tables=""></div>
     </fieldset>
     <fieldset hidden>
-      <legend>Church and Organizations/Memberships</legend>
+      <legend>Church And Organizations/Memberships</legend>
       <div
-        class="fgrid"
+        class="fgrid employee-two-column"
         data-employee-fields="church_has church_position orgs"
       ></div>
-      <div data-employee-tables></div>
+      <div data-employee-tables=""></div>
     </fieldset>
     <fieldset hidden>
-      <legend>Contact in case of emergency</legend>
+      <legend>Contact In Case Of Emergency</legend>
       <div
         class="fgrid"
         data-employee-fields="
         emergency_name emergency_address emergency_no emergency_relationship
       "
       ></div>
-      <div data-employee-tables></div>
+      <div data-employee-tables=""></div>
     </fieldset>
     <fieldset hidden>
       <legend>Social Media</legend>
@@ -120,27 +120,30 @@
         class="fgrid"
         data-employee-fields="facebook instagram tiktok youtube twitter"
       ></div>
-      <div data-employee-tables></div>
+      <div data-employee-tables=""></div>
     </fieldset>
     <fieldset hidden>
-      <legend>Benefits and government information</legend>
+      <legend>Benefits And Government Information</legend>
       <div
         class="fgrid"
         data-employee-fields="hmo tin pagibig sss philhealth gov_deduction"
       ></div>
-      <div data-employee-tables></div>
+      <div data-employee-tables=""></div>
     </fieldset>
     <fieldset hidden>
-      <legend>Compensation information</legend>
-      <div class="fgrid" data-employee-fields="salary_structure fte"></div>
-      <div data-employee-tables></div>
+      <legend>Compensation Information</legend>
+      <div
+        class="fgrid employee-two-column"
+        data-employee-fields="salary_structure fte"
+      ></div>
+      <div data-employee-tables=""></div>
     </fieldset>
   </div>
   <section id="r_account_access" class="panel">
-    <h2>Account access request</h2>
+    <h2>Account Access Request</h2>
     <div class="fgrid">
       <label for="r_account_role"
-        >Assigned role
+        >Assigned Role
         <select id="r_account_role">
           <option value="STAFF">STAFF</option>
           <option value="HEAD">HEAD</option>
@@ -148,7 +151,7 @@
         </select>
       </label>
       <label for="r_account_password"
-        >Initial password
+        >Initial Password
         <input
           id="r_account_password"
           type="password"
@@ -159,7 +162,7 @@
         />
       </label>
       <label for="r_account_password_confirm"
-        >Confirm initial password
+        >Confirm Initial Password
         <input
           id="r_account_password_confirm"
           type="password"
@@ -177,7 +180,7 @@
     ><button class="ghost" id="r_cancel">Cancel</button>
   </div>
   <dialog id="preview">
-    <h2 style="margin-top: 0">Review before saving</h2>
+    <h2 style="margin-top: 0">Review Before Saving</h2>
     <div id="pv_body"></div>
     <div class="actions">
       <button id="pv_save">Save employee</button

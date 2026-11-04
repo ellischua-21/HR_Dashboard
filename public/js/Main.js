@@ -58,29 +58,29 @@ const FILTER_KEYS = [
 
 // [id, title, chart type, data key]
 const CHARTS = [
-  ['company', 'Headcount by company', 'bar', 'company'],
-  ['department', 'Headcount by department', 'bar', 'department'],
-  ['location', 'Headcount by work location', 'bar', 'location'],
-  ['status', 'Employment status', 'doughnut', 'status'],
-  ['gender', 'Gender distribution', 'doughnut', 'gender'],
-  ['age', 'Age groups', 'bar', 'age'],
-  ['education', 'Education level', 'bar', 'education'],
-  ['rank', 'Employee rank', 'bar', 'rank'],
-  ['functionType', 'Function type', 'bar', 'functionType'],
-  ['tenure', 'Tenure distribution', 'bar', 'tenure'],
-  ['hiringTrend', 'Monthly hiring trend', 'line', 'hiringTrend']
+  ['company', 'Headcount By Company', 'bar', 'company'],
+  ['department', 'Headcount By Department', 'bar', 'department'],
+  ['location', 'Headcount By Work Location', 'bar', 'location'],
+  ['status', 'Employment Status', 'doughnut', 'status'],
+  ['gender', 'Gender Distribution', 'doughnut', 'gender'],
+  ['age', 'Age Groups', 'bar', 'age'],
+  ['education', 'Education Level', 'bar', 'education'],
+  ['rank', 'Employee Rank', 'bar', 'rank'],
+  ['functionType', 'Function Type', 'bar', 'functionType'],
+  ['tenure', 'Tenure Distribution', 'bar', 'tenure'],
+  ['hiringTrend', 'Monthly Hiring Trend', 'line', 'hiringTrend']
 ];
 const KPIS = [
-  ['headcount', 'Total headcount', 'hero'],
-  ['fte', 'Full-time equivalent (FTE)', 'hero'],
-  ['active', 'Active employees'],
-  ['inactive', 'Inactive employees'],
-  ['newHires', 'New hires (period)'],
-  ['resigned', 'Resigned employees'],
-  ['avgTenureYears', 'Average tenure (years)'],
+  ['headcount', 'Total Headcount', 'hero'],
+  ['fte', 'Full-Time Equivalent (FTE)', 'hero'],
+  ['active', 'Active Employees'],
+  ['inactive', 'Inactive Employees'],
+  ['newHires', 'New Hires (Period)'],
+  ['resigned', 'Resigned Employees'],
+  ['avgTenureYears', 'Average Tenure (Years)'],
   ['companies', 'Companies'],
   ['departments', 'Departments'],
-  ['locations', 'Work locations']
+  ['locations', 'Work Locations']
 ];
 // Navigation: [id, label, permission]. Visibility only; the server enforces every permission.
 const NAV = [

@@ -8,10 +8,10 @@ function sanitize(value) {
   return text.slice(0, 500);
 }
 
-function validateEmployee(data, lists, includeSensitive = true) {
+function validateEmployee(data, lists) {
   const errors = [];
   EMP_FIELDS.forEach((field) => {
-    if (F.has(field, 'C') || (F.has(field, 'S') && !includeSensitive)) return;
+    if (F.has(field, 'C')) return;
     const value = data[field[0]];
     if (
       F.has(field, 'R') &&

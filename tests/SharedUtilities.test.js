@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   manilaDate,
+  ageOnDate,
   addWorkingDays,
   workingDaysBetween,
   formatDate,
@@ -17,6 +18,17 @@ const {
   notifyAccount,
   notifyReviewers
 } = require('../server/services/incident-management/Notifications');
+
+test('employee age changes on the calendar birthday and rejects invalid or future dates', () => {
+  assert.equal(ageOnDate('2000-11-04', '2026-11-03'), 25);
+  assert.equal(ageOnDate('2000-11-04', '2026-11-04'), 26);
+  assert.equal(ageOnDate('2000-11-04', '2026-11-05'), 26);
+  assert.equal(ageOnDate('2000-02-29', '2026-02-28'), 25);
+  assert.equal(ageOnDate('2000-02-29', '2026-03-01'), 26);
+  assert.equal(ageOnDate('2026-11-05', '2026-11-04'), '');
+  assert.equal(ageOnDate('2026-02-30', '2026-11-04'), '');
+  assert.equal(ageOnDate('', '2026-11-04'), '');
+});
 
 test('shared deadline calendar handles weekends, year boundaries, and invalid input', () => {
   assert.equal(manilaDate(new Date('2026-12-31T16:00:00Z')), '2027-01-01');

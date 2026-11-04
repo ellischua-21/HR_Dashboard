@@ -6,17 +6,16 @@ const {
   syncCounter,
   quote
 } = require('../db/database');
-const { requirePerm } = require('../middleware/Auth');
+const { requireEmployeeAccess } = require('../middleware/Auth');
 const { logAudit } = require('./AuditService');
 const { validateEmployee } = require('../utils/Validation');
 const { cleanEmployee, dbValue } = require('../utils/EmployeeData');
 const { httpError } = require('../utils/HttpError');
 
 async function importEmployees(req, records, commit) {
-  const user = await requirePerm(req, 'emp.write');
+  const user = await requireEmployeeAccess(req, 'emp.write');
   if (!Array.isArray(records) || records.length > 500)
     throw httpError('Import at most 500 rows per request.', 400);
-  const canSensitive = user.perms.includes('emp.sensitive');
   const lists = await getLists();
   const connection = await pool.getConnection();
   try {
@@ -39,7 +38,7 @@ async function importEmployees(req, records, commit) {
         });
         return;
       }
-      const clean = cleanEmployee(record, canSensitive);
+      const clean = cleanEmployee(record);
       EMP_FIELDS.forEach((field) => {
         const value = clean[field[0]];
         if (field[2] === 'list' && value) {
@@ -49,7 +48,7 @@ async function importEmployees(req, records, commit) {
           if (match) clean[field[0]] = match;
         }
       });
-      const rowErrors = validateEmployee(clean, lists, canSensitive);
+      const rowErrors = validateEmployee(clean, lists);
       const employeeNumber = clean.emp_no.toLowerCase();
       if (employeeNumber && existing.has(employeeNumber))
         rowErrors.push('Employee Number already exists');

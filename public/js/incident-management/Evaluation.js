@@ -24,7 +24,7 @@ function renderIncidentDecision(parent, incident, ui = {}) {
       '',
       `Delivered to employee inbox: ${DateUtils.formatDateTime(decision.deliveredAt)}`
     ),
-    incidentElement('h4', '', 'Evaluation findings'),
+    incidentElement('h4', '', 'Evaluation Findings'),
     incidentElement(
       'p',
       'incident-case-text',
@@ -121,7 +121,7 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
     return;
   const section = incidentElement('section', 'incident-case-section');
   section.appendChild(
-    incidentElement('h3', '', 'Evaluation and Final Decision')
+    incidentElement('h3', '', 'Evaluation And Final Decision')
   );
   if (incident.evaluation) {
     const evaluation = incident.evaluation;
@@ -155,7 +155,7 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
   }
   if (incident.disciplinaryHistory?.length) {
     section.appendChild(
-      incidentElement('h4', '', 'Finalized disciplinary history')
+      incidentElement('h4', '', 'Finalized Disciplinary History')
     );
     const history = incidentElement('ul');
     incident.disciplinaryHistory.forEach((item) =>
@@ -206,10 +206,10 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
     section.appendChild(wrapper);
   };
   field('Finding', finding);
-  field('Violation severity', severity);
-  field('Evaluation findings', findings);
-  field('Corrective action', recommendation);
-  field('Additional remarks', remarks);
+  field('Violation Severity', severity);
+  field('Evaluation Findings', findings);
+  field('Corrective Action', recommendation);
+  field('Additional Remarks', remarks);
   section.appendChild(context);
   const updateFindingFields = () => {
     const substantiated = finding.value === 'SUBSTANTIATED';

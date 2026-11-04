@@ -6,7 +6,6 @@ const ROLE_PERMS = {
     'exec.view',
     'emp.read',
     'emp.write',
-    'emp.sensitive',
     'emp.export',
     'emp.archive',
     'admin.manage',

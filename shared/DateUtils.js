@@ -29,6 +29,16 @@
     return `${parts.year}-${parts.month}-${parts.day}`;
   }
 
+  function ageOnDate(birthday, asOf = manilaDate()) {
+    if (!isValidDate(birthday) || !isValidDate(asOf) || birthday > asOf)
+      return '';
+    const [birthYear, birthMonth, birthDay] = birthday.split('-').map(Number);
+    const [year, month, day] = asOf.split('-').map(Number);
+    const birthdayPending =
+      month < birthMonth || (month === birthMonth && day < birthDay);
+    return year - birthYear - Number(birthdayPending);
+  }
+
   // The response period excludes its receipt day and skips Saturdays/Sundays.
   // Holidays are not part of the current HRIS calendar.
   function addWorkingDays(value, count) {
@@ -194,6 +204,7 @@
   return {
     isValidDate,
     manilaDate,
+    ageOnDate,
     addWorkingDays,
     workingDaysBetween,
     formatDate,

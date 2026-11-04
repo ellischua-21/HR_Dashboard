@@ -7,7 +7,7 @@ let META = null,
 const TABLES = {
   siblings: {
     title: 'Siblings',
-    count: 'No. of Siblings',
+    count: 'No. Of Siblings',
     cols: [
       ['name', 'Name'],
       ['address', 'Address'],
@@ -17,7 +17,7 @@ const TABLES = {
   },
   children: {
     title: 'Children',
-    count: 'No. of Children',
+    count: 'No. Of Children',
     cols: [
       ['name', 'Name'],
       ['address', 'Address'],
@@ -27,7 +27,7 @@ const TABLES = {
   },
   orgs: {
     title: 'Organizations/Memberships',
-    count: 'No. of memberships',
+    count: 'No. Of Memberships',
     cols: [
       ['org', 'Organization'],
       ['position', 'Position'],
@@ -168,9 +168,9 @@ VIEWS.employees = guard(async () => {
   const list = loadEmployees(); // start the list right away
   await ensureMeta(); // filter dropdowns load in parallel
   [
-    ['company', 'Company_List', 'All companies'],
-    ['department', 'Department_List', 'All departments'],
-    ['status', 'Employment_Status_List', 'All statuses']
+    ['company', 'Company_List', 'All Companies'],
+    ['department', 'Department_List', 'All Departments'],
+    ['status', 'Employment_Status_List', 'All Statuses']
   ].forEach(([k, l, all]) => {
     const s = $('e_' + k);
     if (s.options.length) return;
@@ -390,6 +390,8 @@ VIEWS.register = guard(async () => {
           i = el('input');
         i.id = 'ff_age';
         i.readOnly = true;
+        i.type = 'number';
+        i.setAttribute('aria-readonly', 'true');
         l.appendChild(i);
         group.appendChild(l);
         return;
@@ -402,7 +404,12 @@ VIEWS.register = guard(async () => {
       }
       const lab = el('label', f.label + (f.required ? ' *' : ''));
       let inp;
-      if (f.type === 'list') {
+      if (['address', 'permanent_address'].includes(k)) {
+        lab.classList.add('employee-address');
+        inp = el('textarea');
+        inp.rows = 2;
+        inp.maxLength = 500;
+      } else if (f.type === 'list') {
         inp = el('select');
         [''].concat(META.lists[f.list]).forEach((v) => {
           const o = el('option', v || 'Select…');
@@ -428,6 +435,8 @@ VIEWS.register = guard(async () => {
         }
       }
       inp.id = 'ff_' + k;
+      inp.required = Boolean(f.required);
+      if (k === 'birthday') inp.max = DateUtils.manilaDate();
       if (rec && rec[k] !== undefined) inp.value = rec[k];
       if (k === 'reports_to' && !rec) {
         inp.type = 'search';
@@ -483,13 +492,11 @@ VIEWS.register = guard(async () => {
   updateRegistrationRoleHelp();
   const calc = () => {
     const b = $('ff_birthday') && $('ff_birthday').value;
-    if ($('ff_age'))
-      $('ff_age').value = b
-        ? Math.floor((Date.now() - new Date(b)) / 31557600000)
-        : '';
+    if ($('ff_age')) $('ff_age').value = DateUtils.ageOnDate(b);
   };
   if ($('ff_birthday')) {
     $('ff_birthday').onchange = calc;
+    $('ff_birthday').oninput = calc;
     calc();
   }
 });

@@ -43,7 +43,7 @@ function fillFormTypeFilter(select) {
   select.replaceChildren();
   const allTypes = document.createElement('option');
   allTypes.value = '';
-  allTypes.textContent = 'All form types';
+  allTypes.textContent = 'All Form Types';
   select.appendChild(allTypes);
   FORM_TEMPLATES.forEach((template) => {
     const option = document.createElement('option');
@@ -71,7 +71,7 @@ function formTemplate(templateKey) {
   return (
     FORM_TEMPLATES.find((template) => template.key === templateKey) || {
       key: templateKey,
-      title: 'Submitted form',
+      title: 'Submitted Form',
       fields: []
     }
   );

@@ -5,7 +5,7 @@
   const dateTime = (value) => window.AppUI.dateTime(value, 'Not reached');
   function renderInformationRequests(parent, incident, controls) {
     const section = el('section', 'incident-case-section');
-    section.appendChild(el('h3', '', 'Information requests'));
+    section.appendChild(el('h3', '', 'Information Requests'));
     if (!incident.informationRequests.length)
       section.appendChild(
         el(
@@ -47,12 +47,12 @@
         const text = el('textarea');
         text.rows = 4;
         text.maxLength = 4000;
-        const textLabel = el('label', '', 'Your response');
+        const textLabel = el('label', '', 'Your Response');
         textLabel.appendChild(text);
         const files = el('input');
         files.type = 'file';
         files.multiple = true;
-        const fileLabel = el('label', '', 'Requested supporting evidence');
+        const fileLabel = el('label', '', 'Requested Supporting Evidence');
         fileLabel.appendChild(files);
         const actions = el('div', 'actions incident-track-actions');
         const submit = el('button', '', 'Submit information');
@@ -112,7 +112,7 @@
   async function renderInvestigationRequests(parent, incident, controls) {
     const section = el('section', 'incident-case-section');
     section.append(
-      el('h3', '', 'Request information from employees'),
+      el('h3', '', 'Request Information From Employees'),
       el(
         'p',
         'note',
@@ -134,7 +134,7 @@
         )
       );
       recipient.value = selectedEmail;
-      const recipientLabel = el('label', '', 'Send to');
+      const recipientLabel = el('label', '', 'Send To');
       recipientLabel.appendChild(recipient);
       const requestText = el('textarea');
       requestText.rows = 3;
@@ -233,7 +233,7 @@
 
   function renderActions(parent, incident, controls) {
     const workflow = el('section', 'incident-case-section');
-    workflow.appendChild(el('h3', '', 'Investigation findings'));
+    workflow.appendChild(el('h3', '', 'Investigation Findings'));
     const note = el('textarea');
     note.rows = 4;
     note.maxLength = 4000;
@@ -267,7 +267,7 @@
       }
     };
     workflow.append(
-      el('h4', '', 'Record findings and evidence'),
+      el('h4', '', 'Record Findings And Evidence'),
       note,
       files,
       saveNote

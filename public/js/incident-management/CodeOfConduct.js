@@ -12,7 +12,8 @@
 
   const feedback = (message, error = false) => ui.feedback(message, error);
   const canSearchHistory = () =>
-    session?.role === 'HR' && (session.perms || []).includes('emp.read');
+    ['HR', 'ADMIN'].includes(session?.role) &&
+    (session.perms || []).includes('emp.read');
 
   function renderMatrix() {
     if (!guide) return;
@@ -52,7 +53,7 @@
     action.rows = 2;
     action.maxLength = 191;
     action.required = true;
-    action.setAttribute('aria-label', 'Corrective action');
+    action.setAttribute('aria-label', 'Corrective Action');
     [severity, occurrence, action].forEach((control) => {
       const cell = el('td');
       cell.appendChild(control);

@@ -8,7 +8,7 @@ const { CFG } = require('../config/Config');
 const { normalizePagination } = require('../utils/Pagination');
 const { normalizeEmployeeFilters } = require('../utils/EmployeeFilters');
 const { httpError } = require('../utils/HttpError');
-const { requirePerm } = require('../middleware/Auth');
+const { requireEmployeeAccess } = require('../middleware/Auth');
 const { logAudit } = require('./AuditService');
 const { formatField } = require('../../shared/DateUtils');
 const {
@@ -35,14 +35,14 @@ const REPORTS = {
     cols: ['emp_no', 'name', 'company', 'department', 'position', 'status'],
     where: (employee) => !isActive(employee)
   },
-  hc_company: { t: 'Headcount by Company', type: 'group', key: 'company' },
+  hc_company: { t: 'Headcount By Company', type: 'group', key: 'company' },
   hc_department: {
-    t: 'Headcount by Department',
+    t: 'Headcount By Department',
     type: 'group',
     key: 'department'
   },
   hc_location: {
-    t: 'Headcount by Work Location',
+    t: 'Headcount By Work Location',
     type: 'group',
     key: 'location'
   },
@@ -89,11 +89,11 @@ const REPORTS = {
 };
 
 async function listReports(req) {
-  await requirePerm(req, 'report.run');
+  await requireEmployeeAccess(req, 'report.run');
   return Object.keys(REPORTS).map((id) => ({ id, title: REPORTS[id].t }));
 }
 
-async function buildReport(id, filters, user) {
+async function buildReport(id, filters) {
   filters = normalizeEmployeeFilters(filters);
   const definition = Object.hasOwn(REPORTS, id) ? REPORTS[id] : null;
   if (!definition)
@@ -118,11 +118,7 @@ async function buildReport(id, filters, user) {
   if (definition.type === 'list') {
     let keys = definition.cols;
     if (keys === 'master') {
-      const canSeeSensitive = user.perms.includes('emp.sensitive');
-      keys = EMP_FIELDS.filter(
-        (field) =>
-          field[0] !== 'docs' && (canSeeSensitive || !F.has(field, 'S'))
-      )
+      keys = EMP_FIELDS.filter((field) => field[0] !== 'docs')
         .map((field) => field[0])
         .concat(['age', 'tenure_years']);
     }
@@ -251,7 +247,7 @@ async function buildReport(id, filters, user) {
 }
 
 async function runReport(req, id, filters, options) {
-  const user = await requirePerm(req, 'report.run');
+  await requireEmployeeAccess(req, 'report.run');
   id = id || 'master';
   options = options || {};
   const { page, pageSize, offset } = normalizePagination(options, {
@@ -259,7 +255,7 @@ async function runReport(req, id, filters, options) {
     maxPageSize: 200,
     clampSize: true
   });
-  const report = await buildReport(id, filters || {}, user);
+  const report = await buildReport(id, filters || {});
   const column = Number(options.sortCol);
   if (
     Number.isInteger(column) &&
@@ -284,9 +280,9 @@ async function runReport(req, id, filters, options) {
 }
 
 async function exportReportCsv(req, id, filters) {
-  const user = await requirePerm(req, 'emp.export');
-  await requirePerm(req, 'report.run');
-  const report = await buildReport(id, filters || {}, user);
+  const user = await requireEmployeeAccess(req, 'emp.export');
+  await requireEmployeeAccess(req, 'report.run');
+  const report = await buildReport(id, filters || {});
   const escape = (value) => {
     let text = String(value === null || value === undefined ? '' : value);
     if (/^[=+\-@]/.test(text) && Number.isNaN(Number(text))) text = "'" + text;
