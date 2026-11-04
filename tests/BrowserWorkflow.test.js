@@ -2,6 +2,145 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createBrowser } = require('./helpers/Browser');
 
+test('attendance shows time logs and device serial numbers in a dropdown', async () => {
+  const browser = createBrowser();
+  browser.loadDashboard();
+  browser.evaluate("session = { role: 'HR', perms: ['emp.read'] }");
+  browser.context.fetch = async (url) => ({
+    ok: true,
+    json: async () =>
+      url.endsWith('getAttendanceContext')
+        ? { configured: true }
+        : {
+            rows: [
+              {
+                firstName: 'MARY anne',
+                lastName: 'O’NEIL',
+                employeeNo: 'E-100',
+                department: 'Business Intelligence',
+                device: 'RAMY_BIO, Office, East',
+                deviceNames: ['RAMY_BIO', 'Office, East'],
+                status: 'On-time',
+                overtime: true,
+                breakStatuses: [
+                  {
+                    period: 'AM',
+                    status: 'Normal',
+                    reason: 'Within grace periods.'
+                  },
+                  {
+                    period: 'Lunch',
+                    status: 'Abnormal',
+                    reason: 'Lunch exceeds 1 hour.'
+                  },
+                  {
+                    period: 'PM',
+                    status: 'Abnormal',
+                    reason: 'Break exceeds 15 minutes.'
+                  }
+                ],
+                timeLogs: [
+                  {
+                    time: '08:00',
+                    seconds: '20',
+                    device: 'RAMY_BIO',
+                    deviceSerialNo: 'SERIAL-1'
+                  },
+                  {
+                    time: '10:15',
+                    seconds: '05',
+                    device: 'Office, East',
+                    deviceSerialNo: 'SERIAL-2'
+                  }
+                ]
+              },
+              {
+                firstName: 'Second',
+                lastName: 'McDonald',
+                employeeNo: 'E-101',
+                status: 'On-time',
+                breakStatuses: [
+                  {
+                    period: 'AM',
+                    status: 'Normal',
+                    reason: 'Within grace periods.'
+                  },
+                  {
+                    period: 'Lunch',
+                    status: 'Normal',
+                    reason: 'Lunch lasted no more than 1 hour.'
+                  }
+                ]
+              }
+            ],
+            departments: [],
+            statuses: ['On-time'],
+            total: 1,
+            fetchedAt: '2026-11-04T08:00:00+08:00'
+          }
+  });
+  await browser.evaluate('VIEWS.attendance()');
+  const { document } = browser;
+  const headings =
+    document.getElementById('attendance-head').children[0].children;
+  assert.deepEqual(
+    headings.slice(-2).map((heading) => heading.textContent),
+    ['Status', 'Time Logs']
+  );
+  const row = document.getElementById('attendance-body').children[0];
+  assert.equal(row.children[0].textContent, 'Mary Anne');
+  assert.equal(row.children[1].textContent, 'O’Neil');
+  assert.equal(row.children[0].classList.contains('attendance-wrap-cell'), true);
+  assert.equal(row.children[1].classList.contains('attendance-wrap-cell'), true);
+  assert.equal(row.children[3].textContent, 'Business Intelligence');
+  assert.equal(
+    row.children[3].classList.contains('attendance-wrap-cell'),
+    true
+  );
+  assert.deepEqual(
+    row.children[14].children.map((item) => item.textContent),
+    ['RAMY_BIO', 'Office, East']
+  );
+  assert.deepEqual(
+    row.children[15].children.map((badge) => badge.textContent),
+    ['On-time', 'Overtime', 'Abnormal Break']
+  );
+  assert.equal(
+    row.children[15].children[1].classList.contains('is-overtime'),
+    true
+  );
+  assert.match(row.children[15].children[2].title, /Lunch: Abnormal/);
+  assert.match(row.children[15].children[2].title, /PM: Abnormal/);
+  assert.equal(
+    row.children[15].children[2].classList.contains('is-abnormal-break'),
+    true
+  );
+  const secondRow = document.getElementById('attendance-body').children[1];
+  assert.equal(secondRow.children[1].textContent, 'McDonald');
+  assert.deepEqual(
+    secondRow.children[15].children.map((badge) => badge.textContent),
+    ['On-time', 'Normal Break']
+  );
+  assert.equal(
+    secondRow.children[15].children[1].classList.contains('is-normal-break'),
+    true
+  );
+  const button = row.children[16].querySelector('button');
+  const panel = document.getElementById('attendance-time-logs');
+  await button.click();
+  assert.equal(button.getAttribute('aria-expanded'), 'true');
+  assert.equal(panel.hidden, false);
+  assert.match(panel.textContent, /8:00:20 AM/);
+  assert.match(panel.textContent, /10:15:05 AM/);
+  assert.match(panel.textContent, /SERIAL-1/);
+  assert.match(panel.textContent, /SERIAL-2/);
+  assert.match(panel.textContent, /Device Name/);
+  assert.match(panel.textContent, /Office, East/);
+  await button.click();
+  assert.equal(panel.hidden, true);
+  assert.equal(button.getAttribute('aria-expanded'), 'false');
+});
+
 test('employee registration renders personal details, address fields, and repeatable family sections', async () => {
   const { EMP_FIELDS, LISTS } = require('../server/config/EmployeeSchema');
   const browser = createBrowser();

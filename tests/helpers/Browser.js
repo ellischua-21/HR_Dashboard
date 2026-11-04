@@ -250,6 +250,7 @@ function createBrowser() {
     },
     clearTimeout: (id) => timers.delete(id),
     setInterval: () => 0,
+    addEventListener: () => {},
     requestAnimationFrame: (callback) => callback(),
     fetch: async () => {
       throw new Error('Unexpected network request');

@@ -2,6 +2,13 @@ const { requirePerm } = require('../middleware/Auth');
 const { httpError } = require('../utils/HttpError');
 const { isValidDate, manilaDate } = require('../../shared/DateUtils');
 const {
+  ATTENDANCE_RULES,
+  minutesOfDay,
+  attendanceStatus,
+  isOvertime,
+  breakStatus
+} = require('./AttendanceRules');
+const {
   createHikConnectAccounts
 } = require('../integrations/HikConnectAccounts');
 
@@ -17,14 +24,16 @@ const BREAK_RULES = {
   lunchStart: 10 * 60 + 30,
   shortLunchStart: 11 * 60 + 30,
   lunchEnd: 14 * 60 + 30,
-  lunchDurationMin: 10,
+  lunchDurationMin: 2,
   earlyLunchDurationMin: 30,
   lunchDurationMax: 120,
-  breakDurationMin: 5,
-  breakDurationMax: 40,
+  // Recognition remains wider than the permitted duration so overlong breaks
+  // can be displayed and flagged, rather than disappearing from the table.
+  breakDurationMin: 2,
+  breakDurationMax: 120,
   expectedLunch: 12 * 60,
-  expectedMorningBreak: 10 * 60,
-  expectedAfternoonBreak: 15 * 60,
+  expectedMorningBreak: ATTENDANCE_RULES.morningBreak,
+  expectedAfternoonBreak: ATTENDANCE_RULES.afternoonBreak,
   repeatScanMinutes: 2
 };
 
@@ -156,8 +165,6 @@ function normalizeRecords(data) {
         device: text(record.deviceName || record.elementName),
         deviceSerialNo: text(record.devSerialNo || record.serialNo),
         eventTimestamp: text(timestamp),
-        status: 'Not calculated',
-        attendanceStatusCode: Number(record.attendanceStatus),
         sortTime: when.sortTime
       };
     })
@@ -181,15 +188,6 @@ function normalizeDailySummaries(data) {
     'Friday',
     'Saturday'
   ];
-  const attendanceStatuses = [
-    'Not calculated',
-    'Normal',
-    'Late',
-    'Early departure',
-    'Late and early departure',
-    'Absent',
-    'Leave'
-  ];
   return data.reportDataList.map((record) => ({
     firstName: text(record?.firstName),
     lastName: text(record?.lastName),
@@ -199,20 +197,27 @@ function normalizeDailySummaries(data) {
     weekday:
       typeof record?.weekday === 'number' ? weekdays[record.weekday] || '' : '',
     timeIn: text(record?.clockInTime),
-    timeOut: text(record?.clockOutTime),
-    workHours: text(record?.workDuration),
-    status:
-      attendanceStatuses[Number(record?.attendanceStatus)] || 'Not calculated'
+    timeOut: text(record?.clockOutTime)
   }));
 }
 
-function minutesOfDay(value) {
-  const match = String(value || '').match(/^(\d{2}):(\d{2})$/);
-  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+function elapsedWorkHours(timeIn, timeOut) {
+  const start = minutesOfDay(timeIn);
+  const end = minutesOfDay(timeOut);
+  if (start === null || end === null || end <= start) return '';
+  const duration = end - start;
+  return Math.floor(duration / 60) + 'h ' + (duration % 60) + 'm';
 }
 
 function inferDailyAttendance(events, summary = {}) {
-  const ordered = [...events].sort((a, b) => a.sortTime - b.sortTime);
+  const ordered = events
+    .filter(
+      (event) =>
+        minutesOfDay(event.time) !== null &&
+        Number.isFinite(event.sortTime) &&
+        event.sortTime > 0
+    )
+    .sort((a, b) => a.sortTime - b.sortTime);
   // Retain the original first/last scans for the day, but collapse rapid
   // rescans before looking for breaks, including rescans on another device.
   const distinct = [];
@@ -238,8 +243,7 @@ function inferDailyAttendance(events, summary = {}) {
         start,
         end,
         duration,
-        startMinute,
-        endsAtLatestScan: index + 1 === distinct.length - 1
+        startMinute
       });
     }
   }
@@ -266,7 +270,6 @@ function inferDailyAttendance(events, summary = {}) {
       ? gap.index + 1 < lunch.index
       : minutesOfDay(gap.end.time) < BREAK_RULES.shortLunchStart;
     return (
-      !gap.endsAtLatestScan &&
       isBeforeLunch &&
       gap.duration >= BREAK_RULES.breakDurationMin &&
       gap.duration <= BREAK_RULES.breakDurationMax
@@ -277,8 +280,8 @@ function inferDailyAttendance(events, summary = {}) {
       ? gap.index > lunch.index + 1
       : gap.startMinute > BREAK_RULES.lunchEnd;
     return (
-      !gap.endsAtLatestScan &&
       isAfterLunch &&
+      minutesOfDay(gap.end.time) < ATTENDANCE_RULES.regularOut &&
       gap.duration >= BREAK_RULES.breakDurationMin &&
       gap.duration <= BREAK_RULES.breakDurationMax
     );
@@ -306,8 +309,16 @@ function inferDailyAttendance(events, summary = {}) {
     lunchIn: lunch?.end.time || '',
     pmBreakOut: afternoonBreak?.start.time || '',
     pmBreakIn: afternoonBreak?.end.time || '',
+    breakStatuses: [
+      breakStatus(morningBreak, 'AM'),
+      breakStatus(lunch, 'Lunch'),
+      breakStatus(afternoonBreak, 'PM')
+    ].filter(Boolean),
     timeOut:
-      distinct.length < 2 || lunch?.end === distinct.at(-1)
+      distinct.length < 2 ||
+      [morningBreak, lunch, afternoonBreak].some(
+        (gap) => gap && gap.end === distinct.at(-1)
+      )
         ? ''
         : ordered.at(-1)?.time || summary.timeOut || ''
   };
@@ -323,6 +334,7 @@ function groupDailyAttendance(rows, summaryByEmployeeDay) {
       daily = {
         ...row,
         events: [],
+        timeLogs: [],
         devices: new Set(),
         serialNumbers: new Set(),
         dataSources: new Set()
@@ -338,6 +350,7 @@ function groupDailyAttendance(rows, summaryByEmployeeDay) {
       daily.eventKeys.add(eventKey);
       daily.events.push(row);
     }
+    daily.timeLogs.push(row);
     if (row.device) daily.devices.add(row.device);
     if (row.deviceSerialNo) daily.serialNumbers.add(row.deviceSerialNo);
     if (row.dataSource) daily.dataSources.add(row.dataSource);
@@ -354,12 +367,24 @@ function groupDailyAttendance(rows, summaryByEmployeeDay) {
       firstName: row.firstName,
       lastName: row.lastName,
       department: row.department,
-      weekday: row.weekday,
-      status: row.status
+      weekday: row.weekday
     };
     Object.assign(row, inferred);
     for (const [field, value] of Object.entries(identity)) row[field] ||= value;
-    row.device = [...row.devices].join(', ');
+    row.timeLogs = row.timeLogs
+      .sort((a, b) => a.sortTime - b.sortTime)
+      .map((event) => ({
+        time: event.time,
+        seconds:
+          /[T ]\d{2}:\d{2}:(\d{2})/.exec(event.eventTimestamp)?.[1] || '',
+        deviceSerialNo: event.deviceSerialNo,
+        device: event.device
+      }));
+    row.workHours = elapsedWorkHours(row.timeIn, row.timeOut);
+    row.status = attendanceStatus(row.timeIn, row.timeOut);
+    row.overtime = isOvertime(row.timeIn, row.timeOut);
+    row.deviceNames = [...row.devices];
+    row.device = row.deviceNames.join(', ');
     row.deviceSerialNo = [...row.serialNumbers].join(', ');
     row.dataSource = [...row.dataSources].join(', ');
     delete row.events;
@@ -369,7 +394,6 @@ function groupDailyAttendance(rows, summaryByEmployeeDay) {
     delete row.dataSources;
     delete row.time;
     delete row.eventTimestamp;
-    delete row.attendanceStatusCode;
     return row;
   });
 }
@@ -445,8 +469,46 @@ async function loadAccountAttendance(client, query) {
     row.department ||= text(summary.department);
     row.weekday ||= text(summary.weekday);
   }
+  const dailyRows = groupDailyAttendance(allRows, summaryByEmployeeDay);
+  const knownDays = new Set(
+    dailyRows.map((row) => JSON.stringify([row.employeeNo, row.date]))
+  );
+  for (const [key, summary] of summaryByEmployeeDay) {
+    if (
+      knownDays.has(key) ||
+      !summary.employeeNo ||
+      !isValidDate(summary.date) ||
+      summary.date < query.dateFrom ||
+      summary.date > query.dateTo
+    )
+      continue;
+    const timeIn = minutesOfDay(summary.timeIn) === null ? '' : summary.timeIn;
+    const timeOut =
+      minutesOfDay(summary.timeOut) === null ? '' : summary.timeOut;
+    dailyRows.push({
+      ...summary,
+      timeIn,
+      timeOut,
+      amBreakOut: '',
+      amBreakIn: '',
+      lunchOut: '',
+      lunchIn: '',
+      pmBreakOut: '',
+      pmBreakIn: '',
+      workHours: elapsedWorkHours(timeIn, timeOut),
+      status: attendanceStatus(timeIn, timeOut),
+      overtime: isOvertime(timeIn, timeOut),
+      breakStatuses: [],
+      timeLogs: [],
+      dataSource: 'Daily report',
+      device: '',
+      deviceNames: [],
+      deviceSerialNo: '',
+      sortTime: Date.parse(`${summary.date}T00:00:00+08:00`)
+    });
+  }
   return {
-    rows: groupDailyAttendance(allRows, summaryByEmployeeDay),
+    rows: dailyRows,
     summaryAvailable
   };
 }
@@ -494,13 +556,9 @@ async function listAttendance(req, input) {
     const departments = [
       ...new Set(allRows.map((row) => row.department).filter(Boolean))
     ].sort((a, b) => a.localeCompare(b));
-    const statuses = [
-      ...new Set(allRows.map((row) => row.status).filter(Boolean))
-    ].sort((a, b) => a.localeCompare(b));
     cached = {
       rows: allRows,
       departments,
-      statuses,
       summaryAvailable,
       fetchedAt: new Date().toISOString(),
       expiresAt: Date.now() + 60000
@@ -509,9 +567,22 @@ async function listAttendance(req, input) {
     while (attendanceCache.size > 5)
       attendanceCache.delete(attendanceCache.keys().next().value);
   }
+  const statuses = [
+    ...new Set(
+      cached.rows.flatMap((row) =>
+        row.overtime ? [row.status, 'Overtime'] : [row.status]
+      )
+    )
+  ].sort((a, b) => a.localeCompare(b));
   const filtered = cached.rows
     .filter((row) => !query.department || row.department === query.department)
-    .filter((row) => !query.status || row.status === query.status)
+    .filter(
+      (row) =>
+        !query.status ||
+        (query.status === 'Overtime'
+          ? row.overtime
+          : row.status === query.status)
+    )
     .sort(
       (a, b) =>
         a.department.localeCompare(b.department) ||
@@ -520,10 +591,9 @@ async function listAttendance(req, input) {
         a.firstName.localeCompare(b.firstName)
     );
   return {
-    rows: filtered
-      .map(({ sortTime, attendanceStatusCode, ...row }) => row),
+    rows: filtered.map(({ sortTime, ...row }) => row),
     departments: cached.departments,
-    statuses: cached.statuses,
+    statuses,
     summaryAvailable: cached.summaryAvailable,
     total: filtered.length,
     fetchedAt: cached.fetchedAt

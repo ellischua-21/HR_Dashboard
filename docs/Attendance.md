@@ -24,7 +24,7 @@ click Refresh. Additional accounts use `HIKCONNECT_3_`, `HIKCONNECT_4_`, and so 
 Each account needs all three settings. Blank optional accounts are ignored;
 partially configured accounts must be completed before attendance can load.
 
-Records from all configured accounts share the existing list, sorting, pagination,
+Records from all configured accounts share the existing list, sorting,
 and filters. Departments found in their records for the selected date are added
 automatically to the department filter. Matching department names share one filter
 option. No employee or department records are imported into the HRIS database.
@@ -46,21 +46,76 @@ Requests use HTTPS with timeouts and no redirects. Tokens stay in server memory;
 
 The table shows one row per employee and day within each connected account, with
 device names combined. Time in and time out use the original first and last
-scans, except that time out stays blank when the latest scan completes lunch or
+scans, except that time out stays blank when the latest scan completes a break or lunch, or
 only one distinct scan exists. Break inference uses a separate chronological
 sequence that collapses
 rescans within two minutes of the first scan in each cluster, even across devices.
-The arrival cluster is excluded from break and lunch pairs. Lunch can use the
-latest scan as its return so lunch remains visible during an ongoing workday.
-Short AM/PM breaks still require a later scan to distinguish them from departure.
+The arrival cluster is excluded from break and lunch pairs. Completed AM/PM breaks
+and lunch appear as soon as their return scan is fetched, without requiring a
+later scan. Their return scans cannot also become Time Out.
 
 Lunch is selected before morning and afternoon breaks. A lunch beginning between
-11:30 AM and 2:30 PM can last 10 to 120 minutes; an earlier lunch beginning between
+11:30 AM and 2:30 PM can last more than 2 and up to 120 minutes; an earlier lunch beginning between
 10:30 AM and 11:30 AM must last at least 30 minutes. Candidates are ranked by
 their distance from noon, then their distance from a 60-minute duration. AM and
-PM breaks last 5 to 40 minutes, occur before or after lunch, and cannot reuse a
-lunch scan. When no lunch is identified, midday gaps are left unclassified;
+PM break recognition allows gaps longer than two minutes and up to 120 minutes,
+so an overlong break can still be displayed and flagged. These recognition limits
+are separate from the permitted 15-minute duration. Breaks occur before or after
+lunch and cannot reuse a lunch scan. A PM pair must finish before 6:30 PM to avoid
+classifying the regular departure as a break return.
+When no lunch is identified, midday gaps are left unclassified;
 morning breaks must finish before 11:30 AM and afternoon breaks must start after
 2:30 PM. These are timing estimates because the scanned events do not reliably
-label a break's purpose. Work hours and attendance status still use the provider's
-daily summary when available.
+label a break's purpose. Work Hours is calculated as Time Out minus Time In,
+including lunch and breaks. It remains blank when Time Out is unavailable.
+
+The arrow in Time Logs shows the original events in chronological order, with
+the time (including seconds), device name and device serial number for each event. Scans are
+not classified by alternating IN/OUT positions; extra scans do not shift the
+classification of every later event.
+
+## Attendance status
+
+Status is calculated in the HRIS using Manila local time. Device status codes and
+device work-duration calculations are ignored.
+
+| Status | Rule |
+| --- | --- |
+| On-time | Time In before 8:11 AM, with no early departure. |
+| Late | Time In at or after 8:11 AM. |
+| Early departure | Time Out before 6:30 PM. |
+| Late and early departure | Both Late and Early departure apply. |
+| Absent | No valid Time In is available. |
+| Overtime | Time Out at or after 7:01 PM, with a valid Time In. |
+
+On-time or Late is shown when Time Out is missing. Overtime appears as a separate
+badge alongside On-time or Late and is available in the status filter. Since scanner
+events do not reliably identify direction, Time Out and Overtime are estimates.
+No Leave status
+is inferred or copied from the device. Daily-report employees with no scans are
+included so missing attendance can appear. When only a daily-report row exists,
+its clock-in/clock-out values supply the times and HRIS calculates the status.
+If the provider returns neither a scan nor a daily-report row for an employee,
+there is no roster entry from which to identify that employee's absence.
+
+## Break status
+
+Completed AM, lunch, and PM breaks contribute to one Normal Break or Abnormal
+Break badge in Status. Any identified abnormal break makes the badge Abnormal;
+when all identified breaks are normal, it is Normal. Its tooltip identifies each
+break and explains the result. Missing break pairs do not contribute a status;
+missing scans do not prove a break was taken incorrectly.
+
+- AM break may start from 9:57 AM to 10:03 AM.
+- PM break may start from 2:57 PM to 3:03 PM.
+- AM and PM breaks must last no more than 15 minutes from the actual break-out time.
+  There is no additional duration grace period.
+- A start outside its window or a duration over 15 minutes is Abnormal.
+- Examples: 9:57 to 10:12 is Normal; 9:57 to 10:15 is Abnormal;
+  10:03 to 10:18 is Normal. Durations use scan seconds when supplied.
+- Lunch may start from 11:55 AM to 12:10 PM and may last up to one hour
+  from lunch out. A start outside that window or a duration longer than one hour,
+  including by one second, is Abnormal. Returning early is Normal.
+
+Hover over a break badge to see its reason. Break badges do not replace the main
+attendance status. The status filter applies to the main attendance status.

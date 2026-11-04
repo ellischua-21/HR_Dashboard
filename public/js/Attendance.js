@@ -1,6 +1,7 @@
 (function () {
   let configured = false;
   let pending = false;
+  let openLogButton = null;
   const columns = [
     ['firstName', 'First Name'],
     ['lastName', 'Last Name'],
@@ -17,13 +18,33 @@
     ['workHours', 'Work Hours'],
     ['dataSource', 'Data Source'],
     ['device', 'Device Name'],
-    ['deviceSerialNo', 'Device Serial No.'],
-    ['status', 'Status']
+    ['status', 'Status'],
+    ['timeLogs', 'Time Logs']
   ];
   const timeColumns = new Set([
-    'timeIn', 'amBreakOut', 'amBreakIn', 'lunchOut', 'lunchIn',
-    'pmBreakOut', 'pmBreakIn', 'timeOut'
+    'timeIn',
+    'amBreakOut',
+    'amBreakIn',
+    'lunchOut',
+    'lunchIn',
+    'pmBreakOut',
+    'pmBreakIn',
+    'timeOut'
   ]);
+  const statusColors = {
+    'on-time': 'is-normal',
+    late: 'is-late',
+    'early departure': 'is-early',
+    'late and early departure': 'is-late-early',
+    absent: 'is-absent'
+  };
+
+  function formatEmployeeName(value) {
+    return String(value || '').replace(/\p{L}[\p{L}\p{M}]*/gu, (word) => {
+      if (word !== word.toLocaleUpperCase() && word !== word.toLocaleLowerCase()) return word;
+      return word.toLocaleLowerCase().replace(/^\p{L}/u, (letter) => letter.toLocaleUpperCase());
+    });
+  }
 
   function setPending(value) {
     pending = value;
@@ -54,7 +75,74 @@
     }).format(new Date(year, month - 1, day));
   }
 
+  function closeTimeLogs(restoreFocus = false) {
+    const button = openLogButton;
+    if (button) button.setAttribute('aria-expanded', 'false');
+    openLogButton = null;
+    $('attendance-time-logs').hidden = true;
+    if (restoreFocus && button) button.focus();
+  }
+
+  function showTimeLogs(button, record) {
+    if (openLogButton === button) {
+      closeTimeLogs();
+      return;
+    }
+    closeTimeLogs();
+    const panel = $('attendance-time-logs');
+    panel.replaceChildren();
+    const header = document.createElement('div');
+    header.className = 'attendance-time-log-header';
+    for (const label of ['Time', 'Device Name', 'Device Serial No.']) {
+      const heading = document.createElement('strong');
+      heading.textContent = label;
+      header.appendChild(heading);
+    }
+    panel.appendChild(header);
+    const logs = record.timeLogs || [];
+    if (!logs.length) {
+      const empty = document.createElement('p');
+      empty.textContent = 'No time logs available.';
+      panel.appendChild(empty);
+    }
+    for (const log of logs) {
+      const item = document.createElement('div');
+      item.className = 'attendance-time-log-item';
+      const time = document.createElement('span');
+      const formatted = DateUtils.formatTime(log.time) || '—';
+      time.textContent = /^\d{2}$/.test(log.seconds || '')
+        ? formatted.replace(/ (AM|PM)$/, `:${log.seconds} $1`)
+        : formatted;
+      const serial = document.createElement('span');
+      serial.textContent = log.deviceSerialNo || '—';
+      const device = document.createElement('span');
+      device.textContent = log.device || '—';
+      item.append(time, device, serial);
+      panel.appendChild(item);
+    }
+    panel.hidden = false;
+    const anchor = button.getBoundingClientRect();
+    const bounds = panel.getBoundingClientRect();
+    const left = Math.max(
+      8,
+      Math.min(
+        anchor.right - bounds.width,
+        window.innerWidth - bounds.width - 8
+      )
+    );
+    const below = anchor.bottom + 4;
+    const top =
+      below + bounds.height <= window.innerHeight - 8
+        ? below
+        : Math.max(8, anchor.top - bounds.height - 4);
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+    openLogButton = button;
+    button.setAttribute('aria-expanded', 'true');
+  }
+
   function drawTable(rows, emptyMessage) {
+    closeTimeLogs();
     const header = document.createElement('tr');
     columns.forEach(([, label]) => {
       const cell = document.createElement('th');
@@ -76,7 +164,50 @@
     rows.forEach((record) => {
       const row = document.createElement('tr');
       columns.forEach(([key]) => {
+        if (key === 'timeLogs') {
+          const cell = AppUI.tableCell('');
+          cell.className = 'attendance-time-logs-cell';
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'attendance-time-logs-toggle';
+          button.textContent = '▾';
+          button.setAttribute('aria-controls', 'attendance-time-logs');
+          button.setAttribute('aria-expanded', 'false');
+          const employee = [
+            formatEmployeeName(record.firstName),
+            formatEmployeeName(record.lastName),
+            record.employeeNo
+          ]
+            .filter(Boolean)
+            .join(' ');
+          button.setAttribute(
+            'aria-label',
+            `Show time logs for ${employee || 'employee'}`
+          );
+          button.addEventListener('click', () => showTimeLogs(button, record));
+          cell.appendChild(button);
+          row.appendChild(cell);
+          return;
+        }
+        if (key === 'device') {
+          const cell = AppUI.tableCell('');
+          cell.classList.add('attendance-wrap-cell');
+          const names = record.deviceNames?.length
+            ? record.deviceNames
+            : record.device
+              ? [record.device]
+              : [];
+          if (!names.length) cell.textContent = '—';
+          names.forEach((name) => {
+            const item = document.createElement('div');
+            item.textContent = name;
+            cell.appendChild(item);
+          });
+          row.appendChild(cell);
+          return;
+        }
         let value = record[key];
+        if (key === 'firstName' || key === 'lastName') value = formatEmployeeName(value);
         if (
           [
             'timeIn',
@@ -90,25 +221,46 @@
           ].includes(key)
         )
           value = DateUtils.formatTime(value);
-        row.appendChild(AppUI.tableCell(value || '—'));
+        const cell = AppUI.tableCell(value || '—');
+        if (['firstName', 'lastName', 'department'].includes(key)) cell.classList.add('attendance-wrap-cell');
+        row.appendChild(cell);
       });
-      const statusCell = row.lastElementChild;
-      const status = String(record.status || 'Not calculated');
+      const statusCell =
+        row.children[columns.findIndex(([key]) => key === 'status')];
+      const status = String(record.status || '—');
       const normalizedStatus = status.toLowerCase();
       const statusBadge = document.createElement('span');
       statusBadge.className = 'attendance-status-badge';
-      if (normalizedStatus === 'normal')
-        statusBadge.classList.add('is-normal');
-      else if (
-        normalizedStatus.includes('late') ||
-        normalizedStatus.includes('early')
-      )
-        statusBadge.classList.add('is-exception');
-      else if (normalizedStatus === 'absent')
-        statusBadge.classList.add('is-absent');
-      else statusBadge.classList.add('is-neutral');
+      statusBadge.classList.add(statusColors[normalizedStatus] || 'is-neutral');
       statusBadge.textContent = status;
+      statusBadge.title = status;
       statusCell.replaceChildren(statusBadge);
+      if (record.overtime) {
+        const overtimeBadge = document.createElement('span');
+        overtimeBadge.className =
+          'attendance-status-badge attendance-additional-status is-overtime';
+        overtimeBadge.textContent = 'Overtime';
+        statusCell.appendChild(overtimeBadge);
+      }
+      const breaks = record.breakStatuses || [];
+      if (breaks.length) {
+        const abnormal = breaks.some((entry) => entry.status === 'Abnormal');
+        const badge = document.createElement('span');
+        badge.className =
+          'attendance-status-badge attendance-additional-status';
+        badge.classList.add(abnormal ? 'is-abnormal-break' : 'is-normal-break');
+        badge.textContent = abnormal ? 'Abnormal Break' : 'Normal Break';
+        badge.title = breaks
+          .map(
+            (entry) => `${entry.period}: ${entry.status}. ${entry.reason || ''}`
+          )
+          .join('\n');
+        badge.setAttribute(
+          'aria-label',
+          `${badge.textContent}. ${badge.title}`
+        );
+        statusCell.appendChild(badge);
+      }
       timeColumns.forEach((key) => {
         const columnIndex = columns.findIndex(
           ([columnKey]) => columnKey === key
@@ -124,6 +276,22 @@
       body.appendChild(row);
     });
   }
+
+  document.addEventListener('click', (event) => {
+    if (
+      openLogButton &&
+      !openLogButton.contains(event.target) &&
+      !$('attendance-time-logs').contains(event.target)
+    )
+      closeTimeLogs();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && openLogButton) closeTimeLogs(true);
+  });
+  document
+    .querySelector('.attendance-table-scroll')
+    .addEventListener('scroll', () => closeTimeLogs());
+  window.addEventListener('resize', () => closeTimeLogs());
 
   async function loadRecords(query, refresh = false) {
     if (pending || !configured) return;

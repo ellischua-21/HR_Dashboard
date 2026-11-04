@@ -12,6 +12,7 @@ const {
   getAttendanceContext
 } = require('../server/services/AttendanceService');
 const { pool } = require('../server/db/database');
+const { attendanceStatus } = require('../server/services/AttendanceRules');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
@@ -133,8 +134,8 @@ test('attendance keeps account-scoped IDs separate and uses first scan time-in',
   assert.deepEqual(
     Array.from(result.rows, (row) => [row.department, row.timeIn, row.status]),
     [
-      ['Dept A', '08:00', 'Normal'],
-      ['Dept B', '08:00', 'Late']
+      ['Dept A', '08:00', 'On-time'],
+      ['Dept B', '08:00', 'On-time']
     ]
   );
   const filtered = await service.listAttendance(
@@ -219,6 +220,12 @@ test('attendance infers daily break times across device names and returns one da
       '18:30'
     ]
   );
+  assert.deepEqual(Array.from(result.rows[0].deviceNames), [
+    'RAMY_BIO',
+    'COTI_BIO'
+  ]);
+  assert.equal(result.rows[0].timeLogs[0].device, 'RAMY_BIO');
+  assert.equal(result.rows[0].timeLogs[1].device, 'COTI_BIO');
   assert.ok(result.rows.every((row) => !Object.hasOwn(row, 'time')));
 });
 
@@ -308,9 +315,9 @@ test('short lunches and repeated boundary scans do not become extra breaks', asy
       expected: ['08:00', '', '', '12:07', '12:26', '', '', '18:30']
     },
     {
-      name: 'a midday gap too short for lunch is left unclassified',
+      name: 'a short midday lunch is displayed',
       times: ['08:00', '12:07', '12:12', '18:30'],
-      expected: ['08:00', '', '', '', '', '', '', '18:30']
+      expected: ['08:00', '', '', '12:07', '12:12', '', '', '18:30']
     }
   ];
   for (const { name, times, expected } of cases) {
@@ -346,6 +353,223 @@ test('short lunches and repeated boundary scans do not become extra breaks', asy
       );
     });
   }
+});
+
+test('local attendance status handles the arrival cutoff, departure cutoff and missing punches', () => {
+  for (const [arrival, departure, expected] of [
+    ['08:10', '18:30', 'On-time'],
+    ['08:11', '18:30', 'Late'],
+    ['08:00', '18:29', 'Early departure'],
+    ['08:11', '18:29', 'Late and early departure'],
+    ['08:00', '19:00', 'On-time'],
+    ['08:11', '', 'Late'],
+    ['08:10', '', 'On-time'],
+    ['', '', 'Absent'],
+    ['', '18:30', 'Absent'],
+    ['08:00', '07:00', 'On-time'],
+    ['invalid', '18:30', 'Absent']
+  ])
+    assert.equal(
+      attendanceStatus(arrival, departure),
+      expected,
+      `${arrival} to ${departure}`
+    );
+});
+
+test('completed breaks appear immediately, preserve raw logs and respect start and duration grace periods', async (t) => {
+  const cases = [
+    { times: ['08:00', '09:57', '10:12'], period: 'AM', status: 'Normal' },
+    { times: ['08:00', '10:03', '10:18'], period: 'AM', status: 'Normal' },
+    { times: ['08:00', '09:57', '10:15'], period: 'AM', status: 'Abnormal' },
+    { times: ['08:00', '10:00', '10:04'], period: 'AM', status: 'Normal' },
+    { times: ['08:00', '10:00', '11:00'], period: 'AM', status: 'Abnormal' },
+    { times: ['08:00', '09:56', '10:11'], period: 'AM', status: 'Abnormal' },
+    { times: ['08:00', '10:04', '10:19'], period: 'AM', status: 'Abnormal' },
+    { times: ['08:00', '10:00', '10:18'], period: 'AM', status: 'Abnormal' },
+    {
+      times: ['08:00', '10:00:00', '10:15:01'],
+      period: 'AM',
+      status: 'Abnormal'
+    },
+    {
+      times: ['08:00', '12:00', '13:00', '14:57', '15:12'],
+      period: 'PM',
+      status: 'Normal'
+    },
+    {
+      times: ['08:00', '12:00', '13:00', '15:03', '15:18'],
+      period: 'PM',
+      status: 'Normal'
+    },
+    {
+      times: ['08:00', '12:00', '13:00', '15:04', '15:19'],
+      period: 'PM',
+      status: 'Abnormal'
+    },
+    {
+      times: ['08:00', '12:00', '13:00', '15:00', '15:18'],
+      period: 'PM',
+      status: 'Abnormal'
+    },
+    {
+      times: ['08:00', '12:00', '13:00', '15:00', '16:00'],
+      period: 'PM',
+      status: 'Abnormal'
+    },
+    { times: ['08:00', '15:00', '15:15'], period: 'PM', status: 'Normal' }
+  ];
+  for (const { times, period, status } of cases)
+    await t.test(times.join(', '), async () => {
+      const client = {
+        search: async () => ({
+          totalNum: times.length,
+          recordList: times.map((time) => ({
+            deviceTime: `2026-10-31T${time.length === 5 ? time + ':00' : time}+08:00`,
+            personInfo: { personCode: 'E-100' }
+          }))
+        }),
+        searchDailySummary: async () => ({ moreData: 0, reportDataList: [] })
+      };
+      const result = await attendanceWithAccounts([
+        { name: 'Account 1', client }
+      ]).listAttendance({}, { dateFrom: '2026-10-31', dateTo: '2026-10-31' });
+      const row = result.rows[0];
+      const prefix = period === 'AM' ? 'am' : 'pm';
+      assert.equal(row[`${prefix}BreakOut`], times.at(-2).slice(0, 5));
+      assert.equal(row[`${prefix}BreakIn`], times.at(-1).slice(0, 5));
+      assert.equal(
+        row.breakStatuses.find((badge) => badge.period === period).status,
+        status
+      );
+      assert.equal(row.timeOut, '');
+      assert.equal(row.workHours, '');
+      assert.equal(row.status, 'On-time');
+      assert.equal(row.timeLogs.length, times.length);
+    });
+});
+
+test('overtime starts at 7:01 PM and can be filtered alongside arrival status', async () => {
+  const days = [
+    ['E-1', '08:00', '19:00'],
+    ['E-2', '08:00', '19:01'],
+    ['E-3', '08:11', '20:00']
+  ];
+  const client = {
+    search: async () => ({
+      totalNum: days.length * 2,
+      recordList: days.flatMap(([personCode, start, end]) =>
+        [start, end].map((time) => ({
+          deviceTime: `2026-10-31T${time}:00+08:00`,
+          personInfo: { personCode }
+        }))
+      )
+    }),
+    searchDailySummary: async () => ({ moreData: 0, reportDataList: [] })
+  };
+  const service = attendanceWithAccounts([{ name: 'Account 1', client }]);
+  const filters = { dateFrom: '2026-10-31', dateTo: '2026-10-31' };
+  const result = await service.listAttendance({}, filters);
+  const find = (id) => result.rows.find((row) => row.employeeNo === id);
+  assert.equal(find('E-1').overtime, false);
+  assert.equal(find('E-2').overtime, true);
+  assert.equal(find('E-2').status, 'On-time');
+  assert.equal(find('E-3').overtime, true);
+  assert.equal(find('E-3').status, 'Late');
+  assert.ok(result.statuses.includes('Overtime'));
+  const filtered = await service.listAttendance(
+    {},
+    { ...filters, status: 'Overtime' }
+  );
+  assert.deepEqual(Array.from(filtered.rows, (row) => row.employeeNo).sort(), [
+    'E-2',
+    'E-3'
+  ]);
+});
+
+test('lunch status uses its allowed start window and permits up to one hour', async (t) => {
+  for (const [out, back, expected] of [
+    ['11:55:00', '12:55:00', 'Normal'],
+    ['12:10:00', '13:10:00', 'Normal'],
+    ['11:54:59', '12:54:59', 'Abnormal'],
+    ['12:10:01', '13:10:01', 'Abnormal'],
+    ['12:00:00', '12:03:00', 'Normal'],
+    ['12:00:00', '12:59:00', 'Normal'],
+    ['12:00:00', '13:01:00', 'Abnormal'],
+    ['12:00:00', '13:00:01', 'Abnormal']
+  ]) {
+    await t.test(`${out} to ${back}`, async () => {
+      const times = ['08:00:00', out, back];
+      const client = {
+        search: async () => ({
+          totalNum: times.length,
+          recordList: times.map((time) => ({
+            deviceTime: `2026-10-31T${time}+08:00`,
+            personInfo: { personCode: 'E-100' }
+          }))
+        }),
+        searchDailySummary: async () => ({ moreData: 0, reportDataList: [] })
+      };
+      const result = await attendanceWithAccounts([
+        { name: 'Account 1', client }
+      ]).listAttendance({}, { dateFrom: '2026-10-31', dateTo: '2026-10-31' });
+      const row = result.rows[0];
+      assert.equal(row.lunchOut, out.slice(0, 5));
+      assert.equal(row.lunchIn, back.slice(0, 5));
+      assert.equal(
+        row.breakStatuses.find((entry) => entry.period === 'Lunch').status,
+        expected
+      );
+      assert.equal(row.timeOut, '');
+    });
+  }
+});
+
+test('daily reports include employees without scans and local status overrides device status', async () => {
+  const client = {
+    search: async () => ({ totalNum: 0, recordList: [] }),
+    searchDailySummary: async () => ({
+      moreData: 0,
+      reportDataList: [
+        {
+          personCode: 'ABSENT',
+          date: '2026/10/31',
+          attendanceStatus: 1,
+          groupName: 'Accounting'
+        },
+        {
+          personCode: 'PENDING',
+          date: '2026/10/31',
+          clockInTime: '08:11',
+          attendanceStatus: 2
+        },
+        {
+          personCode: 'EARLY',
+          date: '2026/10/31',
+          clockInTime: '08:00',
+          clockOutTime: '17:00',
+          attendanceStatus: 1
+        },
+        { personCode: 'HALF', date: '2026/10/31', attendanceStatus: 6 }
+      ]
+    })
+  };
+  const service = attendanceWithAccounts([{ name: 'Account 1', client }]);
+  const filters = { dateFrom: '2026-10-31', dateTo: '2026-10-31' };
+  const result = await service.listAttendance({}, filters);
+  const find = (id) => result.rows.find((row) => row.employeeNo === id);
+  assert.equal(find('ABSENT').status, 'Absent');
+  assert.equal(find('PENDING').status, 'Late');
+  assert.equal(find('EARLY').status, 'Early departure');
+  assert.equal(find('HALF').status, 'Absent');
+  assert.equal(find('ABSENT').timeLogs.length, 0);
+  const filtered = await service.listAttendance(
+    {},
+    { ...filters, status: 'Absent' }
+  );
+  assert.deepEqual(Array.from(filtered.rows, (row) => row.employeeNo).sort(), [
+    'ABSENT',
+    'HALF'
+  ]);
 });
 
 test('a failed account does not return a successful partial attendance list', async () => {
@@ -508,7 +732,7 @@ test('provider error bodies cannot expose credentials in feedback', async () => 
   });
 });
 
-test('normalization returns transaction columns, status, and Manila date parts only', () => {
+test('normalization returns transaction columns and Manila date parts without device status', () => {
   const rows = normalizeRecords({
     totalNum: 51,
     recordList: [
@@ -529,7 +753,8 @@ test('normalization returns transaction columns, status, and Manila date parts o
       }
     ]
   });
-  assert.equal(rows[0].status, 'Not calculated');
+  assert.equal(rows[0].status, undefined);
+  assert.equal(rows[0].attendanceStatusCode, undefined);
   assert.equal(rows[0].employeeNo, 'E-100');
   assert.equal(rows[0].department, 'Head Office');
   assert.equal(rows[0].date, '2026-10-01');
@@ -542,7 +767,7 @@ test('normalization returns transaction columns, status, and Manila date parts o
   assert.throws(() => normalizeRecords({}), { status: 422 });
 });
 
-test('daily summaries supply clock-in, clock-out and calculated work hours', () => {
+test('daily summaries supply time data without device status or computed work hours', () => {
   const rows = normalizeDailySummaries({
     reportDataList: [
       {
@@ -568,11 +793,99 @@ test('daily summaries supply clock-in, clock-out and calculated work hours', () 
     date: '2026-10-01',
     weekday: 'Thursday',
     timeIn: '08:28',
-    timeOut: '17:14',
-    workHours: '08:00',
-    status: 'Late'
+    timeOut: '17:14'
   });
   assert.throws(() => normalizeDailySummaries({}), { status: 422 });
+});
+
+test('time logs keep scans in chronological order with their device serial numbers', async () => {
+  const scans = [
+    ['10:00:45', 'A'],
+    ['08:00:00', 'A'],
+    ['10:00:20', 'A'],
+    ['10:00:20', 'B'],
+    ['10:00:20', 'A']
+  ];
+  const client = {
+    search: async () => ({
+      totalNum: scans.length,
+      recordList: scans.map(([time, serial]) => ({
+        deviceTime: `2026-10-31T${time}+08:00`,
+        deviceName: 'Scanner',
+        devSerialNo: serial,
+        personInfo: { personCode: 'E-100' }
+      }))
+    }),
+    searchDailySummary: async () => ({ moreData: 0, reportDataList: [] })
+  };
+  const result = await attendanceWithAccounts([
+    { name: 'Account 1', client }
+  ]).listAttendance({}, { dateFrom: '2026-10-31', dateTo: '2026-10-31' });
+
+  assert.equal(result.total, 1);
+  assert.deepEqual(
+    Array.from(result.rows[0].timeLogs, (log) => [
+      log.time,
+      log.seconds,
+      log.deviceSerialNo
+    ]),
+    [
+      ['08:00', '00', 'A'],
+      ['10:00', '20', 'A'],
+      ['10:00', '20', 'B'],
+      ['10:00', '20', 'A'],
+      ['10:00', '45', 'A']
+    ]
+  );
+});
+
+test('extra midday scans do not hide the last departure or change gross work hours', async () => {
+  const examples = [
+    {
+      scans: ['08:36:53', '12:02:45', '12:30:57', '13:00:47', '18:01:01'],
+      hours: '9h 25m'
+    },
+    {
+      scans: ['07:47:22', '12:04:06', '12:38:29', '12:49:33', '18:31:43'],
+      hours: '10h 44m'
+    },
+    {
+      scans: ['08:07:57', '12:00:56', '12:50:58', '12:55:56', '17:00:19'],
+      hours: '8h 53m'
+    }
+  ];
+  const client = {
+    search: async () => ({
+      totalNum: 15,
+      recordList: examples.flatMap(({ scans }, index) =>
+        scans.map((time) => ({
+          deviceTime: `2026-10-31T${time}+08:00`,
+          deviceName: 'Scanner',
+          personInfo: { personCode: `E-${index}` }
+        }))
+      )
+    }),
+    searchDailySummary: async () => ({
+      moreData: 0,
+      reportDataList: examples.map((_, index) => ({
+        personCode: `E-${index}`,
+        date: '2026-10-31',
+        workDuration: 'Unreliable provider value'
+      }))
+    })
+  };
+  const result = await attendanceWithAccounts([
+    { name: 'Account 1', client }
+  ]).listAttendance({}, { dateFrom: '2026-10-31', dateTo: '2026-10-31' });
+  examples.forEach(({ scans, hours }, index) => {
+    const row = result.rows.find(
+      (record) => record.employeeNo === `E-${index}`
+    );
+    assert.equal(row.timeIn, scans[0].slice(0, 5));
+    assert.equal(row.timeOut, scans.at(-1).slice(0, 5));
+    assert.equal(row.workHours, hours);
+    assert.equal(row.timeLogs.length, scans.length);
+  });
 });
 
 test('only HR and ADMIN can access attendance, even when another role has emp.read', async (t) => {
