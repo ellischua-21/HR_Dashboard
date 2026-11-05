@@ -36,6 +36,7 @@ if (stylesheet)
     }
     for (const path of [
       '../shared/FormTemplates.js',
+      '../shared/FormValidation.js',
       '../shared/FormStatus.js',
       '../shared/DateUtils.js',
       'js/DateTimeInputs.js',

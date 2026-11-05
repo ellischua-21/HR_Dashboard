@@ -70,6 +70,8 @@
           name: 'particulars',
           label: 'Particulars',
           type: 'textarea',
+          explanation: true,
+          placeholder: 'What is the deduction for, and why is it being deducted?',
           required: true,
           maxLength: 500
         },
@@ -127,13 +129,15 @@
           name: 'reason',
           label: 'Reason',
           type: 'textarea',
+          explanation: true,
+          placeholder: 'Why is the record incorrect? What happened, and who was with you, if anyone?',
           required: true,
           maxLength: 500
         },
         ...legacyTimeRecordFields,
         {
-          name: 'witnessName',
-          label: 'Witness Name',
+          name: 'reportsTo',
+          label: 'Reports To',
           type: 'text',
           maxLength: 191
         },
@@ -193,6 +197,8 @@
           name: 'purpose',
           label: 'Purpose',
           type: 'textarea',
+          explanation: true,
+          placeholder: 'What is the purpose of your trip, and who will be joining you?',
           required: true,
           maxLength: 500
         },
@@ -279,6 +285,8 @@
           name: 'reason',
           label: 'Reason For Request',
           type: 'textarea',
+          explanation: true,
+          placeholder: 'What work requires overtime, and why is overtime needed?',
           required: true,
           maxLength: 500
         }
@@ -384,7 +392,7 @@
         {
           name: 'propertyAcknowledgment',
           label:
-            'I hereby acknowledge and certify that all listed above are my responsibility and will take proper care of all company properties that I am entrusted with. I further understand that upon resignation or termination, I agree to return all Nexus Ingredients Corporation property. I also understand that I may be subject for the replacement value or be held financially responsible of any damaged, lost or stolen property while in my custody.',
+            'I hereby acknowledge and certify that all listed above are my responsibility and will take proper care of all company properties that I am entrusted with. I further understand that upon resignation or termination, I agree to return all company property. I also understand that I may be subject for the replacement value or be held financially responsible of any damaged, lost or stolen property while in my custody.',
           type: 'checkbox',
           required: true,
           afterConfirmation: true

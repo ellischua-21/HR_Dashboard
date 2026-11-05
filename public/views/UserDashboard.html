@@ -183,6 +183,8 @@
     <label class="leave-reason"
       >Reason<textarea
         name="reason"
+        data-explanation="true"
+        placeholder="What will you be doing that day, and why are you taking leave?"
         maxlength="500"
         rows="3"
         required
@@ -230,7 +232,6 @@
 
 <dialog id="leave-view-dialog">
   <div class="form-view-header">
-    <h2 id="uf_form_view_title">Submitted Form</h2>
     <button id="uf_close_view" class="ghost" type="button">Close</button>
   </div>
   <div id="uf_form_view"></div>

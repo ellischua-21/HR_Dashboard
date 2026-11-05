@@ -6,6 +6,7 @@ let formBeingEdited = null;
 let activeReviewScope = 'HR';
 let reviewLoadVersion = 0;
 let employeeProfile = {};
+let assignedFormReviewer = null;
 
 const APPLICANT_IDENTITY_FIELDS = new Set([
   'name',
@@ -25,15 +26,6 @@ function applyApplicantIdentity(input, fieldName) {
     }
   }
   input.readOnly = true;
-}
-
-function wireFormEmployeeSearch(input, suggestions) {
-  return window.createEmployeeSearch({
-    input,
-    suggestions,
-    search: (query) => api('searchFormEmployees', query),
-    getOwner: () => session?.email
-  });
 }
 
 const userCell = window.AppUI.tableCell;
@@ -167,9 +159,7 @@ function buildLeaveSheet(data, metadata = {}) {
   heading.className = 'leave-sheet-heading';
   const title = document.createElement('h1');
   title.textContent = 'LEAVE APPLICATION FORM';
-  const year = document.createElement('p');
-  year.textContent = 'HR FORM REVISED 2026';
-  heading.append(title, year);
+  heading.appendChild(title);
   sheet.appendChild(heading);
 
   const control = document.createElement('div');
@@ -339,7 +329,7 @@ async function centerSignatureImages(container) {
 async function showFormContents(form) {
   const content = $('uf_form_view');
   const template = formTemplate(form.template_key);
-  $('uf_form_view_title').textContent = template.title;
+  $('leave-view-dialog').setAttribute('aria-label', template.title);
   const metadata = {
     controlNo: form.control_no,
     submittedAt: form.submitted_at,
@@ -367,6 +357,7 @@ async function showFormContents(form) {
 async function loadMyForms() {
   const result = await api('listMyForms');
   employeeProfile = result.employeeProfile || {};
+  assignedFormReviewer = result.assignedHead || null;
   mySubmittedForms = result.forms;
   const assignedHeadLabel = $('uf_assigned_head');
   if (result.assignedHead) {
@@ -588,6 +579,7 @@ function openTemplateForm(template, existingForm = null) {
   const fields = $('user-template-fields');
   fields.replaceChildren();
   const deferredFields = [];
+  let correctionReason = null;
   template.fields.forEach((field) => {
     if (field.type === 'time-records') {
       fields.appendChild(
@@ -620,34 +612,28 @@ function openTemplateForm(template, existingForm = null) {
     const input = document.createElement(
       field.type === 'textarea' ? 'textarea' : 'input'
     );
+    if (field.type === 'textarea') {
+      label.classList.add('form-narrative-field');
+      input.rows = 3;
+    }
+    if (field.placeholder) input.placeholder = field.placeholder;
+    if (field.explanation) input.dataset.explanation = 'true';
     if (field.type !== 'textarea') input.type = field.type;
     input.name = field.name;
-    if (field.name === 'witnessName') {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'incident-search-field';
-      const inputId = 'user-template-witness-name';
-      label.textContent = field.label;
-      label.htmlFor = inputId;
-      input.id = inputId;
-      input.type = 'search';
-      const suggestions = document.createElement('div');
-      suggestions.className = 'incident-suggestions';
-      suggestions.setAttribute('role', 'listbox');
-      suggestions.hidden = true;
-      wrapper.append(label, input, suggestions);
-      fields.appendChild(wrapper);
-      wireFormEmployeeSearch(input, suggestions);
-    } else {
-      label.textContent = field.label;
-      label.appendChild(input);
-      fields.appendChild(label);
-    }
+    label.textContent = field.label;
+    label.appendChild(input);
+    if (template.key === 'nexus-no-in-out' && field.name === 'reason')
+      correctionReason = label;
+    else fields.appendChild(label);
     input.required = Boolean(field.required);
     if (field.maxLength) input.maxLength = field.maxLength;
     if (field.min !== undefined) input.min = String(field.min);
     if (field.max !== undefined) input.max = String(field.max);
     if (field.step !== undefined) input.step = String(field.step);
-    if (existingForm) {
+    if (field.name === 'reportsTo') {
+      input.value = existingForm?.form_data?.reportsTo ?? assignedFormReviewer?.full_name ?? '';
+      input.readOnly = true;
+    } else if (existingForm) {
       input.value =
         existingForm.form_data[field.name] === undefined
           ? ''
@@ -673,6 +659,7 @@ function openTemplateForm(template, existingForm = null) {
   confirmationInput.type = 'checkbox';
   confirmationInput.className = 'acknowledgment-checkbox';
   fields.appendChild(confirmation);
+  if (correctionReason) fields.appendChild(correctionReason);
   deferredFields.forEach((field) => {
     const label = document.createElement('label');
     label.className = 'form-acknowledgment';
@@ -747,6 +734,11 @@ function openLeaveForm(existingForm = null) {
 async function submitLeaveRequest(event) {
   event.preventDefault();
   const form = $('leave-form');
+  if (!FormValidation.hasSufficientExplanation(form.elements.reason.value)) {
+    showErr('Insufficient explanation.');
+    form.elements.reason.focus();
+    return;
+  }
   if (!leaveSignaturePad.hasSignature()) {
     showErr('Draw your electronic signature before submitting.');
     return;
@@ -817,9 +809,7 @@ function buildGenericFormSheet(formData, metadata, template) {
   heading.className = 'leave-sheet-heading';
   const title = document.createElement('h1');
   title.textContent = template.title.toUpperCase();
-  const year = document.createElement('p');
-  year.textContent = 'NEXUS INGREDIENTS INC.';
-  heading.append(title, year);
+  heading.appendChild(title);
   sheet.appendChild(heading);
 
   const control = document.createElement('div');
@@ -838,6 +828,7 @@ function buildGenericFormSheet(formData, metadata, template) {
   template.fields.forEach((field) => {
     if (field.name === 'name') return;
     if (field.type === 'time-records' || field.legacyTimeRecordColumn) return;
+    if (field.name === 'reportsTo' && !formData.reportsTo) return;
     const value =
       field.type === 'checkbox'
         ? formData[field.name]
@@ -851,6 +842,8 @@ function buildGenericFormSheet(formData, metadata, template) {
       field.type === 'textarea' ? 'wide' : ''
     );
   });
+  if (template.key === 'nexus-no-in-out' && formData.witnessName)
+    appendFormField(fields, 'WITNESS NAME', formData.witnessName);
   sheet.appendChild(fields);
   const timeRecordField = template.fields.find(
     (field) => field.type === 'time-records'
@@ -1343,6 +1336,12 @@ async function submitTemplateForm(event) {
   if (!template) return;
   const form = $('user-template-form');
   const submit = form.querySelector('[type="submit"]');
+  const explanation = form.querySelector('[data-explanation]');
+  if (explanation && !FormValidation.hasSufficientExplanation(explanation.value)) {
+    showErr('Insufficient explanation.');
+    explanation.focus();
+    return;
+  }
   if (!templateSignaturePad.hasSignature()) {
     showErr('Draw your electronic signature before submitting.');
     return;
@@ -1561,6 +1560,15 @@ async function acknowledgePendingAnnouncements() {
 }
 
 window.showPendingAnnouncements = showPendingAnnouncements;
+
+['leave-form', 'user-template-form'].forEach((id) => {
+  $(id).addEventListener('invalid', (event) => {
+    if (event.target.dataset.explanation !== 'true') return;
+    event.preventDefault();
+    showErr('Insufficient explanation.');
+    event.target.focus();
+  }, true);
+});
 
 VIEWS['user-dashboard'] = guard(loadMyForms);
 VIEWS['user-forms'] = guard(loadMyForms);

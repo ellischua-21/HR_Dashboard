@@ -3,6 +3,7 @@ const { requirePerm, getCurrentUser } = require('../middleware/Auth');
 const { logAudit } = require('./AuditService');
 const { sanitize, isValidDate } = require('../utils/Validation');
 const FORM_TEMPLATES = require('../../shared/FormTemplates');
+const { hasSufficientExplanation } = require('../../shared/FormValidation');
 const { canEditForm } = require('../../shared/FormStatus');
 const { httpError } = require('../utils/HttpError');
 const { buildReviewScope } = require('./FormReviewScope');
@@ -70,7 +71,9 @@ function validateLeaveForm(data = {}) {
       'Leave days must be greater than 0 and no more than 365, in half-day increments.'
     );
   }
-  if (!reason || String(data.reason || '').length > 500)
+  if (!hasSufficientExplanation(reason))
+    errors.push('Insufficient explanation.');
+  if (String(data.reason || '').length > 500)
     errors.push('Enter a reason (up to 500 characters).');
   if (!['WITH_PAY', 'WITHOUT_PAY'].includes(payType))
     errors.push('Choose with pay or without pay.');
@@ -111,7 +114,9 @@ function validateUserForm(templateKey, data = {}) {
         ? ''
         : String(data[field.name]).trim();
     const value = sanitize(raw);
-    if (field.required && !value) errors.push(`${field.label} is required.`);
+    if (field.explanation && !hasSufficientExplanation(value))
+      errors.push('Insufficient explanation.');
+    else if (field.required && !value) errors.push(`${field.label} is required.`);
     if (raw.length > (field.maxLength || 191))
       errors.push(`${field.label} is too long.`);
     if (field.type === 'date' && value && !isValidDate(value))
@@ -363,6 +368,24 @@ function parseForm(row) {
   };
 }
 
+async function getAssignedFormReviewer(email) {
+  const [[head]] = await pool.execute(
+    `SELECT CASE WHEN owner.role = 'HR' AND owner.is_hr_head = 0 THEN hr_head.email ELSE h.email END AS email,
+            CASE WHEN owner.role = 'HR' AND owner.is_hr_head = 0
+              THEN COALESCE(NULLIF(hr_head.full_name, ''), hr_head.email)
+              ELSE COALESCE(NULLIF(h.full_name, ''), h.email) END AS full_name,
+            CASE WHEN owner.role = 'HR' AND owner.is_hr_head = 0 THEN hr_head.active ELSE h.active END AS active
+     FROM user_roles owner
+     LEFT JOIN user_roles h ON h.email = owner.assigned_head_email
+     LEFT JOIN user_roles hr_head ON hr_head.role = 'HR' AND hr_head.is_hr_head = 1 AND hr_head.active = 1
+     WHERE owner.email = ? AND owner.active = 1 LIMIT 1`,
+    [email]
+  );
+  return head && head.email
+    ? { email: head.email, full_name: head.full_name, active: Boolean(head.active) }
+    : null;
+}
+
 async function listMyForms(req) {
   const user = await requirePerm(req, 'forms.self');
   const [[employeeProfile]] = await pool.execute(
@@ -391,32 +414,14 @@ async function listMyForms(req) {
      WHERE f.user_email = ? ORDER BY f.submitted_at DESC, f.id DESC`,
     [user.email]
   );
-  const [[head]] = await pool.execute(
-    `SELECT CASE WHEN owner.role = 'HR' AND owner.is_hr_head = 0 THEN hr_head.email ELSE h.email END AS email,
-            CASE WHEN owner.role = 'HR' AND owner.is_hr_head = 0
-              THEN COALESCE(NULLIF(hr_head.full_name, ''), hr_head.email)
-              ELSE COALESCE(NULLIF(h.full_name, ''), h.email) END AS full_name,
-            CASE WHEN owner.role = 'HR' AND owner.is_hr_head = 0 THEN hr_head.active ELSE h.active END AS active
-     FROM user_roles owner
-     LEFT JOIN user_roles h ON h.email = owner.assigned_head_email
-     LEFT JOIN user_roles hr_head ON hr_head.role = 'HR' AND hr_head.is_hr_head = 1 AND hr_head.active = 1
-     WHERE owner.email = ? AND owner.active = 1 LIMIT 1`,
-    [user.email]
-  );
+  const assignedHead = await getAssignedFormReviewer(user.email);
   return {
     forms: rows.map((row) => ({
       ...parseForm(row),
       submitter_role: user.role
     })),
     employeeProfile: employeeProfile || null,
-    assignedHead:
-      head && head.email
-        ? {
-            email: head.email,
-            full_name: head.full_name,
-            active: Boolean(head.active)
-          }
-        : null,
+    assignedHead,
     summary: {
       total: Number(summary.total),
       pending: Number(summary.pending),
@@ -506,6 +511,10 @@ async function submitUserForm(req, templateKey, data = {}) {
   const user = await requirePerm(req, 'forms.self');
   const identity = await getApplicantIdentity(user);
   const normalizedData = applyApplicantIdentity(data, identity);
+  if (templateKey === 'nexus-no-in-out') {
+    const reviewer = await getAssignedFormReviewer(user.email);
+    normalizedData.reportsTo = reviewer?.full_name || '';
+  }
   const { errors, data: cleanData } = validateUserForm(
     templateKey,
     normalizedData
@@ -531,6 +540,10 @@ async function updateMyForm(req, formId, templateKey, data = {}) {
   const user = await requirePerm(req, 'forms.self');
   const identity = await getApplicantIdentity(user);
   const normalizedData = applyApplicantIdentity(data, identity);
+  if (templateKey === 'nexus-no-in-out') {
+    const reviewer = await getAssignedFormReviewer(user.email);
+    normalizedData.reportsTo = reviewer?.full_name || '';
+  }
 
   const template = FORM_TEMPLATES.find((item) => item.key === templateKey);
   if (!template) throw httpError('Choose a valid form template.', 400);
@@ -588,6 +601,12 @@ async function updateMyForm(req, formId, templateKey, data = {}) {
       savedData,
       identity
     );
+    if (templateKey === 'nexus-no-in-out') {
+      if (Object.hasOwn(savedData, 'reportsTo'))
+        preservedData.reportsTo = savedData.reportsTo;
+      if (Object.hasOwn(savedData, 'witnessName'))
+        preservedData.witnessName = savedData.witnessName;
+    }
 
     await connection.execute(
       'UPDATE user_forms SET form_data = ? WHERE id = ?',
