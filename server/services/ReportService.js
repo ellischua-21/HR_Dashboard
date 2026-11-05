@@ -128,6 +128,9 @@ async function buildReport(id, filters) {
       rows: rows.map((employee) =>
         keys.map(
           (key) =>
+            (key === 'record_status' && employee[key] === 'Active'
+              ? 'Not Archived'
+              : null) ||
             (employee[key] === '' &&
               definition.blank &&
               definition.blank[key]) ||

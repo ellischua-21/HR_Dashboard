@@ -12,6 +12,7 @@ const { sanitize, validateEmployee } = require('../utils/Validation');
 const { withCalc, normalizeEmployee } = require('./DashboardService');
 const { createEmployeeAccountRequest } = require('./AccountService');
 const { cleanEmployee, dbValue } = require('../utils/EmployeeData');
+const { manilaDate } = require('../../shared/DateUtils');
 
 const LIGHT = [
   'record_id',
@@ -188,6 +189,11 @@ async function saveEmployee(req, data = {}) {
           old.record_id
         ]
       );
+      if (old.status !== 'Regular' && next.status === 'Regular')
+        await connection.execute('UPDATE employees SET regularized_on = ? WHERE record_id = ?',
+          [manilaDate(), old.record_id]);
+      else if (old.status === 'Regular' && next.status !== 'Regular')
+        await connection.execute('UPDATE employees SET regularized_on = NULL WHERE record_id = ?', [old.record_id]);
       await logAudit(
         user.email,
         'UPDATE',
@@ -216,6 +222,9 @@ async function saveEmployee(req, data = {}) {
       `INSERT INTO employees (${keys.map(quote).join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`,
       keys.map((key) => dbValue(F.get(key), record[key]))
     );
+    if (record.status === 'Regular')
+      await connection.execute('UPDATE employees SET regularized_on = ? WHERE record_id = ?',
+        [manilaDate(), recordId]);
     await logAudit(
       user.email,
       'CREATE',

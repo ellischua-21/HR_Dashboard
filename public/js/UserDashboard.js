@@ -7,6 +7,7 @@ let activeReviewScope = 'HR';
 let reviewLoadVersion = 0;
 let employeeProfile = {};
 let assignedFormReviewer = null;
+let leaveBalanceRequest = 0;
 
 const APPLICANT_IDENTITY_FIELDS = new Set([
   'name',
@@ -241,8 +242,8 @@ function buildLeaveSheet(data, metadata = {}) {
   hr.appendChild(hrTitle);
   const balances = document.createElement('div');
   balances.className = 'leave-sheet-grid';
-  appendFormField(balances, 'VL BALANCE', data.vlBalance || '');
-  appendFormField(balances, 'SL BALANCE', data.slBalance || '');
+  appendFormField(balances, 'VL BALANCE', data.vlBalance ?? '');
+  appendFormField(balances, 'SL BALANCE', data.slBalance ?? '');
   appendFormField(balances, 'SIL BALANCE', data.silBalance || '');
   hr.appendChild(balances);
   sheet.appendChild(hr);
@@ -687,6 +688,52 @@ function setOtherLeaveVisibility() {
   $('leave-form').elements.otherLeaveType.required = isOther;
 }
 
+function updateLeaveAllocation(saved = {}) {
+  const form = $('leave-form');
+  const target = $('leave-year-allocation');
+  const first = Number(form.elements.dateFrom.value.slice(0, 4));
+  const last = Number(form.elements.dateTo.value.slice(0, 4));
+  const prior = Object.fromEntries(Array.from(target.querySelectorAll('input'), (input) => [input.name, input.value]));
+  target.replaceChildren();
+  const paidAllowance = form.elements.payType.value === 'WITH_PAY' &&
+    ['Sick Leave (SL)', 'Vacation Leave (VL)'].includes(form.elements.leaveType.value);
+  target.hidden = !(paidAllowance && first && last && last === first + 1);
+  if (target.hidden) return;
+  [first, last].forEach((year) => {
+    const label = document.createElement('label');
+    label.textContent = `Leave Days In ${year}`;
+    const input = document.createElement('input');
+    input.type = 'number'; input.min = '0'; input.step = '0.5'; input.required = true;
+    input.name = `leaveDays${year}`;
+    input.value = prior[input.name] ?? saved[year] ?? '';
+    label.appendChild(input);
+    target.appendChild(label);
+  });
+}
+
+async function refreshLeaveBalances(selectPay = false) {
+  const form = $('leave-form');
+  const year = Number(form.elements.dateFrom.value.slice(0, 4)) || Number(DateUtils.manilaDate().slice(0, 4));
+  const request = ++leaveBalanceRequest;
+  $('leave-available-balances').hidden = true;
+  try {
+    const balances = await api('getMyLeaveBalances', year);
+    if (request !== leaveBalanceRequest) return;
+    $('leave-sick-balance').textContent = `${balances.SL} left`;
+    $('leave-vacation-balance').textContent = `${balances.VL} left`;
+    $('leave-balance-year').textContent = String(year);
+    $('leave-available-balances').hidden = false;
+    if (selectPay) {
+      const type = form.elements.leaveType.value;
+      const available = type === 'Sick Leave (SL)' ? balances.SL : type === 'Vacation Leave (VL)' ? balances.VL : null;
+      form.elements.payType.value = available === null || (balances.eligible && available > 0) ? 'WITH_PAY' : 'WITHOUT_PAY';
+      updateLeaveAllocation();
+    }
+  } catch (error) {
+    if (request === leaveBalanceRequest) showErr(error.message || String(error));
+  }
+}
+
 function openLeaveForm(existingForm = null) {
   const form = $('leave-form');
   form.reset();
@@ -727,6 +774,9 @@ function openLeaveForm(existingForm = null) {
     form.elements[name].readOnly = true;
   });
   setOtherLeaveVisibility();
+  updateLeaveAllocation(existingForm?.form_data?.yearAllocation || {});
+  if (!existingForm) form.elements.payType.value = 'WITH_PAY';
+  refreshLeaveBalances(!existingForm);
   $('leave-form-dialog').showModal();
   leaveSignaturePad.clear();
 }
@@ -758,6 +808,7 @@ async function submitLeaveRequest(event) {
       dateTo: values.get('dateTo'),
       days: values.get('days'),
       reason: values.get('reason'),
+      yearAllocation: Object.fromEntries(Array.from($('leave-year-allocation').querySelectorAll('input'), (input) => [input.name.replace('leaveDays', ''), input.value])),
       payType: values.get('payType'),
       signature: leaveSignaturePad.toDataURL()
     };
@@ -1110,15 +1161,21 @@ async function approveWithoutReviewerSignature(form, button) {
   }
 }
 
-function setHrLeaveBalances(containerId, form) {
+async function setHrLeaveBalances(containerId, form) {
   const container = $(containerId);
   const visible =
     form.template_key === 'leave-2026' && form.review_stage === 'HR';
   container.hidden = !visible;
   const data = form.form_data || {};
-  ['vlBalance', 'slBalance', 'silBalance'].forEach((name) => {
-    container.querySelector(`[name="${name}"]`).value = data[name] || '';
-  });
+  container.querySelector('[name="silBalance"]').value = data.silBalance || '';
+  container.querySelector('[name="vlBalance"]').value = '';
+  container.querySelector('[name="slBalance"]').value = '';
+  if (!visible) return;
+  try {
+    const balances = await api('getReviewLeaveBalances', form.id);
+    container.querySelector('[name="vlBalance"]').value = balances.VL;
+    container.querySelector('[name="slBalance"]').value = balances.SL;
+  } catch (error) { showErr(error.message || String(error)); }
 }
 
 function getHrLeaveBalances(containerId, form) {
@@ -1126,8 +1183,6 @@ function getHrLeaveBalances(containerId, form) {
     return null;
   const container = $(containerId);
   return {
-    vlBalance: container.querySelector('[name="vlBalance"]').value.trim(),
-    slBalance: container.querySelector('[name="slBalance"]').value.trim(),
     silBalance: container.querySelector('[name="silBalance"]').value.trim()
   };
 }
@@ -1591,7 +1646,12 @@ $('uf_review_clear_dates').onclick = guard(async () => {
   $('uf_review_date_to').value = '';
   await loadFormsForReview('ALL');
 });
-$('leave-form').elements.leaveType.onchange = setOtherLeaveVisibility;
+$('leave-form').elements.leaveType.onchange = () => { setOtherLeaveVisibility(); refreshLeaveBalances(true); };
+$('leave-form').elements.dateFrom.onchange = () => { updateLeaveAllocation(); refreshLeaveBalances(false); };
+$('leave-form').elements.dateTo.onchange = () => updateLeaveAllocation();
+$('leave-form').querySelectorAll('[name="payType"]').forEach((input) => {
+  input.addEventListener('change', () => updateLeaveAllocation());
+});
 $('leave-form').onsubmit = submitLeaveRequest;
 $('uf_cancel_leave').onclick = () => {
   $('leave-form-dialog').close();

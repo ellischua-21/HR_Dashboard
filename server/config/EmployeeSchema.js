@@ -11,7 +11,7 @@ const LISTS = {
     'Executive'
   ],
   Employment_Status_List: [
-    'Active',
+    'Regular',
     'Probationary',
     'Contractual',
     'Resigned',
@@ -69,7 +69,7 @@ const EMP_FIELDS = [
   ['function_type', 'Function Type', 'list', '', 'Function_Type_List'],
   ['fte', 'FTE Allocation', 'number', 'R'],
   ['docs', 'Supporting Documents', 'text', 'S'],
-  ['record_status', 'Record Status', 'text', 'C'],
+  ['record_status', 'Archive Status', 'text', 'C'],
   ['created_at', 'Date Created', 'date', 'C'],
   ['created_by', 'Created By', 'text', 'C'],
   ['modified_at', 'Last Modified', 'date', 'C'],
@@ -112,7 +112,7 @@ function masterReportFields() {
   ]);
 }
 
-const ACTIVE_STATUSES = ['Active', 'Probationary', 'Contractual'];
+const ACTIVE_STATUSES = ['Regular', 'Probationary', 'Contractual'];
 const AGE_BANDS = ['Under 25', '25-34', '35-44', '45-54', '55+', 'Unknown'];
 const TENURE_BANDS = [
   'Under 1 yr',

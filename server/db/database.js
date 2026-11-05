@@ -40,6 +40,10 @@ async function initializeDatabase() {
     KEY idx_employee_employment_date (${quote('date_employed')})
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
+  const [regularizedColumn] = await pool.query("SHOW COLUMNS FROM employees LIKE 'regularized_on'");
+  if (!regularizedColumn.length)
+    await pool.query('ALTER TABLE employees ADD COLUMN regularized_on DATE NULL');
+
   // Keep the existing personal login address while removing the obsolete Email and
   // Corporate Email employee fields. Older installs used corp_email for Personal Email.
   const [personalEmailColumn] = await pool.query(
@@ -164,6 +168,29 @@ async function initializeDatabase() {
     KEY idx_user_form_owner (user_email, submitted_at),
     KEY idx_user_form_status (status, submitted_at),
     KEY idx_user_form_head_queue (head_reviewer_email, review_stage, submitted_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS leave_accounts (
+    employee_id VARCHAR(20) NOT NULL,
+    leave_year SMALLINT UNSIGNED NOT NULL,
+    leave_type VARCHAR(16) NOT NULL,
+    allowance DECIMAL(8,2) NOT NULL DEFAULT 5,
+    PRIMARY KEY (employee_id, leave_year, leave_type)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS leave_transactions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    employee_id VARCHAR(20) NOT NULL,
+    leave_year SMALLINT UNSIGNED NOT NULL,
+    leave_type VARCHAR(16) NOT NULL,
+    transaction_type VARCHAR(16) NOT NULL,
+    days DECIMAL(8,2) NOT NULL,
+    form_id BIGINT UNSIGNED NULL,
+    remarks VARCHAR(255) NOT NULL DEFAULT '',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_leave_form_year (form_id, leave_year, leave_type, transaction_type),
+    KEY idx_leave_employee_year (employee_id, leave_year, leave_type)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
   const formColumns = [
@@ -853,6 +880,9 @@ async function initializeDatabase() {
     for (const value of values)
       await pool.execute(insertLookup, [listName, value]);
   }
+  await pool.query("UPDATE employees SET status = 'Regular' WHERE status = 'Active'");
+  await pool.query("UPDATE lookup_values SET active = 0 WHERE list_name = 'Employment_Status_List' AND value = 'Active'");
+  await pool.query("UPDATE lookup_values SET active = 1 WHERE list_name = 'Employment_Status_List' AND value = 'Regular'");
   await pool.execute(
     'INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VALUES (?, ?, ?)',
     [

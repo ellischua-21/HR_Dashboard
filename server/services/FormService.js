@@ -7,6 +7,8 @@ const { hasSufficientExplanation } = require('../../shared/FormValidation');
 const { canEditForm } = require('../../shared/FormStatus');
 const { httpError } = require('../utils/HttpError');
 const { buildReviewScope } = require('./FormReviewScope');
+const LeaveService = require('./LeaveService');
+const { getAccountEmployee } = require('../utils/EmployeeIdentity');
 
 const { manilaDate } = require('../../shared/DateUtils');
 const currentSerialYear = (date = new Date()) =>
@@ -258,13 +260,8 @@ function validateUserForm(templateKey, data = {}) {
 }
 
 async function getApplicantIdentity(user, connection = pool) {
-  const [[employee]] = await connection.execute(
-    `SELECT name, position, department, emp_no
-     FROM employees
-     WHERE LOWER(personal_email) = LOWER(?) AND record_status <> 'Archived'
-     ORDER BY record_id DESC LIMIT 1`,
-    [user.email]
-  );
+  const employee = await getAccountEmployee(user.email, connection);
+  if (!employee) throw httpError('A unique employee record must be linked to this account. Contact HR.', 403);
   return {
     name: employee?.name || user.full_name || user.email,
     employeeNo: employee?.emp_no || '',
@@ -388,12 +385,11 @@ async function getAssignedFormReviewer(email) {
 
 async function listMyForms(req) {
   const user = await requirePerm(req, 'forms.self');
-  const [[employeeProfile]] = await pool.execute(
-    `SELECT name, position, department, emp_no
-     FROM employees WHERE LOWER(personal_email) = LOWER(?)
-     ORDER BY record_id DESC LIMIT 1`,
-    [user.email]
-  );
+  const employee = await getAccountEmployee(user.email);
+  const employeeProfile = employee ? {
+    name: employee.name, position: employee.position,
+    department: employee.department, emp_no: employee.emp_no
+  } : null;
   const [[summary]] = await pool.execute(
     `SELECT COUNT(*) AS total,
             COALESCE(SUM(status = 'PENDING'), 0) AS pending,
@@ -473,12 +469,24 @@ async function getSubmissionHead(email, role) {
   return assignedHead;
 }
 
+async function checkPaidLeave(email, data) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const employee = await LeaveService.employeeForEmail(connection, email, true);
+    await LeaveService.validatePaidLeave(connection, employee, email, data);
+    await connection.commit();
+  } catch (error) { await connection.rollback(); throw error; }
+  finally { connection.release(); }
+}
+
 async function submitLeaveForm(req, data = {}) {
   const user = await requirePerm(req, 'forms.self');
   const identity = await getApplicantIdentity(user);
   const formData = applyApplicantIdentity(data, identity);
   const errors = validateLeaveForm(formData);
   if (errors.length) throw httpError(errors.join(' '), 400);
+  await checkPaidLeave(user.email, formData);
 
   const headEmail = await getSubmissionHead(user.email, user.role);
   const cleanData = {
@@ -493,6 +501,7 @@ async function submitLeaveForm(req, data = {}) {
     dateTo: formData.dateTo,
     days: Number(formData.days),
     reason: sanitize(formData.reason),
+    yearAllocation: formData.yearAllocation || null,
     payType: formData.payType,
     signature: formData.signature
   };
@@ -551,6 +560,7 @@ async function updateMyForm(req, formId, templateKey, data = {}) {
   if (templateKey === 'leave-2026') {
     const errors = validateLeaveForm(normalizedData);
     if (errors.length) throw httpError(errors.join(' '), 400);
+    await checkPaidLeave(user.email, normalizedData);
     cleanData = {
       name: sanitize(normalizedData.name),
       position: sanitize(normalizedData.position),
@@ -562,6 +572,7 @@ async function updateMyForm(req, formId, templateKey, data = {}) {
       dateTo: normalizedData.dateTo,
       days: Number(normalizedData.days),
       reason: sanitize(normalizedData.reason),
+      yearAllocation: normalizedData.yearAllocation || null,
       payType: normalizedData.payType,
       signature: normalizedData.signature
     };
@@ -900,14 +911,27 @@ async function reviewUserForm(
       signature,
       rows[0].template_key
     );
+    let calculatedLeaveData = null;
+    if (decision === 'APPROVED' && rows[0].template_key === 'leave-2026' &&
+        (!isHead || rows[0].submitter_role === 'HR')) {
+      calculatedLeaveData = typeof rows[0].form_data === 'string'
+        ? JSON.parse(rows[0].form_data) : { ...rows[0].form_data };
+      const employee = await LeaveService.employeeForEmail(connection, rows[0].user_email, true);
+      await LeaveService.validatePaidLeave(connection, employee, rows[0].user_email, calculatedLeaveData, formId);
+      const balances = await LeaveService.getBalances(connection, employee, rows[0].user_email,
+        Number(String(calculatedLeaveData.dateFrom).slice(0, 4)));
+      calculatedLeaveData.slBalance = balances.SL;
+      calculatedLeaveData.vlBalance = balances.VL;
+    }
     if (isHead) {
       if (decision === 'APPROVED') {
         if (rows[0].submitter_role === 'HR') {
           await connection.execute(
             `UPDATE user_forms SET status = 'APPROVED', head_signature = ?, head_signed_by = ?,
-               head_signed_at = CURRENT_TIMESTAMP, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP
+               head_signed_at = CURRENT_TIMESTAMP, reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP,
+               form_data = COALESCE(?, form_data)
              WHERE id = ?`,
-            [signature, reviewer.email, reviewer.email, formId]
+            [signature, reviewer.email, reviewer.email, calculatedLeaveData ? JSON.stringify(calculatedLeaveData) : null, formId]
           );
           await logAudit(
             reviewer.email,
@@ -944,7 +968,7 @@ async function reviewUserForm(
       );
     }
 
-    let updatedFormData = null;
+    let updatedFormData = calculatedLeaveData;
     if (hrFields !== null && hrFields !== undefined) {
       if (
         isHead ||
@@ -963,7 +987,7 @@ async function reviewUserForm(
       ) {
         throw httpError('Enter valid Leave balances.', 400);
       }
-      const allowedBalanceFields = ['vlBalance', 'slBalance', 'silBalance'];
+      const allowedBalanceFields = ['silBalance'];
       const suppliedFields = Object.keys(hrFields);
       if (
         suppliedFields.some((field) => !allowedBalanceFields.includes(field))
@@ -985,10 +1009,9 @@ async function reviewUserForm(
         }
       }
       try {
-        updatedFormData =
-          typeof rows[0].form_data === 'string'
-            ? JSON.parse(rows[0].form_data)
-            : rows[0].form_data;
+        updatedFormData = updatedFormData || (typeof rows[0].form_data === 'string'
+          ? JSON.parse(rows[0].form_data)
+          : rows[0].form_data);
       } catch (_) {
         updatedFormData = {};
       }

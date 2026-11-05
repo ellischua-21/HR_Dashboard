@@ -5,6 +5,7 @@ const { requirePerm } = require('../middleware/Auth');
 const { logAudit } = require('./AuditService');
 const { hashPassword, verifyPassword } = require('../utils/Password');
 const { sanitize } = require('../utils/Validation');
+const { getAccountEmployee } = require('../utils/EmployeeIdentity');
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -419,6 +420,9 @@ async function approveAccountRequest(req, requestId) {
     }
 
     const accountRequest = requests[0];
+    const employee = await getAccountEmployee(accountRequest.email, connection, true);
+    if (!employee)
+      throw httpError('A unique employee record must exist before this account can be approved.', 409);
     const role = Object.prototype.hasOwnProperty.call(
       ACCOUNT_ROLE_MAP,
       accountRequest.assigned_role
@@ -472,7 +476,7 @@ async function approveAccountRequest(req, requestId) {
          assigned_head_email = VALUES(assigned_head_email), extra_perms = '', password_hash = VALUES(password_hash)`,
       [
         accountRequest.email,
-        accountRequest.full_name,
+        employee.name,
         role,
         accountRequest.assigned_head_email,
         accountRequest.password_hash

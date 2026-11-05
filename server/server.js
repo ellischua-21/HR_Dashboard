@@ -19,6 +19,7 @@ const incidents = require('./services/IncidentService');
 const incidentArchive = require('./services/incident-management/Archive');
 const incidentConduct = require('./services/incident-management/Conduct');
 const { verifyPassword } = require('./utils/Password');
+const { getAccountEmployee } = require('./utils/EmployeeIdentity');
 const { sendAttachment } = require('./utils/AttachmentResponse');
 
 const app = express();
@@ -88,6 +89,12 @@ app.post('/api/login', async (req, res, next) => {
         .status(403)
         .json({ error: 'This account has an unrecognized role.' });
     }
+    const employee = await getAccountEmployee(user.email);
+    if (!employee) {
+      return res.status(403).json({
+        error: 'A unique employee record must be linked to this account. Contact HR.'
+      });
+    }
     await new Promise((resolve, reject) =>
       req.session.regenerate((error) => (error ? reject(error) : resolve()))
     );
@@ -155,6 +162,8 @@ const methods = {
   changeMyPassword: (req, currentPassword, newPassword) =>
     accounts.changeMyPassword(req, currentPassword, newPassword),
   listMyForms: (req) => userForms.listMyForms(req),
+  getMyLeaveBalances: (req, year) => require('./services/LeaveService').getMyLeaveBalances(req, year),
+  getReviewLeaveBalances: (req, formId) => require('./services/LeaveService').getReviewLeaveBalances(req, formId),
   searchFormEmployees: (req, query) =>
     userForms.searchFormEmployees(req, query),
   submitLeaveForm: (req, data) => userForms.submitLeaveForm(req, data),
@@ -310,7 +319,11 @@ app.use((error, req, res, next) => {
 });
 
 initializeDatabase()
-  .then(() => {
+  .then(async () => {
+    const { processRegularizations } = require('./services/RegularizationService');
+    await processRegularizations();
+    setInterval(() => processRegularizations().catch((error) =>
+      console.error('Could not update probationary employees:', error)), 60 * 60 * 1000).unref();
     incidents
       .processOverdueIncidentNtes()
       .catch((error) =>

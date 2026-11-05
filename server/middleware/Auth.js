@@ -2,6 +2,7 @@ const { httpError } = require('../utils/HttpError');
 const { ROLE_PERMS } = require('../config/Permissions');
 const { pool } = require('../db/database');
 const { logAudit } = require('../services/AuditService');
+const { getAccountEmployee } = require('../utils/EmployeeIdentity');
 
 async function getCurrentUser(req) {
   const email = String(req.session.userEmail || '')
@@ -14,6 +15,8 @@ async function getCurrentUser(req) {
   );
   const row = rows[0];
   if (!row || !row.active) return null;
+  const employee = await getAccountEmployee(row.email);
+  if (!employee) return null;
   const extra = String(row.extra_perms || '')
     .split(',')
     .map((value) => value.trim())
@@ -30,7 +33,8 @@ async function getCurrentUser(req) {
   const perms = [...basePermissions, ...extra];
   return {
     email: row.email,
-    full_name: row.full_name,
+    full_name: employee.name,
+    employee_id: employee.record_id,
     role: row.role,
     is_hr_head: Boolean(row.is_hr_head),
     perms
@@ -55,6 +59,7 @@ async function getSession(req) {
     ? {
         email: user.email,
         full_name: user.full_name,
+        employee_id: user.employee_id,
         role: user.role,
         is_hr_head: user.is_hr_head,
         perms: user.perms

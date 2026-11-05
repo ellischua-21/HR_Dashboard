@@ -965,6 +965,13 @@ tbody tr:hover {
   background: #f1e4e8;
   color: var(--brand);
 }
+.employee-status-regular { color: #21623b; background: #e5f3e9; }
+.employee-status-probationary { color: #704600; background: #fff0c1; }
+.employee-status-contractual { color: #075d5e; background: #d9f4ef; }
+.employee-status-resigned { color: #425161; background: #e6ebef; }
+.employee-status-terminated { color: #8b263b; background: #f8e7eb; }
+.employee-status-retired { color: #613287; background: #f0e6fa; }
+.employee-status-inactive { color: #684328; background: #f3e5d7; }
 .hr-head-toggle {
   min-height: 0;
   position: relative;
@@ -1279,6 +1286,15 @@ legend {
   grid-column: 1 / -1;
   min-width: 0;
 }
+#leave-year-allocation[hidden] { display: none; }
+.leave-pay-options { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 24px; }
+.leave-pay-choices { display: flex; flex-wrap: wrap; gap: 12px 20px; }
+.leave-pay-choices label { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.leave-available-balances { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
+.leave-available-balances[hidden] { display: none; }
+.leave-available-balances > div { display: grid; gap: 2px; color: var(--muted); font-size: 13px; }
+.leave-available-balances strong { color: var(--ink); font-size: 14px; font-weight: 600; }
+.leave-balance-year { color: var(--muted); font-size: 12px; }
 #r_form .employee-contact-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }

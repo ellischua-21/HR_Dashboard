@@ -45,6 +45,10 @@ Keep page components inside the isolated `#main` stacking context and use the sh
 
 ## First-time setup
 
+Login requires exactly one non-archived record in the central `employees` table whose Personal Email matches the account email. This applies to every role, including ADMIN and HR, and is checked again for existing sessions. Credentials and permissions stay in `user_roles`; Master List, HR Reports, form autofill and leave eligibility use the central employee records.
+
+Before activating this rule on an existing installation, use Employee Master List import to add genuine employee records for any existing accounts that lack them, including at least one administrator. Importing a profile does not replace its account password or role. The `create-user` command also requires an existing employee profile; on a new installation, provision the first genuine employee record in MySQL before creating its administrator login.
+
 1. Start **Apache** and **MySQL** in the XAMPP Control Panel.
 2. The current workspace already has an empty `hr_dashboard` database and its tables. On a different XAMPP installation, create a database named `hr_dashboard` using `utf8mb4`; the Node setup command creates the tables and default lookup values.
 3. If Node.js is installed in the default location but PowerShell cannot find `node`, add it to this terminal's PATH:

@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { pool, initializeDatabase } = require('../server/db/database');
 const { ROLE_PERMS } = require('../server/config/Permissions');
 const { hashPassword } = require('../server/utils/Password');
+const { getAccountEmployee } = require('../server/utils/EmployeeIdentity');
 
 async function main() {
   const email = String(process.argv[2] || '')
@@ -20,12 +21,14 @@ async function main() {
   if (!ROLE_PERMS[role]) throw new Error('Unsupported role: ' + role);
 
   await initializeDatabase();
+  const employee = await getAccountEmployee(email);
+  if (!employee) throw new Error('Create or import one non-archived employee record with this Personal Email before creating the login account.');
   const password = crypto.randomBytes(18).toString('base64url');
   await pool.execute(
     `INSERT INTO user_roles (email, full_name, role, active, extra_perms, password_hash)
      VALUES (?, ?, ?, 1, '', ?)
-     ON DUPLICATE KEY UPDATE role = VALUES(role), active = 1, password_hash = VALUES(password_hash)`,
-    [email, email, role, hashPassword(password)]
+     ON DUPLICATE KEY UPDATE full_name = VALUES(full_name), role = VALUES(role), active = 1, password_hash = VALUES(password_hash)`,
+    [email, employee.name, role, hashPassword(password)]
   );
   console.log(`Local account created.
 Email: ${email}

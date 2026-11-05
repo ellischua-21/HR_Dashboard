@@ -190,16 +190,20 @@
         required
       ></textarea>
     </label>
-    <fieldset>
+    <div id="leave-year-allocation" class="fgrid" hidden></div>
+    <fieldset class="leave-pay-fieldset">
       <legend>Leave Pay</legend>
-      <label
-        ><input name="payType" type="radio" value="WITH_PAY" required /> With
-        pay</label
-      >
-      <label
-        ><input name="payType" type="radio" value="WITHOUT_PAY" required />
-        Without pay</label
-      >
+      <div class="leave-pay-options">
+        <div class="leave-pay-choices">
+          <label><input name="payType" type="radio" value="WITH_PAY" required /> With Pay</label>
+          <label><input name="payType" type="radio" value="WITHOUT_PAY" required /> Without Pay</label>
+        </div>
+        <div id="leave-available-balances" class="leave-available-balances" aria-live="polite" hidden>
+          <div><span>Sick Leave</span><strong id="leave-sick-balance"></strong></div>
+          <div><span>Vacation Leave</span><strong id="leave-vacation-balance"></strong></div>
+          <span id="leave-balance-year" class="leave-balance-year"></span>
+        </div>
+      </div>
     </fieldset>
     <label class="leave-confirm form-acknowledgment"
       ><input
@@ -307,8 +311,8 @@
     <p id="hr-signature-control" class="note"></p>
     <fieldset id="hr-leave-balances" class="hr-leave-balances" hidden>
       <legend>For HR Use Only</legend>
-      <label>VL Balance<input name="vlBalance" maxlength="100" /></label>
-      <label>SL Balance<input name="slBalance" maxlength="100" /></label>
+      <label>VL Balance<input name="vlBalance" readonly /></label>
+      <label>SL Balance<input name="slBalance" readonly /></label>
       <label>SIL Balance<input name="silBalance" maxlength="100" /></label>
     </fieldset>
     <div class="signature-pad-field">
@@ -346,8 +350,8 @@
       hidden
     >
       <legend>For HR Use Only</legend>
-      <label>VL Balance<input name="vlBalance" maxlength="100" /></label>
-      <label>SL Balance<input name="slBalance" maxlength="100" /></label>
+      <label>VL Balance<input name="vlBalance" readonly /></label>
+      <label>SL Balance<input name="slBalance" readonly /></label>
       <label>SIL Balance<input name="silBalance" maxlength="100" /></label>
     </fieldset>
     <label for="form-rejection-reason">Reason For Rejection</label>

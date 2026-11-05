@@ -166,6 +166,7 @@ async function ensureMeta() {
 }
 
 function formatReportValue(value, type, key) {
+  if (key === 'record_status' && value === 'Active') return 'Not Archived';
   if (type === 'json' && TABLES[key]) {
     try {
       const rows =
@@ -195,9 +196,9 @@ async function showEmployeeDetails(report, row, { manage = false } = {}) {
   const details = $('report-employee-details');
   details.replaceChildren();
   $('report-employee-title').textContent = values.name || 'Employee Details';
-  $('employee-detail-actions').hidden = !manage;
-  $('p_edit').hidden = !can('emp.write');
-  $('p_archive').hidden = !can('emp.archive');
+  $('p_edit').hidden = !manage || !can('emp.write');
+  $('p_print').hidden = !manage;
+  $('p_archive').hidden = !manage || !can('emp.archive');
   const rendered = new Set();
   const renderSection = (title, keys) => {
     const section = el('section', undefined, 'report-detail-section');
@@ -335,12 +336,7 @@ async function loadEmployees() {
           el(
             'span',
             e.status,
-            'badge ' +
-              (['Resigned', 'Terminated', 'Retired', 'Inactive'].includes(
-                e.status
-              )
-                ? 'off'
-                : 'ok')
+            'badge employee-status-' + String(e.status || '').toLowerCase()
           )
         );
       else d.textContent = e[c[0]] === undefined ? '' : e[c[0]];
