@@ -195,8 +195,8 @@ function drawChart(id, type, data, horizontal) {
       datasets: [
         {
           data: data.map((x) => x.value),
-          backgroundColor: type === 'doughnut' ? PALETTE : '#6b2638',
-          borderColor: '#f6a53a',
+          backgroundColor: type === 'doughnut' ? PALETTE : '#c86b4b',
+          borderColor: '#6b8e23',
           tension: 0.25
         }
       ]

@@ -109,14 +109,14 @@ const FORM_NAV = [
   ['leave-requests', 'Review Requests', 'forms.review']
 ];
 const PALETTE = [
-  '#6b2638',
-  '#f6a53a',
-  '#a1566a',
-  '#8a8f98',
-  '#c98a1b',
-  '#3d1620',
-  '#d9b3be',
-  '#5b6678'
+  '#c86b4b',
+  '#6b8e23',
+  '#a75b43',
+  '#9b855e',
+  '#d19b6f',
+  '#4f6240',
+  '#c88f7e',
+  '#79685b'
 ];
 let charts = {},
   session = null;
@@ -659,11 +659,11 @@ function render(d) {
             data: data.map((x) => x.value),
             backgroundColor:
               c[2] === 'line'
-                ? '#f6a53a'
+                ? '#6b8e23'
                 : c[2] === 'doughnut'
                   ? PALETTE
-                  : '#6b2638',
-            borderColor: '#f6a53a',
+                  : '#c86b4b',
+            borderColor: '#6b8e23',
             tension: 0.25
           }
         ]
