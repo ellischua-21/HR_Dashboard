@@ -290,6 +290,7 @@ function renderIncidentSignature(
       )
     );
   } else if (canSignIncidentAs(incident, role)) {
+    section.firstElementChild.dataset.requiredLabel = '';
     const canvas = incidentElement(
       'canvas',
       'signature-pad incident-signature-pad'
@@ -442,6 +443,9 @@ function renderIncidentClosureAction(incident, ui = {}) {
   reason.placeholder = isInvestigation
     ? 'Investigation findings and reason for closure (required)'
     : 'Reason for closing the case (required)';
+  reason.dataset.requiredIndicator = 'true';
+  const reasonLabel = incidentElement('label', '', 'Reason For Closure');
+  reasonLabel.appendChild(reason);
   const panel = incidentElement('div', 'incident-case-section');
   panel.hidden = true;
   const confirmClose = incidentElement('button', '', 'Confirm closure');
@@ -475,7 +479,7 @@ function renderIncidentClosureAction(incident, ui = {}) {
       'note',
       'Closing for documentation requires a reason. It does not record a disciplinary violation.'
     ),
-    reason,
+    reasonLabel,
     confirmClose
   );
   workflow.append(toggle, panel);
@@ -519,6 +523,9 @@ async function openIncidentCase(incidentId, options = {}) {
   const ui = { reload: (id) => openIncidentCase(id, options) };
   const padSetup = [];
   body.replaceChildren();
+  window.AppOutsideDismiss.clearDirty(
+    document.getElementById('ir-case-dialog')
+  );
   document.getElementById('ir-case-title').textContent = incident.caseNumber;
   if (incident.status === 'CLOSED') {
     const progress = incidentElement('section', 'incident-review-progress');

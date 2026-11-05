@@ -13,6 +13,11 @@
   --field-gap: 4px;
   --toolbar-gap: 8px;
   --filter-width: 180px;
+  /* Page components < floating menus < sidebar < transient feedback. */
+  --layer-content: 0;
+  --layer-menu: 20;
+  --layer-sidebar: 30;
+  --layer-feedback: 10000;
 }
 * {
   box-sizing: border-box;
@@ -36,6 +41,7 @@ body {
 }
 #side {
   position: sticky;
+  z-index: var(--layer-sidebar);
   top: 0;
   width: 230px;
   height: 100vh;
@@ -101,7 +107,7 @@ body {
 }
 #nav .notification-nav-group > summary .nav-notification-dot {
   position: fixed;
-  z-index: 1000;
+  z-index: var(--layer-menu);
   width: 8px;
   height: 8px;
   min-width: 8px;
@@ -159,6 +165,8 @@ body {
 }
 #main {
   flex: 1;
+  isolation: isolate;
+  z-index: var(--layer-content);
   min-width: 0;
   padding: 0 24px 32px;
 }
@@ -275,7 +283,7 @@ input:focus-visible {
 .feedback-popup {
   position: fixed;
   inset: 12px 12px auto;
-  z-index: 10000;
+  z-index: var(--layer-feedback);
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -424,7 +432,7 @@ ul.obs {
     height: 100vh;
     height: 100dvh;
     transform: translateX(-100%);
-    z-index: 5;
+    z-index: var(--layer-sidebar);
     transition: transform 0.2s;
   }
   body.open #side {
@@ -590,10 +598,99 @@ button.ghost {
   flex: 1;
 }
 .tablewrap {
+  isolation: isolate;
   overflow-x: auto;
   background: #fff;
   border: 1px solid var(--rule);
   border-radius: 6px;
+}
+.tablewrap:not(.attendance-table-scroll) {
+  max-width: 100%;
+  max-height: min(calc(68vh + 80px), 800px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.tablewrap.employee-table-scroll {
+  max-height: min(calc(68vh + 140px), 860px);
+}
+.tablewrap:not(.attendance-table-scroll) > table {
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 100%;
+}
+.tablewrap:not(.attendance-table-scroll) > table th,
+.tablewrap:not(.attendance-table-scroll) > table td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-width: 7rem;
+  max-width: 24rem;
+}
+.tablewrap:not(.attendance-table-scroll) > table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #f2edef;
+}
+.tablewrap:not(.attendance-table-scroll) > table tr > :first-child:not(:only-child) {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+  box-shadow: 2px 0 4px rgb(23 32 51 / 12%);
+}
+.tablewrap:not(.attendance-table-scroll) > table thead tr > th:first-child:not(:only-child) {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  background: #f2edef;
+}
+.tablewrap:not(.attendance-table-scroll) > table tbody tr:hover > :first-child {
+  background: #faf5f7;
+}
+.report-table-scroll > .report-table {
+  min-width: 0;
+  max-width: none;
+  table-layout: fixed;
+}
+.tablewrap.report-table-scroll > table.report-table th,
+.tablewrap.report-table-scroll > table.report-table td {
+  min-width: 0;
+  max-width: none;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.report-table-master tr > :nth-child(-n + 4):not(:only-child) {
+  position: sticky;
+  background: #fff;
+  z-index: 2;
+}
+.report-table-master tr > :nth-child(1) { left: 0; }
+.report-table-master tr > :nth-child(2) { left: 48px; }
+.report-table-master tr > :nth-child(3) { left: 168px; }
+.report-table-master tr > :nth-child(4) { left: 240px; box-shadow: 2px 0 4px rgb(23 32 51 / 12%); }
+.tablewrap.report-table-scroll > table.report-table-master thead tr > th:nth-child(-n + 4):not(:only-child) {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: #f2edef;
+}
+.report-table-master tbody tr:hover > :nth-child(-n + 4) { background: #faf5f7; }
+.report-details-toggle { min-width: 0; padding: 4px 8px; }
+.report-employee-dialog { width: min(94vw, 1000px); max-height: 90vh; overflow: auto; }
+.report-detail-section { border: 1px solid var(--rule); border-radius: 6px; padding: 14px; margin: 12px 0; }
+.report-detail-section h3 { margin: 0 0 12px; }
+.report-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 12px; margin: 0; }
+.report-detail-grid textarea { resize: vertical; }
+.report-detail-rows { margin-top: 12px; }
+.incident-review-list { max-height: min(calc(68vh + 80px), 800px); overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.required-indicator { color: #a1253d; font-weight: 700; margin-left: 0.2em; }
+@media (max-width: 640px) {
+  .tablewrap.report-table-scroll > table.report-table-master tr > :nth-child(3):not(:only-child),
+  .tablewrap.report-table-scroll > table.report-table-master tr > :nth-child(4):not(:only-child) { position: static; left: auto; box-shadow: none; }
+  .tablewrap.report-table-scroll > table.report-table-master thead tr > th:nth-child(3):not(:only-child),
+  .tablewrap.report-table-scroll > table.report-table-master thead tr > th:nth-child(4):not(:only-child) { position: sticky; }
 }
 .attendance-table-scroll {
   max-width: 100%;
@@ -757,7 +854,7 @@ button.ghost {
 }
 .attendance-time-logs {
   position: fixed;
-  z-index: 20;
+  z-index: var(--layer-menu);
   width: min(460px, calc(100vw - 16px));
   max-height: min(300px, calc(100dvh - 16px));
   overflow: auto;
@@ -923,6 +1020,17 @@ dialog.time-record-dialog {
   max-width: 100%;
   overflow-x: auto;
 }
+.time-record-scroll {
+  isolation: isolate;
+  max-height: min(50vh, 480px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.time-record-scroll .time-record-table { border-collapse: separate; border-spacing: 0; }
+.time-record-table thead th { position: sticky; top: 0; z-index: 3; background: #f2edef; }
+.time-record-table tr > :first-child { position: sticky; left: 0; z-index: 2; background: #fff; }
+.time-record-table thead tr > :first-child { z-index: 4; background: #f2edef; }
 .time-record-table,
 .time-record-print-table {
   width: 100%;
@@ -1071,7 +1179,7 @@ form#announcement-create-form > textarea {
 }
 .head-search-results {
   position: absolute;
-  z-index: 5;
+  z-index: var(--layer-menu);
   display: grid;
   gap: 2px;
   max-height: 220px;
@@ -1308,6 +1416,12 @@ legend {
   }
 }
 @media print {
+  .tablewrap:not(.attendance-table-scroll) { max-height: none; overflow: visible; }
+  .tablewrap:not(.attendance-table-scroll) > table thead th,
+  .tablewrap:not(.attendance-table-scroll) > table thead tr > th:first-child:not(:only-child),
+  .tablewrap:not(.attendance-table-scroll) > table tr > :first-child:not(:only-child),
+  .report-table-master tr > :nth-child(-n + 4):not(:only-child),
+  .tablewrap.report-table-scroll > table.report-table-master thead tr > th:nth-child(-n + 4):not(:only-child) { position: static; box-shadow: none; }
   .toolbar,
   .pager {
     display: none !important;
@@ -1721,6 +1835,11 @@ legend {
   color: #222;
   font: inherit;
 }
+.form-acknowledgment .required-indicator {
+  display: inline;
+  color: #a1253d;
+  font-weight: 700;
+}
 @media (max-width: 600px) {
   .leave-sheet {
     padding: 14px;
@@ -1840,7 +1959,7 @@ legend {
 }
 .incident-suggestions {
   position: absolute;
-  z-index: 5;
+  z-index: var(--layer-menu);
   top: calc(100% - 1px);
   right: 0;
   left: 0;

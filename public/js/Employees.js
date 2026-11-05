@@ -1,5 +1,5 @@
 let META = null,
-  EQ = { page: 1, sortKey: 'name', sortDir: 'asc' },
+  EQ = { sortKey: 'name', sortDir: 'asc' },
   PENDING = null,
   CUR = null,
   IMP = null,
@@ -58,13 +58,16 @@ function rowsTable(k, json) {
   w.appendChild(el('h3', T.count + ': ' + rows.length));
   if (!rows.length) return w;
   const tb = el('table'),
-    h = el('tr');
+    h = el('tr'),
+    head = el('thead'),
+    body = el('tbody');
   T.cols.forEach((c) => h.appendChild(el('th', c[1])));
-  tb.appendChild(h);
+  head.appendChild(h);
+  tb.append(head, body);
   rows.forEach((r) => {
     const tr = el('tr');
     T.cols.forEach((c) => tr.appendChild(el('td', r[c[0]] || '')));
-    tb.appendChild(tr);
+    body.appendChild(tr);
   });
   const tw = el('div', undefined, 'tablewrap');
   tw.appendChild(tb);
@@ -161,6 +164,99 @@ function employeeFormSections() {
 async function ensureMeta() {
   if (!META) META = await api('getFormMeta');
 }
+
+function formatReportValue(value, type, key) {
+  if (type === 'json' && TABLES[key]) {
+    try {
+      const rows =
+        typeof value === 'string' ? JSON.parse(value || '[]') : value;
+      return Array.isArray(rows)
+        ? rows
+            .map((row) =>
+              TABLES[key].cols
+                .map(([column]) => row[column])
+                .filter(Boolean)
+                .join(' · ')
+            )
+            .join('\n')
+        : '';
+    } catch {
+      return String(value || '');
+    }
+  }
+  return DateUtils.formatField(value, type);
+}
+
+async function showEmployeeDetails(report, row, { manage = false } = {}) {
+  await ensureMeta();
+  const values = Object.fromEntries(
+    report.columnKeys.map((key, index) => [key, row[index]])
+  );
+  const details = $('report-employee-details');
+  details.replaceChildren();
+  $('report-employee-title').textContent = values.name || 'Employee Details';
+  $('employee-detail-actions').hidden = !manage;
+  $('p_edit').hidden = !can('emp.write');
+  $('p_archive').hidden = !can('emp.archive');
+  const rendered = new Set();
+  const renderSection = (title, keys) => {
+    const section = el('section', undefined, 'report-detail-section');
+    const grid = el('div', undefined, 'fgrid report-detail-grid');
+    const tables = [];
+    keys.forEach((key) => {
+      const index = report.columnKeys.indexOf(key);
+      if (index < 0 || rendered.has(key)) return;
+      rendered.add(key);
+      if (report.columnTypes[index] === 'json' && TABLES[key]) {
+        const block = el('div', undefined, 'report-detail-rows');
+        block.append(el('h4', TABLES[key].title), rowsTable(key, values[key]));
+        tables.push(block);
+        return;
+      }
+      const item = el('label', report.columns[index]);
+      const value =
+        values[key] == null || values[key] === ''
+          ? '—'
+          : String(
+              formatReportValue(values[key], report.columnTypes[index], key)
+            );
+      const field = el(
+        value.length > 32 || value.includes('\n') ? 'textarea' : 'input'
+      );
+      field.readOnly = true;
+      field.value = value;
+      if (field.tagName === 'TEXTAREA')
+        field.rows = Math.max(2, Math.ceil(value.length / 25));
+      item.appendChild(field);
+      grid.appendChild(item);
+    });
+    if (!grid.childElementCount && !tables.length) return;
+    section.appendChild(el('h3', title));
+    if (grid.childElementCount) section.appendChild(grid);
+    section.append(...tables);
+    details.appendChild(section);
+  };
+  employeeFormSections().forEach(({ title, keys }) =>
+    renderSection(title, keys)
+  );
+  renderSection(
+    'Record Information',
+    report.columnKeys.filter((key) => !rendered.has(key))
+  );
+  $('report-employee-dialog').showModal();
+}
+
+function employeeDetailsRecord(employee) {
+  const fields = META.reportFields;
+  return {
+    report: {
+      columns: fields.map((field) => field.label),
+      columnKeys: fields.map((field) => field.key),
+      columnTypes: fields.map((field) => field.type)
+    },
+    row: fields.map((field) => employee[field.key])
+  };
+}
 /* ---------- Employee list ---------- */
 VIEWS.employees = guard(async () => {
   $('e_import').hidden = !can('emp.write');
@@ -196,7 +292,7 @@ async function loadEmployees() {
     Object.assign(
       {
         search: $('e_search').value,
-        page: EQ.page,
+        allRows: true,
         sortKey: EQ.sortKey,
         sortDir: EQ.sortDir
       },
@@ -257,14 +353,9 @@ async function loadEmployees() {
     };
     b.appendChild(t);
   });
-  const last = Math.max(1, Math.ceil(r.total / r.pageSize));
-  $('e_info').textContent =
-    r.total + ' employee(s) · page ' + r.page + ' of ' + last;
-  $('e_prev').disabled = r.page <= 1;
-  $('e_next').disabled = r.page >= last;
+  $('e_info').textContent = r.total + ' employee(s)';
 }
 $('e_go').onclick = guard(async () => {
-  EQ.page = 1;
   await loadEmployees();
 });
 $('e_search').onkeydown = (e) => {
@@ -273,14 +364,6 @@ $('e_search').onkeydown = (e) => {
 ['company', 'department', 'status'].forEach(
   (k) => ($('e_' + k).onchange = $('e_go').onclick)
 );
-$('e_prev').onclick = guard(async () => {
-  EQ.page--;
-  await loadEmployees();
-});
-$('e_next').onclick = guard(async () => {
-  EQ.page++;
-  await loadEmployees();
-});
 $('e_add').onclick = () => {
   PENDING = null;
   go(NAV.find((n) => n[0] === 'register'));
@@ -293,58 +376,15 @@ $('e_export').onclick = guard(async () => {
 /* ---------- Profile ---------- */
 async function showProfile(id) {
   CUR = await api('getEmployee', id);
-  const body = $('p_body');
-  body.innerHTML = '';
-  body.appendChild(el('h2', CUR.name));
-  body.appendChild(
-    el('p', CUR.position + ' · ' + CUR.department + ' · ' + CUR.company, 'note')
-  );
-  employeeFormSections().forEach(({ title, keys }) => {
-    const dl = el('dl'),
-      tabs = [];
-    keys.forEach((k) => {
-      const f = fld(k);
-      if (!f) return;
-      if (f.type === 'json') {
-        tabs.push(f);
-        return;
-      }
-      dl.appendChild(el('dt', f.label));
-      dl.appendChild(
-        el(
-          'dd',
-          CUR[k] === '' || CUR[k] == null
-            ? '–'
-            : DateUtils.formatField(CUR[k], f.type)
-        )
-      );
-    });
-    if (!dl.childElementCount && !tabs.length) return;
-    body.appendChild(el('h3', title));
-    body.appendChild(dl);
-    tabs.forEach((f) => body.appendChild(rowsTable(f.key, CUR[f.key])));
-  });
-  const dl = el('dl');
-  [
-    ['Age', CUR.age],
-    ['Tenure (years)', CUR.tenure_years],
-    ['FTE', CUR.fte],
-    ['Record ID', CUR.record_id]
-  ].forEach(([a, b]) => {
-    dl.appendChild(el('dt', a));
-    dl.appendChild(el('dd', b === '' ? '–' : b));
-  });
-  body.appendChild(el('h3', 'Calculated'));
-  body.appendChild(dl);
-  $('p_edit').hidden = !can('emp.write');
-  $('p_archive').hidden = !can('emp.archive');
-  $('profile').showModal();
+  await ensureMeta();
+  const { report, row } = employeeDetailsRecord(CUR);
+  await showEmployeeDetails(report, row, { manage: true });
 }
-$('p_close').onclick = () => $('profile').close();
+$('report-employee-close').onclick = () => $('report-employee-dialog').close();
 $('p_print').onclick = () => window.print();
 $('p_edit').onclick = () => {
   PENDING = CUR;
-  $('profile').close();
+  $('report-employee-dialog').close();
   go(NAV.find((n) => n[0] === 'register'));
 };
 $('p_archive').onclick = guard(async () => {
@@ -356,7 +396,7 @@ $('p_archive').onclick = guard(async () => {
   )
     return;
   await api('archiveEmployee', CUR.record_id);
-  $('profile').close();
+  $('report-employee-dialog').close();
   await loadEmployees();
 });
 
@@ -404,7 +444,7 @@ VIEWS.register = guard(async () => {
         tabs.push(f);
         return;
       }
-      const lab = el('label', f.label + (f.required ? ' *' : ''));
+      const lab = el('label', f.label);
       let inp;
       if (['address', 'permanent_address'].includes(k)) {
         lab.classList.add('employee-address');
@@ -438,6 +478,8 @@ VIEWS.register = guard(async () => {
       }
       inp.id = 'ff_' + k;
       inp.required = Boolean(f.required);
+      if (k === 'personal_email' && !rec)
+        inp.dataset.requiredIndicator = 'true';
       if (k === 'birthday') inp.max = DateUtils.manilaDate();
       if (rec && rec[k] !== undefined) inp.value = rec[k];
       if (k === 'reports_to' && !rec) {
@@ -497,6 +539,17 @@ VIEWS.register = guard(async () => {
   $('r_account_role').onchange = updateRegistrationRoleHelp;
   if ($('ff_assigned_head_email')) $('ff_assigned_head_email').value = '';
   updateRegistrationRoleHelp();
+  const churchChoice = $('ff_church_has');
+  const churchPosition = $('ff_church_position');
+  if (churchChoice && churchPosition) {
+    const updateChurchPositionIndicator = () => {
+      churchPosition.dataset.requiredIndicator = String(
+        churchChoice.value === 'Yes'
+      );
+    };
+    churchChoice.addEventListener('change', updateChurchPositionIndicator);
+    updateChurchPositionIndicator();
+  }
   const calc = () => {
     const b = $('ff_birthday') && $('ff_birthday').value;
     if ($('ff_age')) $('ff_age').value = DateUtils.ageOnDate(b);
@@ -514,6 +567,9 @@ function updateRegistrationRoleHelp() {
   if (search) {
     search.value = '';
     search.disabled = !['STAFF', 'SUPERVISOR'].includes(role);
+    search.dataset.requiredIndicator = String(
+      ['STAFF', 'SUPERVISOR'].includes(role)
+    );
   }
   $('r_head_assignment_note').textContent =
     role === 'STAFF'
@@ -655,7 +711,10 @@ $('i_file').onchange = guard(async (e) => {
   ['File column', 'Example', 'Import into'].forEach((x) =>
     th.appendChild(el('th', x))
   );
-  t.appendChild(th);
+  const thead = el('thead'),
+    tbody = el('tbody');
+  thead.appendChild(th);
+  t.append(thead, tbody);
   IMP.head.forEach((h, i) => {
     const tr = el('tr');
     tr.appendChild(el('td', h));
@@ -682,7 +741,7 @@ $('i_file').onchange = guard(async (e) => {
     const td = el('td');
     td.appendChild(s);
     tr.appendChild(td);
-    t.appendChild(tr);
+    tbody.appendChild(tr);
   });
   m.appendChild(t);
   m.hidden = false;

@@ -37,6 +37,12 @@ Apache uses the root `.htaccess` file to redirect `http://localhost/HR_Dashboard
 
 Keep page structure in its matching `public/views/` fragment and page-specific behavior in the matching `public/js/` controller. Put reusable browser behavior in a shared controller or module rather than duplicating it across pages. Keep form definitions shared when they are consumed by both the browser and API; forms with distinct workflows may keep dedicated markup and behavior. Put business rules and data validation on the server, with reusable logic in `server/services/` and authoritative field/permission definitions in `server/config/`. Incident Report tables are added by the existing database initialization, and the shared signature pad is in `public/js/SignaturePad.js`. Use `npm.cmd run format` to format first-party JavaScript, HTML, and CSS consistently.
 
+Wrap data tables in `.tablewrap` and use a `<thead>` for the shared scrolling and sticky headers. Label required controls and use the native `required` attribute when it reflects the existing validation; `RequiredFields.js` adds their visible indicators. For requirements enforced by workflow logic without native validation, use `data-required-indicator="true"` on the associated control, updating it when the requirement changes. Use `data-required-label` for required signature headings.
+
+Dialogs support outside-click dismissal through `OutsideDismiss.js`. Use `data-outside-dismiss="never"` when explicit acknowledgment or confirmation is required, and `data-outside-dismiss-target` when dismissal must invoke an existing cancel or close button. Dialogs with unsaved input or signatures stay open until the user saves or cancels them.
+
+Keep page components inside the isolated `#main` stacking context and use the shared `--layer-*` values for floating menus, the sidebar, and feedback. Scrollable tables isolate their frozen headers locally. Keep native modal dialogs and popovers in the browser's top layer, and avoid raising individual table headers above navigation.
+
 ## First-time setup
 
 1. Start **Apache** and **MySQL** in the XAMPP Control Panel.

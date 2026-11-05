@@ -388,7 +388,7 @@ async function listMyForms(req) {
             CASE WHEN f.status = 'PENDING' THEN DATEDIFF(CURRENT_DATE(), DATE(f.submitted_at)) ELSE NULL END AS days_pending
      FROM user_forms f
      LEFT JOIN user_roles reviewer ON reviewer.email = f.reviewed_by
-     WHERE f.user_email = ? ORDER BY f.submitted_at DESC, f.id DESC LIMIT 500`,
+     WHERE f.user_email = ? ORDER BY f.submitted_at DESC, f.id DESC`,
     [user.email]
   );
   const [[head]] = await pool.execute(
@@ -768,7 +768,7 @@ async function listFormsForReview(req, scope = 'HR', filters = {}) {
      LEFT JOIN user_roles u ON u.email = f.user_email
      LEFT JOIN user_roles reviewer ON reviewer.email = f.reviewed_by
      WHERE ${reviewScope.whereSql}${dateClauses.length ? ' AND ' + dateClauses.join(' AND ') : ''}
-     ORDER BY f.submitted_at DESC, f.id DESC LIMIT 500`,
+     ORDER BY f.submitted_at DESC, f.id DESC`,
     [...reviewScope.whereValues, ...dateValues]
   );
   return {

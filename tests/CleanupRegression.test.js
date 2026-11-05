@@ -5,13 +5,16 @@ const { LISTS, EMP_FIELDS } = require('../server/config/EmployeeSchema');
 const {
   getFormMeta,
   getEmployee,
-  saveEmployee
+  saveEmployee,
+  listEmployees
 } = require('../server/services/EmployeeService');
+const { runReport } = require('../server/services/ReportService');
 const { getSession } = require('../server/middleware/Auth');
 const { importEmployees } = require('../server/services/ImportService');
 const { assignAccountHead } = require('../server/services/AccountService');
 const {
-  listIncidentViolations
+  listIncidentViolations,
+  listIncidentsForHistory
 } = require('../server/services/incident-management/Archive');
 const { listFormsForReview } = require('../server/services/FormService');
 const {
@@ -23,6 +26,103 @@ const {
   saveIncidentMatrix,
   matrixActionForOccurrence
 } = require('../server/services/incident-management/Conduct');
+
+test('employee reports return all sorted rows when requested and keep role checks and ordinary paging', async (t) => {
+  let role = 'HR';
+  t.mock.method(pool, 'execute', async (sql) => {
+    if (sql.includes('FROM user_roles'))
+      return [[{ email: 'reviewer@example.com', role, active: 1 }]];
+    if (sql.includes('INSERT INTO audit_logs')) return [{ affectedRows: 1 }];
+    throw new Error('Unexpected query: ' + sql);
+  });
+  const employees = Array.from({ length: 205 }, (_, index) => ({
+    record_id: `EMP-${index}`,
+    seq_no: index,
+    name: `Employee ${String(index).padStart(3, '0')}`,
+    emp_no: `E-${index}`,
+    date_employed: '2025-01-01',
+    record_status: 'Active',
+    siblings: '[{"name":"Sibling"}]'
+  }));
+  t.mock.method(pool, 'query', async () => [employees]);
+  const req = { session: { userEmail: 'reviewer@example.com' } };
+  const page = await runReport(req, 'master', {}, { pageSize: 25 });
+  assert.equal(page.rows.length, 25);
+  const all = await runReport(
+    req,
+    'master',
+    {},
+    { allRows: true, sortCol: 2, sortDir: 'desc' }
+  );
+  assert.equal(all.rows.length, 205);
+  assert.equal(all.columnKeys[0], 'record_id');
+  assert.equal(all.rows[0][2], 'Employee 204');
+  assert.equal(
+    all.rows[0][all.columnKeys.indexOf('siblings')],
+    '[{"name":"Sibling"}]'
+  );
+  role = 'STAFF';
+  await assert.rejects(runReport(req, 'master', {}, { allRows: true }), {
+    status: 403
+  });
+});
+
+test('employee list keeps filtered access while allowing all rows for scrolling', async (t) => {
+  const calls = [];
+  t.mock.method(pool, 'execute', async (sql, values) => {
+    calls.push({ sql, values });
+    if (sql.includes('FROM user_roles'))
+      return [[{ email: 'hr@example.com', role: 'HR', active: 1 }]];
+    if (sql.includes('COUNT(*)')) return [[{ total: 205 }]];
+    return [[{ record_id: 'EMP-1', date_employed: '2025-01-01' }]];
+  });
+  const result = await listEmployees(
+    { session: { userEmail: 'hr@example.com' } },
+    { allRows: true, department: 'IT' }
+  );
+  const query = calls.find((call) => call.sql.includes('ORDER BY'));
+  assert.doesNotMatch(query.sql, /LIMIT/);
+  assert.deepEqual(query.values, ['IT']);
+  assert.equal(result.total, 205);
+  assert.equal(result.pageSize, 205);
+});
+
+test('scrolling incident histories keeps case and employee access restrictions', async (t) => {
+  const calls = [];
+  t.mock.method(pool, 'execute', async (sql, values) => {
+    calls.push({ sql, values });
+    if (sql.includes('FROM user_roles'))
+      return [[{ email: 'staff@example.com', role: 'STAFF', active: 1 }]];
+    if (sql.includes('SELECT COUNT(*)')) return [[{ total: 50 }]];
+    if (sql.includes('INSERT INTO audit_logs')) return [{ affectedRows: 1 }];
+    return [[]];
+  });
+  const req = { session: { userEmail: 'staff@example.com' } };
+  const history = await listIncidentsForHistory(req, { allRows: true });
+  const cases = calls.find((call) =>
+    call.sql.includes('date_reported AS dateFiled')
+  );
+  assert.doesNotMatch(cases.sql, /LIMIT 25 OFFSET/);
+  assert.match(cases.sql, /LOWER\(reported_employee_email\) = LOWER\(\?\)/);
+  assert.equal(
+    cases.values.filter((value) => value === 'staff@example.com').length,
+    5
+  );
+  assert.equal(history.pages, 1);
+  await listIncidentViolations(req, { allRows: true });
+  const violations = calls.find((call) =>
+    call.sql.includes('AS violationDate')
+  );
+  assert.doesNotMatch(violations.sql, /LIMIT 25 OFFSET/);
+  assert.deepEqual(violations.values, ['staff@example.com']);
+  await assert.rejects(
+    listIncidentViolations(req, {
+      employeeEmail: 'other@example.com',
+      allRows: true
+    }),
+    { status: 403 }
+  );
+});
 
 test('HR and ADMIN can search another employee violation history while STAFF and HEAD cannot', async (t) => {
   let role = 'ADMIN';
@@ -174,7 +274,7 @@ test('COC matrix selects the matching offense count and caps at the final config
   assert.equal(matrixActionForOccurrence(matrix, 'Grave', 1), null);
 });
 
-test('form review date filters apply before the row limit and preserve the authorized queue and badge totals', async (t) => {
+test('form review date filters preserve the authorized queue and badge totals without hiding older forms', async (t) => {
   const calls = [];
   let role = 'HR';
   t.mock.method(pool, 'execute', async (sql, values) => {
@@ -198,8 +298,9 @@ test('form review date filters apply before the row limit and preserve the autho
   assert.ok(list.sql.includes('f.user_email <> ?'));
   assert.match(
     list.sql,
-    /f.submitted_at >= \?[\s\S]*f.submitted_at < DATE_ADD\(\?, INTERVAL 1 DAY\)[\s\S]*LIMIT 500/
+    /f.submitted_at >= \?[\s\S]*f.submitted_at < DATE_ADD\(\?, INTERVAL 1 DAY\)/
   );
+  assert.doesNotMatch(list.sql, /LIMIT 500/);
   assert.deepEqual(list.values, [
     'hr@example.com',
     '2026-10-01 00:00:00',

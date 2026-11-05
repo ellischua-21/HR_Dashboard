@@ -187,10 +187,7 @@
       </table>
     </div>
     <div class="incident-review-pagination">
-      <button id="ir-history-previous" class="ghost" type="button">
-        Previous</button
-      ><span id="ir-history-page" role="status"></span
-      ><button id="ir-history-next" class="ghost" type="button">Next</button>
+      <span id="ir-history-page" role="status"></span>
     </div>
   </section>
 </section>
@@ -286,14 +283,8 @@
       class="incident-review-list"
       role="list"
       aria-label="Incident Reports"
+      tabindex="0"
     ></div>
-    <div class="incident-review-pagination">
-      <button id="ir-review-previous" class="ghost" type="button">
-        Previous
-      </button>
-      <span id="ir-review-page" class="note"></span>
-      <button id="ir-review-next" class="ghost" type="button">Next</button>
-    </div>
   </section>
 </section>
 
@@ -324,7 +315,12 @@
       <form id="ir-violation-employee-form" class="actions" hidden>
         <div class="incident-search-field">
           <label for="ir-violation-employee">Find Employee</label>
-          <input id="ir-violation-employee" type="search" autocomplete="off" />
+          <input
+            id="ir-violation-employee"
+            type="search"
+            autocomplete="off"
+            data-required-indicator="true"
+          />
           <div
             id="ir-violation-options"
             class="incident-suggestions"
@@ -358,12 +354,7 @@
         </table>
       </div>
       <div class="incident-review-pagination">
-        <button id="ir-violation-previous" type="button" class="ghost">
-          Previous</button
-        ><span id="ir-violation-page" role="status"></span
-        ><button id="ir-violation-next" type="button" class="ghost">
-          Next
-        </button>
+        <span id="ir-violation-page" role="status"></span>
       </div>
     </section>
   </div>

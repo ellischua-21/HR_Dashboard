@@ -2,6 +2,47 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createBrowser } = require('./helpers/Browser');
 
+test('employee master report opens a read-only sectioned view of the displayed record', async () => {
+  const browser = createBrowser();
+  browser.loadDashboard();
+  browser.evaluate(
+    "session = { role: 'HR', perms: ['emp.read', 'report.run'] }; META = { fields: [], lists: {} }"
+  );
+  browser.document.getElementById('rp_id').value = 'master';
+  let requestedOptions;
+  browser.context.fetch = async (_url, options) => {
+    requestedOptions = JSON.parse(options.body).args[2];
+    return {
+      ok: true,
+      json: async () => ({
+        title: 'Employee Master List',
+        columns: [
+          'Record ID',
+          'No.',
+          'Name Of Employee',
+          'Department',
+          'First Name'
+        ],
+        columnKeys: ['record_id', 'seq_no', 'name', 'department', 'first_name'],
+        columnTypes: ['text', 'number', 'text', 'text', 'text'],
+        rows: [['EMP-1', 1, 'One, Test', 'Operations', 'Test']],
+        total: 1
+      })
+    };
+  };
+  await browser.evaluate('runRep()');
+  assert.equal(requestedOptions.allRows, true);
+  const row = browser.document.getElementById('rp_body').children[0];
+  await row.children[0].children[0].click();
+  const dialog = browser.document.getElementById('report-employee-dialog');
+  assert.equal(dialog.open, true);
+  const details = browser.document.getElementById('report-employee-details');
+  const values = details.querySelectorAll('input').map((input) => input.value);
+  for (const value of ['EMP-1', 'One, Test', 'Operations', 'Test'])
+    assert.ok(values.includes(value));
+  assert.ok(details.querySelectorAll('input').every((input) => input.readOnly));
+});
+
 test('attendance shows time logs and device serial numbers in a dropdown', async () => {
   const browser = createBrowser();
   browser.loadDashboard();

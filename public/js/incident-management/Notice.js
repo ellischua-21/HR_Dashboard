@@ -77,15 +77,19 @@ function renderIncidentNte(parent, incident, ui = {}) {
     allegation.rows = 5;
     allegation.maxLength = 12000;
     allegation.placeholder = 'Explain the specific allegation';
+    allegation.dataset.requiredIndicator = 'true';
     allegation.value = incident.nte?.allegation || '';
     const issueDate = incidentElement('input');
     issueDate.type = 'date';
+    issueDate.dataset.requiredIndicator = 'true';
     issueDate.value = incident.nte?.issuanceDate || DateUtils.manilaDate();
     const receiptDate = incidentElement('input');
     receiptDate.type = 'date';
+    receiptDate.dataset.requiredIndicator = 'true';
     receiptDate.value = incident.nte?.receiptDate || '';
     const responseDays = incidentElement('input');
     responseDays.type = 'number';
+    responseDays.dataset.requiredIndicator = 'true';
     responseDays.min = '1';
     responseDays.max = '60';
     responseDays.value = incident.nte?.responseWorkingDays || '5';
@@ -145,6 +149,14 @@ function renderIncidentNte(parent, incident, ui = {}) {
       'note',
       `Authorized HR signatory: ${incident.currentUserEmail}`
     );
+    const allegationLabel = incidentElement(
+      'label',
+      '',
+      'Explanation Of The Allegation'
+    );
+    allegationLabel.appendChild(allegation);
+    const signatureLabel = incidentElement('p', '', 'Authorized HR Signature');
+    signatureLabel.dataset.requiredLabel = '';
     const values = async () => ({
       allegation: allegation.value,
       issuanceDate: issueDate.value,
@@ -223,11 +235,11 @@ function renderIncidentNte(parent, incident, ui = {}) {
     editor.append(
       fields,
       deadlineNote,
-      incidentElement('label', '', 'Explanation Of The Allegation'),
-      allegation,
+      allegationLabel,
       incidentElement('label', '', 'NTE Supporting Evidence'),
       evidence,
       currentUser,
+      signatureLabel,
       signatureCanvas,
       signatureControls
     );
@@ -241,6 +253,7 @@ function renderIncidentNte(parent, incident, ui = {}) {
     explanation.rows = 8;
     explanation.maxLength = 20000;
     explanation.placeholder = 'Write your explanation';
+    explanation.dataset.requiredIndicator = 'true';
     explanation.value = incident.explanationDraft?.explanation || '';
     const attachments = incidentElement('input');
     attachments.type = 'file';
@@ -306,8 +319,10 @@ function renderIncidentNte(parent, incident, ui = {}) {
         submit.disabled = false;
       }
     };
+    const explanationLabel = incidentElement('label', '', 'Explanation');
+    explanationLabel.appendChild(explanation);
     form.append(
-      explanation,
+      explanationLabel,
       incidentElement('label', '', 'Supporting Evidence'),
       attachments,
       draftFiles,
@@ -385,6 +400,9 @@ function renderIncidentNte(parent, incident, ui = {}) {
     statement.rows = 5;
     statement.maxLength = 20000;
     statement.placeholder = 'Write an additional statement';
+    statement.dataset.requiredIndicator = 'true';
+    const statementLabel = incidentElement('label', '', 'Additional Statement');
+    statementLabel.appendChild(statement);
     const files = incidentElement('input');
     files.type = 'file';
     files.multiple = true;
@@ -409,7 +427,7 @@ function renderIncidentNte(parent, incident, ui = {}) {
         submit.disabled = false;
       }
     };
-    addendumForm.append(files, statement, submit);
+    addendumForm.append(files, statementLabel, submit);
     section.appendChild(addendumForm);
   }
 

@@ -4,7 +4,6 @@
   const byId = (id) => document.getElementById(id);
   const state = {
     page: 1,
-    pages: 1,
     search: '',
     caseNumber: '',
     from: '',
@@ -33,10 +32,12 @@
     const body = byId('ir-history-rows');
     body.setAttribute('aria-busy', 'true');
     try {
-      const data = await api('listIncidentsForHistory', state);
+      const data = await api('listIncidentsForHistory', {
+        ...state,
+        allRows: true
+      });
       if (ticket !== request || session?.email !== account) return;
       state.page = data.page;
-      state.pages = data.pages;
       body.replaceChildren();
       data.cases.forEach((incident) => {
         const row = el('tr');
@@ -60,9 +61,7 @@
       });
       byId('ir-history-empty').hidden = data.total > 0;
       byId('ir-history-page').textContent =
-        `Page ${data.page} of ${data.pages} · ${data.total} case${data.total === 1 ? '' : 's'}`;
-      byId('ir-history-previous').disabled = data.page <= 1;
-      byId('ir-history-next').disabled = data.page >= data.pages;
+        `${data.total} case${data.total === 1 ? '' : 's'}`;
     } catch (error) {
       if (ticket === request && session?.email === account)
         feedback(error.message || String(error), true);
@@ -115,14 +114,6 @@
       to: '',
       outcome: 'ALL'
     });
-    fetchCases();
-  };
-  byId('ir-history-previous').onclick = () => {
-    --state.page;
-    fetchCases();
-  };
-  byId('ir-history-next').onclick = () => {
-    ++state.page;
     fetchCases();
   };
   window.IncidentHistory = { load };

@@ -65,6 +65,12 @@ function renderIncidentDecision(parent, incident, ui = {}) {
     reason.placeholder = 'Administrative completion notes (required)';
     reason.required = true;
     reason.setAttribute('aria-label', 'Administrative completion notes');
+    const reasonLabel = incidentElement(
+      'label',
+      '',
+      'Administrative Completion Notes'
+    );
+    reasonLabel.appendChild(reason);
     const close = incidentElement(
       'button',
       '',
@@ -99,7 +105,7 @@ function renderIncidentDecision(parent, incident, ui = {}) {
         close.disabled = false;
       }
     };
-    section.append(reason, close);
+    section.append(reasonLabel, close);
   }
   if (decision.closedAt && incident.canReview)
     section.appendChild(
@@ -174,6 +180,7 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
     return;
   }
   const finding = incidentElement('select');
+  finding.dataset.requiredIndicator = 'true';
   finding.add(new Option('Select finding', ''));
   finding.add(new Option('Allegation substantiated', 'SUBSTANTIATED'));
   finding.add(new Option('Allegation not substantiated', 'NOT_SUBSTANTIATED'));
@@ -185,6 +192,7 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
   );
   severity.value = incident.evaluation?.severity || '';
   const findings = incidentElement('textarea');
+  findings.dataset.requiredIndicator = 'true';
   findings.rows = 5;
   findings.maxLength = 20000;
   findings.placeholder = 'Evaluation findings and basis';
@@ -213,6 +221,7 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
   section.appendChild(context);
   const updateFindingFields = () => {
     const substantiated = finding.value === 'SUBSTANTIATED';
+    severity.dataset.requiredIndicator = String(substantiated);
     [severity, recommendation].forEach(
       (control) => (control.disabled = !substantiated)
     );
@@ -361,6 +370,8 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
       process.disabled = false;
     }
   };
-  section.append(authorized, signatureCanvas, clear, process);
+  const signatureLabel = incidentElement('p', '', 'Authorized HR Signature');
+  signatureLabel.dataset.requiredLabel = '';
+  section.append(authorized, signatureLabel, signatureCanvas, clear, process);
   parent.appendChild(section);
 }

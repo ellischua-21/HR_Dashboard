@@ -585,7 +585,7 @@ async function getIncidentReviewDashboard(req, input = {}) {
           EXISTS (SELECT 1 FROM incident_evaluations e WHERE e.incident_id = incident_reports.id) AS hasEvaluation
        FROM incident_reports WHERE ${scope.sql} AND ${filter.sql}
        ORDER BY updatedAt DESC, incident_reports.id DESC
-       LIMIT ${filter.filters.pageSize} OFFSET ${offset}`,
+       ${input.allRows === true ? '' : `LIMIT ${filter.filters.pageSize} OFFSET ${offset}`}`,
       [...scope.values, ...filter.values]
     );
     await connection.commit();
@@ -599,9 +599,10 @@ async function getIncidentReviewDashboard(req, input = {}) {
       },
       cases,
       total,
-      page,
-      pages,
-      pageSize: filter.filters.pageSize
+      page: input.allRows === true ? 1 : page,
+      pages: input.allRows === true ? 1 : pages,
+      pageSize:
+        input.allRows === true ? Math.max(1, total) : filter.filters.pageSize
     };
   } catch (error) {
     await connection.rollback();

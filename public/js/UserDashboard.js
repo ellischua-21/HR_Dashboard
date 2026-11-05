@@ -1531,6 +1531,8 @@ async function loadPendingAnnouncementsPopup() {
   $('staff-announcements-acknowledge').textContent = pendingAnnouncements.length
     ? 'Acknowledge announcements'
     : 'Close';
+  $('staff-announcements-dialog').dataset.outsideDismiss =
+    pendingAnnouncements.length ? 'never' : '';
   $('staff-announcements-dialog').showModal();
 }
 

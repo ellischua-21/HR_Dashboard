@@ -6,6 +6,7 @@
     if (dialog?.isConnected) return dialog;
     dialog = document.createElement('dialog');
     dialog.className = 'app-confirm-dialog';
+    dialog.dataset.outsideDismiss = 'never';
     dialog.setAttribute('aria-labelledby', 'app-confirm-title');
     dialog.innerHTML = `
       <form method="dialog" class="app-confirm-card">

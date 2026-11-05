@@ -139,7 +139,7 @@
   </section>
 </section>
 
-<dialog id="leave-form-dialog">
+<dialog id="leave-form-dialog" data-outside-dismiss-target="uf_cancel_leave">
   <form id="leave-form">
     <h2 id="leave-form-title">Leave Application</h2>
     <div class="fgrid">
@@ -210,7 +210,7 @@
       ></label
     >
     <div class="signature-pad-field">
-      <span>Electronic signature</span>
+      <span data-required-label>Electronic signature</span>
       <canvas
         id="leave-signature-pad"
         class="signature-pad"
@@ -236,7 +236,10 @@
   <div id="uf_form_view"></div>
 </dialog>
 
-<dialog id="user-template-dialog">
+<dialog
+  id="user-template-dialog"
+  data-outside-dismiss-target="user-template-cancel"
+>
   <form id="user-template-form">
     <h2 id="user-template-title"></h2>
     <div id="user-template-fields" class="fgrid"></div>
@@ -246,7 +249,7 @@
       ></label
     >
     <div class="signature-pad-field">
-      <span>Electronic signature</span>
+      <span data-required-label>Electronic signature</span>
       <canvas
         id="template-signature-pad"
         class="signature-pad"
@@ -266,12 +269,15 @@
   </form>
 </dialog>
 
-<dialog id="head-signature-dialog">
+<dialog
+  id="head-signature-dialog"
+  data-outside-dismiss-target="head-signature-cancel"
+>
   <form id="head-signature-form">
     <h2>Sign And Forward Form</h2>
     <p id="head-signature-control" class="note"></p>
     <div class="signature-pad-field">
-      <span>Head signature</span>
+      <span data-required-label>Head signature</span>
       <canvas
         id="head-signature-pad"
         class="signature-pad"
@@ -291,7 +297,10 @@
   </form>
 </dialog>
 
-<dialog id="hr-signature-dialog">
+<dialog
+  id="hr-signature-dialog"
+  data-outside-dismiss-target="hr-signature-cancel"
+>
   <form id="hr-signature-form">
     <h2>Sign And Approve Form</h2>
     <p id="hr-signature-control" class="note"></p>
@@ -302,7 +311,7 @@
       <label>SIL Balance<input name="silBalance" maxlength="100" /></label>
     </fieldset>
     <div class="signature-pad-field">
-      <span>HR/Admin signature</span>
+      <span data-required-label>HR/Admin signature</span>
       <canvas
         id="hr-signature-pad"
         class="signature-pad"
@@ -322,7 +331,11 @@
   </form>
 </dialog>
 
-<dialog id="form-rejection-dialog" class="decision-dialog">
+<dialog
+  id="form-rejection-dialog"
+  class="decision-dialog"
+  data-outside-dismiss-target="form-rejection-cancel"
+>
   <form id="form-rejection-form">
     <h2>Reject Form</h2>
     <p id="form-rejection-control" class="note"></p>
@@ -352,7 +365,12 @@
   </form>
 </dialog>
 
-<dialog id="staff-announcements-dialog" class="announcement-dialog">
+<dialog
+  id="staff-announcements-dialog"
+  class="announcement-dialog"
+  data-outside-dismiss="never"
+  data-outside-dismiss-target="staff-announcements-acknowledge"
+>
   <h2>Notifications</h2>
   <div id="staff-announcements-list" class="announcement-list"></div>
   <div class="actions">

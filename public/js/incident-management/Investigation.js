@@ -126,6 +126,7 @@
     function addRequestRow(selectedEmail = '') {
       const row = el('div', 'incident-case-section');
       const recipient = el('select');
+      recipient.dataset.requiredIndicator = 'true';
       recipient.setAttribute('aria-label', 'Information request recipient');
       recipient.add(new Option('Select an employee', ''));
       recipients.forEach((person) =>
@@ -137,6 +138,7 @@
       const recipientLabel = el('label', '', 'Send To');
       recipientLabel.appendChild(recipient);
       const requestText = el('textarea');
+      requestText.dataset.requiredIndicator = 'true';
       requestText.rows = 3;
       requestText.maxLength = 4000;
       requestText.placeholder = 'What information or explanation is needed?';
@@ -238,6 +240,9 @@
     note.rows = 4;
     note.maxLength = 4000;
     note.placeholder = 'Investigation findings or notes (required)';
+    note.dataset.requiredIndicator = 'true';
+    const noteLabel = el('label', '', 'Investigation Findings');
+    noteLabel.appendChild(note);
     const files = el('input');
     files.type = 'file';
     files.multiple = true;
@@ -268,7 +273,7 @@
     };
     workflow.append(
       el('h4', '', 'Record Findings And Evidence'),
-      note,
+      noteLabel,
       files,
       saveNote
     );

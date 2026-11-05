@@ -1,5 +1,6 @@
 const {
   EMP_FIELDS,
+  masterReportFields,
   F,
   ACTIVE_STATUSES,
   AGE_BANDS
@@ -118,12 +119,11 @@ async function buildReport(id, filters) {
   if (definition.type === 'list') {
     let keys = definition.cols;
     if (keys === 'master') {
-      keys = EMP_FIELDS.filter((field) => field[0] !== 'docs')
-        .map((field) => field[0])
-        .concat(['age', 'tenure_years']);
+      keys = masterReportFields().map((field) => field[0]);
     }
     return {
       columns: keys.map(label),
+      columnKeys: keys,
       columnTypes: keys.map((key) => F.get(key)?.[2] || 'text'),
       rows: rows.map((employee) =>
         keys.map(
@@ -271,11 +271,16 @@ async function runReport(req, id, filters, options) {
   return {
     title: REPORTS[id].t,
     columns: report.columns,
+    columnKeys: report.columnKeys || [],
     columnTypes: report.columnTypes || [],
     total: report.rows.length,
-    page,
-    pageSize,
-    rows: report.rows.slice(offset, offset + pageSize)
+    page: options.allRows === true ? 1 : page,
+    pageSize:
+      options.allRows === true ? Math.max(1, report.rows.length) : pageSize,
+    rows:
+      options.allRows === true
+        ? report.rows
+        : report.rows.slice(offset, offset + pageSize)
   };
 }
 

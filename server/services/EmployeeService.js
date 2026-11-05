@@ -1,4 +1,8 @@
-const { EMP_FIELDS, F } = require('../config/EmployeeSchema');
+const {
+  EMP_FIELDS,
+  F,
+  masterReportFields
+} = require('../config/EmployeeSchema');
 const { CFG } = require('../config/Config');
 const { normalizePagination } = require('../utils/Pagination');
 const { pool, getLists, nextSequence, quote } = require('../db/database');
@@ -57,13 +61,13 @@ async function listEmployees(req, params = {}) {
   const sortKey = LIGHT.includes(params.sortKey) ? params.sortKey : 'name';
   const direction = params.sortDir === 'desc' ? 'DESC' : 'ASC';
   const [rows] = await pool.execute(
-    `SELECT ${LIGHT.map(quote).join(', ')} FROM employees WHERE ${where} ORDER BY ${quote(sortKey)} ${direction} LIMIT ? OFFSET ?`,
-    [...values, size, offset]
+    `SELECT ${LIGHT.map(quote).join(', ')} FROM employees WHERE ${where} ORDER BY ${quote(sortKey)} ${direction}${params.allRows === true ? '' : ' LIMIT ? OFFSET ?'}`,
+    params.allRows === true ? values : [...values, size, offset]
   );
   return {
     total: Number(count.total),
-    page,
-    pageSize: size,
+    page: params.allRows === true ? 1 : page,
+    pageSize: params.allRows === true ? Math.max(1, Number(count.total)) : size,
     rows: rows.map((row) => ({
       ...row,
       tenure_years: withCalc({ date_employed: row.date_employed }).tenure_years
@@ -96,6 +100,11 @@ async function getFormOptions(req) {
 async function getFormMeta(req) {
   await requireEmployeeAccess(req, 'emp.read');
   return {
+    reportFields: masterReportFields().map((field) => ({
+      key: field[0],
+      label: field[1],
+      type: field[2]
+    })),
     fields: EMP_FIELDS.filter(
       (field) => !F.has(field, 'C') && field[0] !== 'docs'
     ).map((field) => ({

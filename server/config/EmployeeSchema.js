@@ -105,6 +105,13 @@ const F = {
   has: (field, flag) => field[3].includes(flag)
 };
 
+function masterReportFields() {
+  return EMP_FIELDS.filter((field) => field[0] !== 'docs').concat([
+    ['age', 'age', 'text', 'C'],
+    ['tenure_years', 'tenure_years', 'text', 'C']
+  ]);
+}
+
 const ACTIVE_STATUSES = ['Active', 'Probationary', 'Contractual'];
 const AGE_BANDS = ['Under 25', '25-34', '35-44', '45-54', '55+', 'Unknown'];
 const TENURE_BANDS = [
@@ -118,6 +125,7 @@ const TENURE_BANDS = [
 module.exports = {
   LISTS,
   EMP_FIELDS,
+  masterReportFields,
   F,
   ACTIVE_STATUSES,
   AGE_BANDS,

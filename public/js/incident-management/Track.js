@@ -81,6 +81,18 @@
   }
 
   input.addEventListener('focus', showOptions);
+  document.addEventListener(
+    'pointerdown',
+    (event) => {
+      if (
+        !options.hidden &&
+        !input.contains(event.target) &&
+        !options.contains(event.target)
+      )
+        closeOptions();
+    },
+    true
+  );
   input.addEventListener('input', () => {
     highlighted = -1;
     showOptions();

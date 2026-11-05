@@ -6,16 +6,18 @@
     ><button class="ghost" id="rp_print">Print</button>
   </div>
   <div class="toolbar" id="rp_filters"></div>
-  <div class="tablewrap">
-    <table>
+  <div
+    class="tablewrap report-table-scroll"
+    tabindex="0"
+    aria-label="Report table; scroll to view all records and columns"
+  >
+    <table class="report-table">
       <thead id="rp_head"></thead>
       <tbody id="rp_body"></tbody>
     </table>
   </div>
   <div class="pager">
-    <span class="note" id="rp_info"></span
-    ><button class="ghost" id="rp_prev">Previous</button
-    ><button class="ghost" id="rp_next">Next</button>
+    <span class="note" id="rp_info"></span>
   </div>
 </section>
 <section id="view-inbox" class="view" hidden>

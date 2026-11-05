@@ -6,8 +6,7 @@
     category: 'ONGOING',
     stage: 'ALL',
     search: '',
-    page: 1,
-    pages: 1
+    page: 1
   };
   let actor = '';
   let listRequest = 0;
@@ -47,8 +46,8 @@
       }
     }
     state.page = data.page;
-    state.pages = data.pages;
     const list = byId('ir-review-list');
+    const scrollTop = list.scrollTop;
     list.replaceChildren();
     data.cases.forEach((incident) => {
       const row = el('article', 'incident-review-case');
@@ -92,12 +91,10 @@
       row.append(details, button);
       list.appendChild(row);
     });
+    list.scrollTop = scrollTop;
     byId('ir-review-empty').hidden = data.total > 0;
     byId('ir-review-results').textContent =
       `${state.category[0]}${state.category.slice(1).toLowerCase()} · ${data.total} matching case${data.total === 1 ? '' : 's'}`;
-    byId('ir-review-page').textContent = `Page ${data.page} of ${data.pages}`;
-    byId('ir-review-previous').disabled = data.page <= 1;
-    byId('ir-review-next').disabled = data.page >= data.pages;
     return summaryReady;
   }
 
@@ -112,7 +109,8 @@
         stage: state.stage,
         search: state.search,
         page: state.page,
-        pageSize: 25
+        pageSize: 25,
+        allRows: true
       });
       if (ticket !== listRequest || owner !== session?.email) return;
       const summaryReady = renderCases(data);
@@ -144,8 +142,7 @@
         category: 'ONGOING',
         stage: 'ALL',
         search: '',
-        page: 1,
-        pages: 1
+        page: 1
       });
     }
     syncFilters();
@@ -181,14 +178,6 @@
     state.search = event.target.value;
     clearTimeout(timer);
     timer = setTimeout(applyFilters, 300);
-  };
-  byId('ir-review-previous').onclick = () => {
-    --state.page;
-    fetchList().catch(() => {});
-  };
-  byId('ir-review-next').onclick = () => {
-    ++state.page;
-    fetchList().catch(() => {});
   };
   setInterval(async () => {
     if (!visible() || document.hidden || !allowed() || polling) return;

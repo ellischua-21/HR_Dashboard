@@ -38,6 +38,7 @@
   ) {
     const row = el('tr');
     const severity = el('select');
+    severity.dataset.requiredIndicator = 'true';
     severities.forEach((value) => severity.add(new Option(value, value)));
     severity.value = item.severity;
     severity.setAttribute('aria-label', 'Severity');
@@ -99,7 +100,11 @@
     const ticket = ++historyRequest;
     const owner = session.email;
     try {
-      const data = await api('listIncidentViolations', { employeeEmail, page });
+      const data = await api('listIncidentViolations', {
+        employeeEmail,
+        page,
+        allRows: true
+      });
       if (ticket !== historyRequest || owner !== session?.email) return;
       page = data.page;
       const body = byId('ir-violation-rows');
@@ -122,9 +127,7 @@
       });
       byId('ir-violation-empty').hidden = data.total > 0;
       byId('ir-violation-page').textContent =
-        `Page ${data.page} of ${data.pages} · ${data.total} record${data.total === 1 ? '' : 's'}`;
-      byId('ir-violation-previous').disabled = data.page <= 1;
-      byId('ir-violation-next').disabled = data.page >= data.pages;
+        `${data.total} record${data.total === 1 ? '' : 's'}`;
     } catch (error) {
       if (ticket === historyRequest && owner === session?.email) {
         byId('ir-violation-rows').replaceChildren();
@@ -186,14 +189,6 @@
     byId('ir-violation-options').replaceChildren();
     byId('ir-violation-options').hidden = true;
     page = 1;
-    loadHistory();
-  };
-  byId('ir-violation-previous').onclick = () => {
-    --page;
-    loadHistory();
-  };
-  byId('ir-violation-next').onclick = () => {
-    ++page;
     loadHistory();
   };
   byId('ir-coc-matrix-form').onsubmit = async (event) => {

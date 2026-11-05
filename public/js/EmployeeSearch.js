@@ -1,4 +1,15 @@
 // Shared behavior for employee suggestions. Each page supplies its lookup and selection rules.
+const employeeSearchOutsideHandlers = new WeakMap();
+document.addEventListener(
+  'pointerdown',
+  (event) => {
+    document.querySelectorAll('[role="listbox"]').forEach((list) => {
+      employeeSearchOutsideHandlers.get(list)?.(event.target);
+    });
+  },
+  true
+);
+
 window.createEmployeeSearch = function createEmployeeSearch({
   input,
   suggestions,
@@ -28,6 +39,12 @@ window.createEmployeeSearch = function createEmployeeSearch({
     input.removeAttribute('aria-activedescendant');
     highlighted = -1;
   }
+  employeeSearchOutsideHandlers.set(suggestions, (target) => {
+    if (input.contains(target) || suggestions.contains(target)) return;
+    ++request;
+    clearTimeout(timer);
+    hide();
+  });
   function show() {
     suggestions.hidden = false;
     input.setAttribute('aria-expanded', 'true');

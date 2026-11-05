@@ -80,6 +80,11 @@
     function sync() {
       if (!editing) display.value = DateUtils.formatField(getValue(), type);
       display.required = source.required;
+      const indicator = source.dataset.requiredIndicator;
+      if (indicator && display.dataset.requiredIndicator !== indicator)
+        display.dataset.requiredIndicator = indicator;
+      else if (!indicator && display.hasAttribute('data-required-indicator'))
+        delete display.dataset.requiredIndicator;
       display.disabled = source.disabled;
       display.readOnly = source.readOnly;
       picker.disabled = source.disabled || source.readOnly;
@@ -171,6 +176,7 @@
       'type',
       'value',
       'required',
+      'data-required-indicator',
       'disabled',
       'readonly',
       'min',

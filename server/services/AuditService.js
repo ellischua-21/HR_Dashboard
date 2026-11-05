@@ -85,7 +85,7 @@ async function getAuditLogs(req, limit, filters) {
   const normalizedFilters = normalizeAuditFilters(filters);
   const [rows] = await pool.execute(
     `SELECT event_time, user_email, action, record_id, detail
-     FROM audit_logs ${normalizedFilters.where} ORDER BY id DESC LIMIT ${take}`,
+     FROM audit_logs ${normalizedFilters.where} ORDER BY id DESC${filters?.allRows === true ? '' : ` LIMIT ${take}`}`,
     normalizedFilters.values
   );
   return rows.map((row) => [

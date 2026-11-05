@@ -90,10 +90,15 @@ async function listIncidentsForHistory(req, input = {}) {
   const [cases] = await pool.execute(
     `SELECT id, case_number AS caseNumber, subject,
     date_reported AS dateFiled, ${CLOSED_AT} AS closedAt, ${OUTCOME} AS outcome
-    FROM incident_reports WHERE ${where} ORDER BY closedAt DESC, id DESC LIMIT 25 OFFSET ${(page - 1) * 25}`,
+    FROM incident_reports WHERE ${where} ORDER BY closedAt DESC, id DESC${input.allRows === true ? '' : ` LIMIT 25 OFFSET ${(page - 1) * 25}`}`,
     [user.email, ...values]
   );
-  return { cases, total, page, pages };
+  return {
+    cases,
+    total,
+    page: input.allRows === true ? 1 : page,
+    pages: input.allRows === true ? 1 : pages
+  };
 }
 
 async function listIncidentViolations(req, input = {}) {
@@ -123,10 +128,16 @@ async function listIncidentViolations(req, input = {}) {
     i.incident_date AS violationDate, h.violation_title AS violationTitle, h.severity,
     e.previous_offenses + 1 AS occurrenceNumber, h.corrective_action AS correctiveAction,
     d.issued_at AS decisionDate, 'Finalized' AS status ${joins} WHERE ${where}
-    ORDER BY d.issued_at DESC, h.id DESC LIMIT 25 OFFSET ${(page - 1) * 25}`,
+    ORDER BY d.issued_at DESC, h.id DESC${input.allRows === true ? '' : ` LIMIT 25 OFFSET ${(page - 1) * 25}`}`,
     [email]
   );
-  return { employeeEmail: email, records, total, page, pages };
+  return {
+    employeeEmail: email,
+    records,
+    total,
+    page: input.allRows === true ? 1 : page,
+    pages: input.allRows === true ? 1 : pages
+  };
 }
 
 module.exports = { listIncidentsForHistory, listIncidentViolations };

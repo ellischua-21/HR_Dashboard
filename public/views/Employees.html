@@ -17,12 +17,15 @@
   <div id="importPanel" class="panel" hidden>
     <h2>Import Employees From Excel Or CSV</h2>
     <div class="toolbar">
-      <input type="file" id="i_file" accept=".csv,.xlsx,.xls" /><button
-        class="ghost"
-        id="i_tpl"
-      >
-        Download template
-      </button>
+      <label for="i_file"
+        >Employee File
+        <input
+          type="file"
+          id="i_file"
+          accept=".csv,.xlsx,.xls"
+          data-required-indicator="true"
+        /> </label
+      ><button class="ghost" id="i_tpl">Download template</button>
     </div>
     <div class="tablewrap" id="i_map" hidden></div>
     <div class="actions" id="i_act" hidden>
@@ -31,27 +34,30 @@
     </div>
     <div id="i_result"></div>
   </div>
-  <div class="tablewrap">
+  <div class="tablewrap employee-table-scroll">
     <table>
       <thead id="e_head"></thead>
       <tbody id="e_body"></tbody>
     </table>
   </div>
   <div class="pager">
-    <span class="note" id="e_info"></span
-    ><button class="ghost" id="e_prev">Previous</button
-    ><button class="ghost" id="e_next">Next</button>
+    <span class="note" id="e_info"></span>
   </div>
-  <dialog id="profile">
-    <div id="p_body"></div>
-    <div class="actions">
-      <button id="p_edit">Edit</button
-      ><button class="ghost" id="p_print">Print</button
-      ><button class="ghost" id="p_archive">Archive</button
-      ><button class="ghost" id="p_close">Close</button>
-    </div>
-  </dialog>
 </section>
+<dialog id="report-employee-dialog" class="report-employee-dialog">
+  <div class="account-heading">
+    <h2 id="report-employee-title">Employee Details</h2>
+    <button id="report-employee-close" class="ghost" type="button">
+      Close
+    </button>
+  </div>
+  <div id="report-employee-details"></div>
+  <div id="employee-detail-actions" class="actions" hidden>
+    <button id="p_edit" type="button">Edit</button>
+    <button class="ghost" id="p_print" type="button">Print</button>
+    <button class="ghost" id="p_archive" type="button">Archive</button>
+  </div>
+</dialog>
 <section id="view-register" class="view" hidden>
   <p class="note" id="r_mode" hidden></p>
   <!-- Section headings and field order are declared here. Field labels, types, and permissions come from the server form metadata. -->
@@ -144,7 +150,7 @@
     <div class="fgrid">
       <label for="r_account_role"
         >Assigned Role
-        <select id="r_account_role">
+        <select id="r_account_role" data-required-indicator="true">
           <option value="STAFF">STAFF</option>
           <option value="SUPERVISOR">SUPERVISOR</option>
           <option value="HEAD">HEAD</option>
@@ -180,7 +186,7 @@
     <button id="r_preview">Review and save</button
     ><button class="ghost" id="r_cancel">Cancel</button>
   </div>
-  <dialog id="preview">
+  <dialog id="preview" data-outside-dismiss="never">
     <h2 style="margin-top: 0">Review Before Saving</h2>
     <div id="pv_body"></div>
     <div class="actions">

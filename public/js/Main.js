@@ -318,7 +318,6 @@ async function init() {
       passive: true
     });
     window.addEventListener('resize', positionNavigationNotificationDots);
-    $('menuBtn').onclick = () => document.body.classList.toggle('open');
     $('logoutBtn').onclick = async () => {
       const finishLoading = AppLoading.begin();
       try {
@@ -514,7 +513,7 @@ function addLoginInput(form, labelText, name, type, autocomplete, required) {
 }
 
 function go(n) {
-  document.body.classList.remove('open');
+  window.AppOutsideDismiss.closeSidebar();
   showErr('');
   document
     .querySelectorAll('#nav a')

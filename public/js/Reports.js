@@ -1,5 +1,5 @@
 let OPTS = null,
-  RP = { page: 1, sortCol: -1, sortDir: 'asc' },
+  RP = { sortCol: -1, sortDir: 'asc' },
   xch = {};
 const ALLF = [
   ['company', 'All Companies'],
@@ -59,20 +59,47 @@ VIEWS.reports = guard(async () => {
       $('rp_id').appendChild(o);
     });
   $('rp_export').hidden = !can('emp.export');
-  RP.page = 1;
   RP.sortCol = -1;
   await runRep();
 });
 async function runRep() {
   const r = await api('runReport', $('rp_id').value, readF('rp_filters'), {
-    page: RP.page,
-    pageSize: 100,
+    allRows: true,
     sortCol: RP.sortCol,
     sortDir: RP.sortDir
   });
   const h = $('rp_head');
   h.innerHTML = '';
   const tr = el('tr');
+  const isMaster =
+    $('rp_id').value === 'master' && r.columnKeys?.[0] === 'record_id';
+  const table = h.closest('table');
+  table.classList.toggle('report-table-master', isMaster);
+  table.querySelector('colgroup')?.remove();
+  const columns = document.createElement('colgroup');
+  const widths = r.columns.map((_, index) =>
+    isMaster && index === 0
+      ? 120
+      : isMaster && index === 1
+        ? 72
+        : isMaster && index === 2
+          ? 200
+          : 180
+  );
+  if (isMaster) widths.unshift(48);
+  widths.forEach((width) => {
+    const column = document.createElement('col');
+    column.style.width = `${width}px`;
+    columns.appendChild(column);
+  });
+  table.style.width = `${widths.reduce((total, width) => total + width, 0)}px`;
+  table.insertBefore(columns, table.firstChild);
+  if (isMaster) {
+    const th = el('th');
+    th.scope = 'col';
+    th.setAttribute('aria-label', 'Employee details');
+    tr.appendChild(th);
+  }
   r.columns.forEach((c, i) => {
     const th = el(
       'th',
@@ -91,44 +118,47 @@ async function runRep() {
   if (!r.rows.length) {
     const t = el('tr'),
       d = el('td', 'No records for this report and filter selection.');
-    d.colSpan = r.columns.length;
+    d.colSpan = r.columns.length + (isMaster ? 1 : 0);
     t.appendChild(d);
     b.appendChild(t);
   }
   r.rows.forEach((row) => {
     const t = el('tr');
+    if (isMaster) {
+      const cell = el('td');
+      const button = el('button', '▾', 'ghost report-details-toggle');
+      button.type = 'button';
+      button.setAttribute(
+        'aria-label',
+        `View details for ${row[r.columnKeys.indexOf('name')] || row[0]}`
+      );
+      button.onclick = guard(() => showEmployeeDetails(r, row));
+      cell.appendChild(button);
+      t.appendChild(cell);
+    }
     row.forEach((v, index) =>
       t.appendChild(
         el(
           'td',
           v === null || v === undefined
             ? ''
-            : DateUtils.formatField(v, r.columnTypes?.[index])
+            : formatReportValue(
+                v,
+                r.columnTypes?.[index],
+                r.columnKeys?.[index]
+              )
         )
       )
     );
     b.appendChild(t);
   });
-  const last = Math.max(1, Math.ceil(r.total / r.pageSize));
-  $('rp_info').textContent =
-    r.title + ': ' + r.total + ' row(s) · page ' + r.page + ' of ' + last;
-  $('rp_prev').disabled = r.page <= 1;
-  $('rp_next').disabled = r.page >= last;
+  $('rp_info').textContent = r.title + ': ' + r.total + ' row(s)';
 }
 $('rp_run').onclick = guard(async () => {
-  RP.page = 1;
   RP.sortCol = -1;
   await runRep();
 });
 $('rp_id').onchange = $('rp_run').onclick;
-$('rp_prev').onclick = guard(async () => {
-  RP.page--;
-  await runRep();
-});
-$('rp_next').onclick = guard(async () => {
-  RP.page++;
-  await runRep();
-});
 $('rp_print').onclick = () => window.print();
 $('rp_export').onclick = guard(async () => {
   const r = await api('exportReportCsv', $('rp_id').value, readF('rp_filters'));
@@ -248,6 +278,16 @@ async function loadExec() {
     const p = el('div', undefined, 'panel');
     p.appendChild(el('h2', title));
     const tb = el('table');
+    const thead = el('thead');
+    const headings = el('tr');
+    [
+      key === 'location' ? 'Work Location' : FormStatus.titleCase(key),
+      'Headcount',
+      'Percentage'
+    ].forEach((label) => headings.appendChild(el('th', label)));
+    thead.appendChild(headings);
+    const tbody = el('tbody');
+    tb.append(thead, tbody);
     c.charts[key].forEach((x) => {
       const r = el('tr');
       r.appendChild(el('td', x.label));
@@ -260,9 +300,11 @@ async function loadExec() {
             : ''
         )
       );
-      tb.appendChild(r);
+      tbody.appendChild(r);
     });
-    p.appendChild(tb);
+    const wrap = el('div', undefined, 'tablewrap');
+    wrap.appendChild(tb);
+    p.appendChild(wrap);
     t.appendChild(p);
   });
   const n = $('ex_notes');
@@ -283,6 +325,7 @@ $('ex_print').onclick = () => window.print();
 /* ---------- Audit logs ---------- */
 async function loadAuditLogs() {
   const filters = {
+    allRows: true,
     from: $('au_from').value,
     to: $('au_to').value,
     user: $('au_user').value.trim()
