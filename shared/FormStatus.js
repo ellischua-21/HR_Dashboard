@@ -34,6 +34,7 @@
     return (
       ['STAFF', 'SUPERVISOR', 'HEAD', 'HR'].includes(role) &&
       form.status === 'PENDING' &&
+      !Number(form.task_taken || 0) &&
       form.review_stage === 'HEAD' &&
       Boolean(form.head_reviewer_email)
     );

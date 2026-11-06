@@ -16,18 +16,18 @@ const guard =
 
 const $ = (id) => document.getElementById(id);
 const API_BASE = window.HR_API_BASE || 'http://localhost:3001/api';
-const api = async (fn, ...args) =>
-  AppLoading.run(async () => {
-    const response = await fetch(API_BASE + '/' + encodeURIComponent(fn), {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ args })
-    });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'The request failed.');
-    return result;
+const apiBackground = async (fn, ...args) => {
+  const response = await fetch(API_BASE + '/' + encodeURIComponent(fn), {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ args })
   });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'The request failed.');
+  return result;
+};
+const api = (fn, ...args) => AppLoading.run(() => apiBackground(fn, ...args));
 const showErr = (m) => {
   AppErrors.show(m);
 };
@@ -91,6 +91,7 @@ const NAV = [
   ['attendance', 'Attendance', 'emp.read'],
   ['executive', 'Executive Summary', 'exec.view'],
   ['reports', 'HR Reports', 'report.run'],
+  ['hr-performance', 'HR Performance', 'admin.manage'],
   ['audit', 'Audit Logs', 'audit.read'],
   ['announcements', 'Create Announcement', 'announcements.manage'],
   ['accounts', 'Accounts', 'admin.manage'],
@@ -179,7 +180,11 @@ async function init() {
       ? USER_NAV.filter(
           (item) => !['user-dashboard', 'user-forms'].includes(item[0])
         )
-      : NAV;
+      : session.role === 'ADMIN'
+        ? NAV.filter((item) => item[0] !== 'dashboard').map((item) =>
+            item[0] === 'hr-performance' ? [item[0], 'Dashboard', item[2]] : item
+          )
+        : NAV;
     const createNavLink = (n) => {
       const a = document.createElement('a');
       a.textContent = n[1];
@@ -252,12 +257,12 @@ async function init() {
       group.appendChild(children);
       $('nav').appendChild(group);
     };
-    const canManageForms = session.perms.includes('forms.review');
+    const canViewForms = session.perms.some((permission) => ['forms.review', 'forms.view'].includes(permission));
     const formItems = FORM_NAV.filter((n) =>
-      n[0] === 'leave-requests' ? canManageForms : session.perms.includes(n[2])
+      n[0] === 'leave-requests' ? canViewForms : session.perms.includes(n[2])
     ).map((item) =>
       session.role === 'ADMIN' && item[0] === 'leave-requests'
-        ? [item[0], 'Manage Forms', item[2]]
+        ? [item[0], 'View Forms', 'forms.view']
         : item
     );
     const visibleNavItems = navItems.filter((n) =>
@@ -265,7 +270,8 @@ async function init() {
     );
     const isHrAdmin = ['HR', 'ADMIN'].includes(session.role);
     if (isHrAdmin) {
-      visibleNavItems.filter((n) => n[0] === 'dashboard').forEach(addNavLink);
+      const landingId = session.role === 'ADMIN' ? 'hr-performance' : 'dashboard';
+      visibleNavItems.filter((n) => n[0] === landingId).forEach(addNavLink);
       addNavGroup('Forms', formItems, true);
 
       const groupedItems = new Set([
@@ -273,6 +279,7 @@ async function init() {
         'register',
         'attendance',
         'executive',
+        'hr-performance',
         'reports',
         'audit',
         'announcements',
@@ -399,11 +406,13 @@ async function init() {
       loadDashboard();
     };
     buildKpiAndChartShells();
-    if (session.perms.includes('dash.view')) {
+    if (session.role === 'ADMIN') {
+      go(['hr-performance', 'Dashboard', 'admin.manage']);
+    } else if (session.perms.includes('dash.view')) {
       await loadOptions();
       go(NAV[0]);
     }
-    if (session.perms.includes('forms.review')) {
+    if (session.perms.some((permission) => ['forms.review', 'forms.view'].includes(permission))) {
       const reviewBadgeScope = 'ALL';
       window
         .refreshSubmittedFormsBadge(reviewBadgeScope)
@@ -519,6 +528,10 @@ function addLoginInput(form, labelText, name, type, autocomplete, required) {
 }
 
 function go(n) {
+  if (session.role === 'ADMIN' && ['dashboard', 'hr-performance'].includes(n[0])) {
+    n = ['hr-performance', 'Dashboard', 'admin.manage'];
+  }
+  if (n[0] === 'executive' && !can('exec.view')) return;
   window.AttendanceUI?.closeAll();
   window.AppOutsideDismiss.closeSidebar();
   showErr('');
@@ -558,7 +571,7 @@ function setSubmittedFormsCount(count, scope = 'HR') {
   badge.hidden = pending === 0;
   updateFormsNotificationDot();
   const link = badge.parentElement;
-  link.setAttribute('aria-label', `Manage Forms, ${pending} pending`);
+  link.setAttribute('aria-label', `${session.role === 'ADMIN' ? 'View Forms' : 'Review Requests'}, ${pending} pending`);
   link.title = `${pending} pending form${pending === 1 ? '' : 's'}`;
 }
 

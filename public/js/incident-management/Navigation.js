@@ -25,7 +25,6 @@
       ['incident-code-of-conduct', 'Code of Conduct']
     ],
     ADMIN: [
-      ['incident-file', 'File'],
       ['incident-track', 'Track'],
       ['incident-review', 'Review'],
       ['incident-code-of-conduct', 'Code of Conduct']

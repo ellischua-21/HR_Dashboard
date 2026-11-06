@@ -874,6 +874,8 @@ async function initializeDatabase() {
     PRIMARY KEY (counter_name)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
+  await require('./TaskSchema').initializeTaskSchema(pool);
+
   const insertLookup =
     'INSERT IGNORE INTO lookup_values (list_name, `value`, active) VALUES (?, ?, 1)';
   for (const [listName, values] of Object.entries(LISTS)) {

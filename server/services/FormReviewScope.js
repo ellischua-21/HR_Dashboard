@@ -1,6 +1,6 @@
 function buildReviewScope(reviewer, requestedScope = null) {
-  const hasReviewPermission = Boolean(
-    reviewer.perms && reviewer.perms.includes('forms.review')
+  const hasReviewAccess = Boolean(
+    reviewer.perms && (reviewer.perms.includes('forms.review') || reviewer.perms.includes('forms.view'))
   );
   const defaultScope =
     reviewer &&
@@ -32,7 +32,7 @@ function buildReviewScope(reviewer, requestedScope = null) {
       );
     }
 
-    if (hasReviewPermission && ['HR', 'ADMIN'].includes(reviewer.role)) {
+    if (hasReviewAccess && ['HR', 'ADMIN'].includes(reviewer.role)) {
       const excludeOwn = reviewer.role === 'HR';
       addBranch(
         `${hrQueueStageFilter}${excludeOwn ? ' AND f.user_email <> ?' : ''}`,

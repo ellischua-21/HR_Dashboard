@@ -406,13 +406,14 @@ function renderInbox() {
       });
       card.appendChild(acknowledge);
     } else if (item.type === 'FORM') {
+      const formsTitle = session.role === 'ADMIN' ? 'View Forms' : 'Review Requests';
       const target = [
         'leave-requests',
-        'Manage Forms',
+        formsTitle,
         item.reviewPermission,
         true
       ];
-      const view = el('button', 'View in Manage Forms');
+      const view = el('button', `View in ${formsTitle}`);
       view.type = 'button';
       view.onclick = () => go(target);
       card.appendChild(view);

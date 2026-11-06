@@ -13,7 +13,8 @@ Updated: 11/06/2026
 - [7. Use Incident Management](#7-use-incident-management)
 - [8. Manage accounts](#8-manage-accounts)
 - [9. Change your password](#9-change-your-password-and-sign-out)
-- [10. Get help](#10-get-help)
+- [10. View HR performance](#10-view-hr-performance)
+- [11. Get help](#11-get-help)
 
 ## 1. Sign in and get started
 
@@ -52,12 +53,17 @@ their existing dashboard and attendance list.
 | SUPERVISOR | STAFF features, plus review assigned STAFF form requests and file Incident Reports. |
 | HEAD    | STAFF features, plus review assigned SUPERVISOR form requests and file Incident Reports. |
 | HR      | Dashboard, employee records, attendance, reports, announcements, personal forms, form reviews, and incident filing and review. |
-| ADMIN   | Dashboard, employee records, attendance, reports, announcements, form reviews, incident management, account approvals, and account assignments. ADMIN does not have personal form submission pages. |
+| ADMIN   | Dashboard, employee records, attendance, reports, announcements, view-only forms and incident access, HR task assignment and performance monitoring, account approvals, and account assignments. ADMIN does not have personal form submission pages. |
 
 **Head HR is an HR account with an extra assignment.** It keeps the normal HR
 features and can also review forms submitted by other HR accounts.
 
 ### Where to go
+
+ADMIN opens on **Dashboard**, which displays HR Performance.
+HR Reports remains inside the Reports group for both HR and ADMIN.
+**Reports → Executive Summary** remains available to ADMIN only. HR retains its
+analytics Dashboard and **Reports → HR Reports**, without Executive Summary access.
 
 | You want to… | Open… |
 | ------------ | ----- |
@@ -67,7 +73,7 @@ features and can also review forms submitted by other HR accounts.
 | Find an employee                                   | **Employees → Employee Master List** |
 | Register an employee                               | **Employees → Employee Registration** |
 | Check scanner attendance                           | **Employees → Attendance** |
-| File an incident                                   | **Incident Management → File**; available to SUPERVISOR, HEAD, HR, and ADMIN  |
+| File an incident                                   | **Incident Management → File**; available to SUPERVISOR, HEAD, and HR  |
 | Open a case and its available actions              | **Incident Management → Track** |
 | Find incidents awaiting HR attention               | **Incident Management → Review**; HR and ADMIN |
 | Find completed personal cases                      | **Incident Management → History**; STAFF, SUPERVISOR and HEAD |
@@ -147,6 +153,8 @@ serial number or details.
 1. Open **Forms → Review Requests**, or **Manage Forms** for ADMIN.
 2. Use status, form type, search, and submission-date filters to find the request.
 3. Select **View form** and read the request.
+   HR must select **Take Task** before processing it. ADMIN can view requests and assign or reassign them, but cannot process them. If another
+   reviewer has taken it, their name is shown and you can still view the form.
 4. Select **Sign** when a signature is required, or **Approve** when it is not. Supervisor or Head approval normally forwards the request to HR.
 5. To reject a request, select **Reject** and enter the reason.
 
@@ -270,6 +278,12 @@ Search by IR number, employee, title, or reporter, and use the workflow-stage
 filter where needed. Select **View** to open the case in **Track**. Review is the
 case list; Track contains the case details and available actions.
 
+Before signing for HR or processing a case, select **Take Task** in Track.
+The task stays with that reviewer through investigation, explanation, evaluation,
+and closure. Other HR accounts can view it; ADMIN can reassign it when needed.
+Tasks awaiting employee or assigned-reviewer signatures become available to take
+after those signatures are complete.
+
 ### HR: review or investigate
 
 During **Under Review**, HR can require further investigation, prepare an NTE, or
@@ -353,7 +367,7 @@ Open **Incident Management → Code of Conduct**.
   unsubstantiated findings are not confirmed violations.
 - HR can search for an employee, select the name suggestion, and select
   **View records**. Other accounts see their ow
-**HR/ADMIN: edit the matrix** in the configuration section. Change existing rows,
+**HR: edit the matrix** in the configuration section. Change existing rows,
 use **Add matrix row** to add one, or **Remove** to remove one. Each severity and
 occurrence combination must be unique. Keep corrective-action text within **191
 characters**, then select **Save changes**.
@@ -393,7 +407,67 @@ prevents removing the assignment without an eligible replacement.
 2. Enter a different new password with **12–128 characters**.
 3. Enter the same new password again and select **Update Password**.
 
-## 10. Get help
+## 10. View HR performance
+
+**Available to:** ADMIN, on **Dashboard**.
+
+Only HR accounts are included in the performance figures. ADMIN can view records and assign or reassign tasks, but cannot take tasks, sign forms, issue notices, make decisions, or change the COC matrix.
+
+1. Choose a date range, reviewer, and request type, then select **Apply Filters**.
+2. Use the overview cards and charts to compare completed form reviews, reviewed
+   incident reports, workload, and review times. Approvals and rejections both count
+   as completed form reviews. **Incidents Reviewed** counts distinct incident
+   reports each HR worked on during the selected dates. Multiple review actions,
+   decisions, or closure actions on the same report count only once per HR.
+   The top **Incidents Reviewed** count includes each report once across the
+   selected HR accounts.
+3. Use the **Reviewer** filter to focus on one HR account. Select **All Reviewers**
+   to return to the full comparison.
+   In **Current Workload** and **Reviewer Performance**, **Tasks Assigned** counts
+   all unfinished tasks owned by that HR. **Tasks Waiting for Employee Response**
+   counts the portion awaiting signatures, an explanation, or requested information.
+4. In **Review Tasks**, use **View** to open a form or incident. **History** shows
+   who took or handled the task, changes of reviewer, and recorded pauses.
+5. Select **Assign** or **Reassign**, choose an authorized reviewer, enter a
+   reason, and select **Save Changes**. Previous reviewers keep their recorded
+   time in the history. Only the current owner can process the task.
+6. **Incident Task Assignments** lists which HR took or was assigned each incident,
+   the most recent assignment date within the selected dates, and whether they
+   remain the current owner, transferred the task, or completed it.
+
+**Total Backlog** counts all unfinished HR tasks, assigned or unassigned, including
+tasks waiting for employee responses. **Unassigned Backlog** counts the portion
+without an HR owner. Subtract Unassigned Backlog from Total Backlog to see how many
+unfinished tasks have an owner. Completed tasks are excluded from both counts.
+Both backlog cards cover all HR accounts and follow **Request Type**, regardless
+of the Reviewer, date range, or Task List Status filters.
+
+**Tasks Waiting for Employee
+Response** means tasks awaiting signatures, an explanation, or requested
+information. This count can overlap with Unassigned Backlog when an incident is waiting for employee
+signatures before an HR takes it.
+
+### Understand the timer
+
+- The timer starts at **00:00:00** when a task is taken. It counts only
+  **Monday–Friday, 8:00 AM–6:30 PM, Philippine time**. There is no separate lunch
+  deduction or automatic public-holiday exclusion.
+- HR sees their own task timer in each form review row and in the incident Track view.
+- Time pauses while an incident awaits requested employee information or an NTE
+  explanation. It resumes when HR can act, and stops when the task is completed.
+- The timer continues correctly when the page is closed or the server restarts.
+- **Total HR Time** includes HR reviewers' recorded time; ADMIN activity is excluded. **Current Owner Time**
+  includes only the current reviewer's share. Time is a measure of workflow
+  turnaround, not a record of hours actively spent working on the item.
+- Completion figures use the selected dates; current workload shows unresolved
+  tasks now. Older reviews can appear in completion counts, but missing ownership
+  and timing records are not guessed.
+
+Claim and ownership updates normally appear on other open HR dashboards within
+10 seconds. Inbox entries remain visible, while tasks owned by another reviewer
+are excluded from their task-related notification counts.
+
+## 11. Get help
 
 | What happened? | What to do |
 | -------------- | ---------- |

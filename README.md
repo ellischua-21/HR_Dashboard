@@ -106,7 +106,7 @@ Only an account with the `ADMIN` role sees **Manage Accounts** and can approve o
 - **STAFF**: a personal dashboard for submitted-form history and status, plus form templates. STAFF cannot access employee records or the HR dashboard.
 - **SUPERVISOR** and **HEAD**: the STAFF dashboard and form templates, plus **Review Requests** for assigned forms. Supervisors review assigned STAFF forms, while Heads review assigned SUPERVISOR forms. Both can sign and forward a request or reject it with a reason.
 - **HR**: dashboard, full employee registration and record read/write, and reports, plus **Manage Forms** for requests forwarded to HR. The designated Head HR can also review forms submitted by other HR accounts. HR and ADMIN have the same complete employee fields; no separate sensitive-data permission is required.
-- **ADMIN**: full system access, including account management and sensitive employee records.
+- **ADMIN**: account management and full employee-record access; view-only access to forms and incidents, with HR task assignment/reassignment and performance monitoring.
 
 The searchable Reports To field offers active or pending SUPERVISOR accounts for STAFF, and HEAD accounts for SUPERVISOR. Approve the assigned reviewer before approving their subordinate's account. ADMIN can change saved assignments in Manage Accounts. STAFF forms go to their Supervisor then HR; SUPERVISOR forms go to their Head then HR; HEAD forms go directly to HR. At API startup, legacy USER, MANAGER, and EXECUTIVE accounts are migrated to STAFF; HR_STAFF and HR_ADMIN migrate to HR; SYSTEM_ADMIN migrates to ADMIN. Bootstrap the initial administrator with the `create-user` command above. Grant **ADMIN** only to trusted administrators.
 
@@ -141,6 +141,60 @@ For manual account provisioning, bootstrap or recovery administrators can use `n
 - Existing report, import, export, employee privacy, audit, and role-permission rules are enforced by the API, not by the browser.
 
 ## Checks and sample records
+
+### HR review ownership and performance
+
+- ADMIN opens **Dashboard** for HR performance: completed reviews, current queues,
+  trends, task reassignment, and ownership history. `PerformanceService.js` owns
+  the analytics; `TaskService.js` owns claiming, authorization, and timing.
+- Total Backlog counts all unfinished HR tasks; Unassigned Backlog is its subset
+  without an owner. Both include employee-response waits, exclude completed work,
+  and respect Request Type independently of Reviewer, date range, and Task List
+  Status filters.
+- Current Workload and Reviewer Performance count each HR's unfinished owned tasks
+  as Tasks Assigned, including the Tasks Waiting for Employee Response subset.
+- ADMIN's Dashboard reuses HR Performance; HR Reports stays inside Reports.
+  Its old dashboard analytics endpoint is
+  unavailable to ADMIN. Executive Summary is ADMIN-only. HR retains its existing
+  analytics Dashboard and HR Reports navigation.
+- Incidents Reviewed counts distinct case IDs per HR with recorded review work
+  in the selected period. Repeated actions or multiple stages on one case do not
+  increase this count. The summary and review trends deduplicate reports across
+  HR accounts; reviewer comparisons count each report once for each HR involved.
+  Incident Task Assignments lists recorded HR claims and assignments, one row per
+  HR/report in the selected period, with its latest assignment time and current
+  ownership state. Internal case activity stays in the existing audit history.
+- `server/db/TaskSchema.js` runs through the existing database initializer on the
+  next API restart. It creates task/event/revision tables and reporting
+  indexes, and registers existing unresolved work as unassigned. It does not
+  invent historical ownership or timing and does not delete existing records.
+- Only HR can take a task and process form reviews or HR incident
+  actions. Claims lock the underlying request row and enforce a unique task
+  identity in the same transaction. Employee and assigned Supervisor/Head
+  signature permissions remain separate. Head HR form reviews also use claims.
+- Timer timestamps come from the server. `shared/WorkTime.js` supplies the same
+  Monday–Friday, Manila 08:00–18:30 calculation to server and display clocks.
+  External-response waits pause timing; completion and reassignment checkpoint
+  earned time transactionally. Browser presence is not required. Public holidays
+  are not excluded automatically. Durations measure turnaround, not effort.
+- ADMIN retains HR-level viewing access using `forms.view` and case-level read
+  rules, while mutation endpoints reject ADMIN regardless of extra permissions.
+  Performance statistics exclude ADMIN; old task activity remains in the audit
+  history. Open tasks previously taken by ADMIN are released at API startup.
+- Task ownership and earnings are retained per reviewer across transfers. ADMIN
+  reassignment requires a reason. A changed Head HR releases previously taken
+  Head HR tasks to the newly authorized reviewer, who must take them again.
+- `TaskUI.js` checks a lightweight revision every 10 seconds while an HR/ADMIN
+  tab is visible. It refreshes ownership and actionable badge counts without
+  deleting inbox history. Backend ownership checks also reject stale actions.
+- Duration targets, target statistics, their endpoint, and their configuration
+  are removed. The startup migration preserves the revision counter and drops
+  the obsolete configuration table. Historical completion counts reuse existing
+  form and incident records; timing
+  statistics include only tracked tasks. Current workload is independent of the
+  completion date filter.
+
+### Existing maintenance commands
 
 Run the structural checks and JavaScript regression tests with:
 

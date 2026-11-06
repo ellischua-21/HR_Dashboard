@@ -3,7 +3,7 @@ function renderIncidentNte(parent, incident, ui = {}) {
   if (
     !incident.nte &&
     !(
-      incident.canReview &&
+      incident.canReview && incident.canManageTask &&
       ['UNDER_REVIEW', 'UNDER INVESTIGATION'].includes(incident.status)
     )
   )
@@ -18,6 +18,7 @@ function renderIncidentNte(parent, incident, ui = {}) {
     )
   );
   const employeeCanAccess =
+    incident.currentUserRole !== 'ADMIN' &&
     incident.reportedEmployeeEmail.toLowerCase() ===
     incident.currentUserEmail.toLowerCase();
 
@@ -58,7 +59,7 @@ function renderIncidentNte(parent, incident, ui = {}) {
   }
 
   if (
-    incident.canReview &&
+    incident.canReview && incident.canManageTask &&
     ['UNDER_REVIEW', 'UNDER INVESTIGATION'].includes(incident.status) &&
     (!incident.nte || incident.nte.status === 'DRAFT')
   ) {

@@ -128,6 +128,7 @@
   function renderContent(incident) {
     content.replaceChildren();
 
+    if (incident.task) content.appendChild(TaskUI.render(incident.task, () => select(incident.id)));
     const tracking = incident.tracking;
     const current = tracking.stages.find(
       (stage) => stage.key === tracking.currentStage
@@ -206,7 +207,7 @@
     });
     signatories.insertBefore(completion, signatories.children[2] || null);
     content.appendChild(signatories);
-    if (incident.canReview && incident.status === 'UNDER_REVIEW')
+    if (incident.canReview && incident.canManageTask && incident.status === 'UNDER_REVIEW')
       content.appendChild(ui.renderReviewActions(incident, controls));
     if (incident.status === 'UNDER_REVIEW') {
       const hrSignature = incident.signatures.find(
@@ -225,7 +226,7 @@
       (request) => request.status === 'PENDING'
     );
     if (
-      incident.canReview &&
+      incident.canReview && incident.canManageTask &&
       ['UNDER_REVIEW', 'UNDER INVESTIGATION'].includes(incident.status) &&
       !(
         incident.status === 'UNDER INVESTIGATION' &&
@@ -247,7 +248,7 @@
       );
     }
     if (
-      incident.canReview &&
+      incident.canReview && incident.canManageTask &&
       ['UNDER_REVIEW', 'UNDER INVESTIGATION'].includes(incident.status) &&
       !(
         incident.status === 'UNDER INVESTIGATION' &&
@@ -267,7 +268,7 @@
           `Explanation submitted ${dateTime(sent.reachedAt)}. Awaiting HR evaluation.`
         )
       );
-      if (incident.canReview) {
+      if (incident.canReview && incident.canManageTask) {
         const startEvaluation = el('button', '', 'Start evaluation');
         startEvaluation.type = 'button';
         startEvaluation.onclick = async () => {
@@ -284,7 +285,7 @@
         content.appendChild(startEvaluation);
       }
     }
-    if (incident.status === 'EVALUATION' && incident.canReview)
+    if (incident.status === 'EVALUATION' && incident.canViewReview)
       ui.renderEvaluation(content, view, pads, { reload: select });
     window.IncidentTimeline.render(content, incident);
     ui.renderDecision(content, view, controls);
@@ -403,5 +404,9 @@
       refreshing = false;
     }
   }, 45000);
+  window.addEventListener('review-tasks-changed', () => {
+    if (visible() && !refreshing && !document.querySelector('dialog[open]'))
+      load(null, false).catch((error) => ui.feedback(error.message, true));
+  });
   window.IncidentTrack = { load, select };
 })();

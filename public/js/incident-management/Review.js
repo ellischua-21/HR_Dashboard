@@ -67,7 +67,8 @@
         ['Reported employee', incident.reportedEmployeeName],
         ['Reported by', incident.reporterName],
         ['Date filed', DateUtils.formatDate(incident.dateFiled)],
-        ['Last updated', formatDate(incident.updatedAt)]
+        ['Last updated', formatDate(incident.updatedAt)],
+        ['Assigned To', incident.taskOwner || 'Unassigned']
       ]) {
         const pair = el('div');
         pair.append(el('dt', '', label), el('dd', '', value || '—'));
@@ -183,5 +184,8 @@
       polling = false;
     }
   }, 60000);
+  window.addEventListener('review-tasks-changed', () => {
+    if (visible()) fetchList().catch(() => {});
+  });
   window.IncidentReview = { load };
 })();

@@ -15,5 +15,5 @@ Options -Indexes
   RewriteBase /HR_Dashboard/
   RewriteRule ^$ public/ [R=302,L]
   RewriteRule ^(?:node_modules|server|scripts|tests)(?:/|$) - [F,L,NC]
-  RewriteRule ^shared/(?!(?:FormTemplates|FormStatus|FormValidation|DateUtils)\.js$).* - [F,L,NC]
+  RewriteRule ^shared/(?!(?:FormTemplates|FormStatus|FormValidation|DateUtils|WorkTime)\.js$).* - [F,L,NC]
 </IfModule>

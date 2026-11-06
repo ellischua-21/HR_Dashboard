@@ -34,6 +34,7 @@
           el('p', 'note', `Responded ${dateTime(request.respondedAt)}`)
         );
       if (
+        incident.currentUserRole !== 'ADMIN' &&
         incident.status === 'UNDER INVESTIGATION' &&
         request.status === 'PENDING' &&
         String(request.recipientEmail || '')
@@ -83,7 +84,7 @@
       }
       section.appendChild(card);
     });
-    if (incident.canReview && incident.activity.length) {
+    if (incident.canViewReview && incident.activity.length) {
       const updates = el('section');
       updates.appendChild(el('h4', '', 'Authorized Investigation Updates'));
       const list = el('ul');
@@ -284,7 +285,7 @@
     );
     if (incident.informationRequests.length)
       renderInformationRequests(parent, incident, controls);
-    if (incident.canReview && incident.status === 'UNDER INVESTIGATION') {
+    if (incident.canReview && incident.canManageTask && incident.status === 'UNDER INVESTIGATION') {
       if (hasPendingRequests) {
         parent.appendChild(
           el(
@@ -298,7 +299,7 @@
         renderInvestigationRequests(parent, incident, controls);
       }
     } else if (
-      !incident.canReview &&
+      !incident.canViewReview &&
       incident.informationRequests.some(
         (request) => request.status === 'RESPONDED'
       ) &&

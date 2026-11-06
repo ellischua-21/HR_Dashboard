@@ -58,7 +58,7 @@ function renderIncidentDecision(parent, incident, ui = {}) {
     windowRef.document.close();
   };
   section.appendChild(preview);
-  if (incident.canReview && incident.status === 'DECISION ISSUED') {
+  if (incident.canReview && incident.canManageTask && incident.status === 'DECISION ISSUED') {
     const reason = incidentElement('textarea');
     reason.rows = 3;
     reason.maxLength = 4000;
@@ -107,7 +107,7 @@ function renderIncidentDecision(parent, incident, ui = {}) {
     };
     section.append(reasonLabel, close);
   }
-  if (decision.closedAt && incident.canReview)
+  if (decision.closedAt && incident.canViewReview)
     section.appendChild(
       incidentElement(
         'p',
@@ -120,7 +120,7 @@ function renderIncidentDecision(parent, incident, ui = {}) {
 
 function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
   if (
-    !incident.canReview ||
+    !incident.canViewReview ||
     (!['EVALUATION', 'DECISION ISSUED'].includes(incident.status) &&
       !(incident.status === 'CLOSED' && incident.decision))
   )
@@ -175,7 +175,7 @@ function renderIncidentEvaluation(parent, incident, padSetup, ui = {}) {
     );
     section.appendChild(history);
   }
-  if (incident.status !== 'EVALUATION') {
+  if (incident.status !== 'EVALUATION' || !incident.canManageTask) {
     parent.appendChild(section);
     return;
   }

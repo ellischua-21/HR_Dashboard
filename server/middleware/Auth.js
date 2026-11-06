@@ -22,7 +22,9 @@ async function getCurrentUser(req) {
     .map((value) => value.trim())
     .filter(
       (value) =>
-        value && !['forms.head-review', 'emp.sensitive'].includes(value)
+        value && !['forms.head-review', 'emp.sensitive'].includes(value) &&
+        !(row.role === 'ADMIN' && ['dash.view', 'forms.review', 'forms.self', 'incidents.coc.manage'].includes(value)) &&
+        !(row.role === 'HR' && value === 'exec.view')
     );
   const basePermissions = Object.prototype.hasOwnProperty.call(
     ROLE_PERMS,

@@ -1,0 +1,148 @@
+<section id="view-hr-performance" class="view" hidden>
+  <form id="performance-filters" class="panel performance-toolbar">
+    <label>From<input id="performance-from" type="date" required /></label>
+    <label>To<input id="performance-to" type="date" required /></label>
+    <label
+      >Reviewer<select id="performance-reviewer">
+        <option value="">All Reviewers</option>
+      </select></label
+    >
+    <label
+      >Request Type<select id="performance-type">
+        <option value="ALL">All</option>
+        <option value="FORM">Forms</option>
+        <option value="INCIDENT">Incident Cases</option>
+      </select></label
+    >
+    <label
+      >Task List Status<select id="performance-state">
+        <option value="ALL">All</option>
+        <option value="UNASSIGNED">Unassigned</option>
+        <option value="READY">Awaiting HR</option>
+        <option value="WAITING">Waiting on Others</option>
+        <option value="COMPLETED">Completed</option>
+      </select></label
+    >
+    <label
+      >Chart Interval<select id="performance-interval">
+        <option value="WEEK">Weekly</option>
+        <option value="MONTH">Monthly</option>
+        <option value="DAY">Daily</option>
+      </select></label
+    >
+    <div class="actions">
+      <button type="submit">Apply Filters</button
+      ><button id="performance-refresh" class="ghost" type="button">
+        Refresh
+      </button>
+    </div>
+  </form>
+  <div id="performance-kpis" class="performance-kpis"></div>
+  <div class="performance-charts">
+    <section class="panel">
+      <h2>Reviews By Reviewer</h2>
+      <div class="performance-chart">
+        <canvas id="performance-completions-chart"></canvas>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Review Trends</h2>
+      <div class="performance-chart">
+        <canvas id="performance-trend-chart"></canvas>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Current Workload</h2>
+      <div class="performance-chart">
+        <canvas id="performance-workload-chart"></canvas>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Current Workflow Stages</h2>
+      <div class="performance-chart">
+        <canvas id="performance-stages-chart"></canvas>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Pending Task Durations</h2>
+      <div class="performance-chart">
+        <canvas id="performance-age-chart"></canvas>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>HR Turnaround Trends</h2>
+      <div class="performance-chart">
+        <canvas id="performance-turnaround-chart"></canvas>
+      </div>
+    </section>
+  </div>
+  <section class="panel">
+    <h2>Reviewer Performance</h2>
+    <div class="performance-scroll">
+      <table class="performance-reviewers-table">
+        <thead>
+          <tr>
+            <th scope="col">Reviewer</th>
+            <th scope="col">Role</th>
+            <th scope="col">Forms Reviewed</th>
+            <th
+              scope="col"
+              title="Each incident report counts once per HR with recorded review work in the selected period."
+            >
+              Incidents Reviewed
+            </th>
+            <th
+              scope="col"
+              title="All unfinished tasks owned by this HR, including tasks waiting for employee responses."
+            >
+              Tasks Assigned
+            </th>
+            <th scope="col">Tasks Waiting for Employee Response</th>
+            <th scope="col">Typical HR Time</th>
+          </tr>
+        </thead>
+        <tbody id="performance-reviewer-rows"></tbody>
+      </table>
+    </div>
+  </section>
+  <section class="panel">
+    <h2>Review Tasks</h2>
+    <div class="performance-scroll">
+      <table class="performance-tasks-table">
+        <thead>
+          <tr>
+            <th scope="col">Reference</th>
+            <th scope="col">Request</th>
+            <th scope="col">Employee</th>
+            <th scope="col">Reviewer</th>
+            <th scope="col">Stage</th>
+            <th scope="col">Status / Waiting Reason</th>
+            <th scope="col">Total HR Time</th>
+            <th scope="col">Current Owner Time</th>
+            <th scope="col">Last Action</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="performance-task-rows"></tbody>
+      </table>
+    </div>
+  </section>
+  <section class="panel">
+    <h2>Incident Task Assignments</h2>
+    <div class="performance-scroll">
+      <table class="performance-assignments-table">
+        <thead>
+          <tr>
+            <th scope="col">IR Number</th>
+            <th scope="col">Incident Title</th>
+            <th scope="col">HR Reviewer</th>
+            <th scope="col">Date Taken / Assigned</th>
+            <th scope="col">Ownership</th>
+            <th scope="col">View Case</th>
+          </tr>
+        </thead>
+        <tbody id="performance-assignment-rows"></tbody>
+      </table>
+    </div>
+  </section>
+</section>

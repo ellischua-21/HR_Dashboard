@@ -2974,3 +2974,69 @@ legend {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+/* Review ownership controls share the existing warm surfaces and controls. */
+.task-ownership {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-block: 12px;
+  padding: 14px;
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--brand);
+  border-radius: 8px;
+  background: var(--paper);
+}
+.task-ownership-details { display: grid; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.task-ownership-compact { padding: 8px; margin-block: 8px; }
+.task-ownership-compact .actions { margin: 0; }
+.task-clock { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.task-waiting { color: #704600; }
+.task-assignment-dialog { width: min(540px, calc(100vw - 32px)); box-sizing: border-box; }
+.task-assignment-dialog label { display: grid; gap: 6px; margin-block: 14px; }
+.task-assignment-dialog input, .task-assignment-dialog select, .task-assignment-dialog textarea { width: 100%; box-sizing: border-box; }
+.task-history-dialog { width: min(760px, calc(100vw - 32px)); max-height: 85dvh; overflow: auto; box-sizing: border-box; }
+.task-history { padding-left: 24px; }
+.task-history li { padding-block: 10px; border-bottom: 1px solid var(--rule); overflow-wrap: anywhere; }
+.task-history p { margin-block: 6px; }
+#view-hr-performance { min-width: 0; max-width: 100%; }
+#view-hr-performance > .panel { max-width: none; margin-bottom: 18px; }
+.performance-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.performance-toolbar > label { display: grid; gap: 6px; flex: 1 1 150px; min-width: 0; }
+.performance-toolbar input, .performance-toolbar select { width: 100%; min-width: 0; box-sizing: border-box; }
+.performance-toolbar .actions { margin: 0; flex-wrap: wrap; }
+.performance-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-block: 18px; }
+.performance-kpis article { display: grid; gap: 10px; padding: 18px; border: 1px solid var(--rule); border-top: 3px solid var(--brand); border-radius: 10px; background: var(--card); min-width: 0; }
+.performance-kpis article:nth-child(3n + 2) { border-top-color: #768758; background: #edf0e4; }
+.performance-kpis article:nth-child(3n) { border-top-color: #c49842; background: #faf0d9; }
+.performance-kpis article > span { color: var(--muted); }
+.performance-kpis strong { font-size: clamp(1.1rem, 1.5vw, 1.6rem); overflow-wrap: anywhere; }
+.performance-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-bottom: 18px; }
+.performance-charts .panel { min-width: 0; max-width: none; margin: 0; }
+.performance-charts h2 { font-size: 1rem; margin-top: 0; }
+.performance-chart { position: relative; height: 280px; }
+.performance-scroll { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; overflow: auto; max-height: 520px; max-height: min(65dvh, 600px); isolation: isolate; scrollbar-gutter: stable; border: 1px solid var(--rule); border-radius: 8px; }
+.performance-scroll table { border-collapse: separate; border-spacing: 0; table-layout: fixed; margin: 0; }
+.performance-scroll th, .performance-scroll td { width: 160px; min-width: 160px; box-sizing: border-box; padding: 12px; white-space: normal; overflow-wrap: anywhere; vertical-align: top; border-bottom: 1px solid var(--rule); background: var(--table-row-bg, var(--card)); }
+.performance-scroll th { position: sticky; top: 0; z-index: 2; background: var(--table-head-bg, var(--paper)); }
+.performance-scroll th:first-child, .performance-scroll td:first-child { position: sticky; left: 0; width: 220px; min-width: 220px; z-index: 1; }
+.performance-scroll th:first-child { z-index: 3; }
+.performance-scroll tbody tr:nth-child(even) { --table-row-bg: #faf6f0; }
+.performance-scroll tbody tr:hover { --table-row-bg: #f8e9dc; }
+.performance-scroll button { margin: 2px; }
+.performance-scroll .performance-reviewers-table { width: 100%; min-width: 1180px; }
+.performance-tasks-table { width: 1780px; }
+.performance-tasks-table th:last-child, .performance-tasks-table td:last-child { width: 280px; min-width: 280px; }
+.performance-assignments-table { width: 100%; min-width: 1020px; }
+@media (max-width: 1100px) {
+  .performance-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .performance-charts { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 540px) {
+  .performance-toolbar > label { flex-basis: 100%; }
+  .performance-toolbar .actions, .performance-toolbar .actions button { flex: 1 1 auto; }
+  .task-ownership { align-items: stretch; }
+  .task-ownership > .actions { width: 100%; }
+  .performance-kpis article { padding: 12px; }
+}

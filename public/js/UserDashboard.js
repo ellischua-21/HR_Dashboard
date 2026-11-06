@@ -1090,9 +1090,13 @@ function reviewRow(form) {
       (session.role === 'HR' &&
         session.is_hr_head &&
         form.submitter_role === 'HR')
-    : ['HR', 'ADMIN'].includes(session.role) &&
+    : session.role === 'HR' &&
       session.perms.includes('forms.review');
-  const awaitingReviewer = form.status === 'PENDING' && canReviewStage;
+  const requiresTask = ['HR', 'ADMIN'].includes(session.role);
+  if (requiresTask && form.task)
+    actions.appendChild(TaskUI.render(form.task, () => loadFormsForReview(), true));
+  const awaitingReviewer = form.status === 'PENDING' && canReviewStage &&
+    (!requiresTask || form.task?.isMine);
   if (awaitingReviewer) {
     ['APPROVED', 'REJECTED'].forEach((decision) => {
       const button = document.createElement('button');
@@ -1687,3 +1691,8 @@ $('staff-announcements-acknowledge').onclick = acknowledgePendingAnnouncements;
 $('staff-announcements-dialog').addEventListener('cancel', (event) =>
   event.preventDefault()
 );
+
+window.addEventListener('review-tasks-changed', () => {
+  if (!session || !['HR', 'ADMIN'].includes(session.role) || $('view-leave-requests').hidden || document.querySelector('dialog[open]')) return;
+  loadFormsForReview().catch((error) => showErr(error.message));
+});

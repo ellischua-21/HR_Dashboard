@@ -1,5 +1,7 @@
+const Tasks = require('./TaskService');
 const { pool } = require('../db/database');
 const { requirePerm, getCurrentUser } = require('../middleware/Auth');
+const requireFormView = (req, user) => requirePerm(req, user?.role === 'ADMIN' ? 'forms.view' : 'forms.review');
 const { logAudit } = require('./AuditService');
 const { sanitize, isValidDate } = require('../utils/Validation');
 const FORM_TEMPLATES = require('../../shared/FormTemplates');
@@ -402,6 +404,7 @@ async function listMyForms(req) {
     `SELECT f.id, f.control_no, f.template_key, f.form_data, f.status, f.review_stage,
             f.head_signature, f.head_signed_by, f.head_signed_at, f.hr_signature,
             f.submitted_at, f.reviewed_by, f.reviewed_at, f.review_notes, f.head_reviewer_email,
+            EXISTS (SELECT 1 FROM hr_tasks task WHERE task.resource_type = 'FORM' AND task.resource_id = f.id AND task.owner_email IS NOT NULL) AS task_taken,
             COALESCE(NULLIF(reviewer.full_name, ''), 'HR/Admin') AS reviewed_by_name,
             reviewer.role AS reviewed_by_role,
             CASE WHEN f.status = 'PENDING' THEN DATEDIFF(CURRENT_DATE(), DATE(f.submitted_at)) ELSE NULL END AS days_pending
@@ -586,13 +589,16 @@ async function updateMyForm(req, formId, templateKey, data = {}) {
   try {
     await connection.beginTransaction();
     const [rows] = await connection.execute(
-      `SELECT id, control_no, template_key, form_data, status, review_stage, head_reviewer_email
+      `SELECT id, control_no, template_key, form_data, status, review_stage, head_reviewer_email,
+        EXISTS (SELECT 1 FROM hr_tasks task WHERE task.resource_type = 'FORM' AND task.resource_id = user_forms.id AND task.owner_email IS NOT NULL) AS task_taken
        FROM user_forms WHERE id = ? AND user_email = ? FOR UPDATE`,
       [formId, user.email]
     );
     if (!rows.length)
       throw httpError('This form does not exist in your submissions.', 404);
     const existingForm = rows[0];
+    if (Number(existingForm.task_taken))
+      throw httpError('This form is being reviewed and can no longer be edited.', 409);
     if (existingForm.template_key !== templateKey) {
       throw httpError('The form type cannot be changed while editing.', 400);
     }
@@ -708,6 +714,7 @@ async function persistUserForm(
       `${description} submitted: ${serialNumber}`,
       connection
     );
+    await Tasks.sync(connection, 'FORM', Number(id), email);
     await connection.commit();
     return {
       ok: true,
@@ -726,13 +733,15 @@ async function persistUserForm(
 
 async function getFormReviewSummary(reviewer, scope = null, builtScope = null) {
   const reviewScope = builtScope || buildReviewScope(reviewer, scope);
+  const ownedFilter = reviewer.role === 'HR'
+    ? " AND NOT EXISTS (SELECT 1 FROM hr_tasks t WHERE t.resource_type = 'FORM' AND t.resource_id = f.id AND t.phase = IF(f.review_stage = 'HEAD' AND f.template_key <> 'nexus-accountability', 'HEAD', 'HR') AND t.owner_email IS NOT NULL AND LOWER(t.owner_email) <> LOWER(?))" : '';
   const [[summary]] = await pool.execute(
     `SELECT COUNT(*) AS total,
-            COALESCE(SUM(${reviewScope.pendingSql}), 0) AS pending,
+            COALESCE(SUM((${reviewScope.pendingSql})${ownedFilter}), 0) AS pending,
             COALESCE(SUM(f.status = 'APPROVED'), 0) AS approved,
             COALESCE(SUM(f.status = 'REJECTED'), 0) AS rejected
      FROM user_forms f WHERE ${reviewScope.whereSql}`,
-    [...reviewScope.pendingValues, ...reviewScope.whereValues]
+    [...reviewScope.pendingValues, ...(ownedFilter ? [reviewer.email] : []), ...reviewScope.whereValues]
   );
   return {
     total: Number(summary.total),
@@ -744,11 +753,11 @@ async function getFormReviewSummary(reviewer, scope = null, builtScope = null) {
 
 async function listFormsForReview(req, scope = 'HR', filters = {}) {
   const current = await getCurrentUser(req);
-  if (!current) await requirePerm(req, 'forms.review');
+  if (!current) await requireFormView(req, current);
   const normalizedScope = String(scope).toUpperCase();
   const isCombinedQueue = normalizedScope === 'ALL';
   const isHead = normalizedScope === 'HEAD';
-  const reviewer = await requirePerm(req, 'forms.review');
+  const reviewer = await requireFormView(req, current);
   if (
     isHead &&
     !['HEAD', 'SUPERVISOR'].includes(reviewer.role) &&
@@ -802,23 +811,23 @@ async function listFormsForReview(req, scope = 'HR', filters = {}) {
     [...reviewScope.whereValues, ...dateValues]
   );
   return {
-    forms: rows.map(parseForm),
+    forms: await Tasks.attachForms(rows.map(parseForm), reviewer),
     summary
   };
 }
 
 async function getFormReviewSummaryForUser(req, scope = 'HR') {
   const current = await getCurrentUser(req);
-  if (!current) await requirePerm(req, 'forms.review');
+  if (!current) await requireFormView(req, current);
   const normalizedScope = String(scope).toUpperCase();
   const isCombinedQueue = normalizedScope === 'ALL';
   if (isCombinedQueue) {
-    const reviewer = await requirePerm(req, 'forms.review');
+    const reviewer = await requireFormView(req, current);
     return getFormReviewSummary(reviewer, 'ALL');
   }
   const isHead = normalizedScope === 'HEAD';
   if (isHead) {
-    const reviewer = await requirePerm(req, 'forms.review');
+    const reviewer = await requireFormView(req, current);
     if (
       !['HEAD', 'SUPERVISOR'].includes(reviewer.role) &&
       !(reviewer.role === 'HR' && reviewer.is_hr_head)
@@ -831,13 +840,28 @@ async function getFormReviewSummaryForUser(req, scope = 'HR') {
     return getFormReviewSummary(reviewer);
   }
   if (
-    !current.perms.includes('forms.review') ||
+    !current.perms.some((permission) => ['forms.review', 'forms.view'].includes(permission)) ||
     !['HR', 'ADMIN'].includes(current.role)
   ) {
     return { total: 0, pending: 0, approved: 0, rejected: 0 };
   }
-  const reviewer = await requirePerm(req, 'forms.review');
+  const reviewer = await requireFormView(req, current);
   return getFormReviewSummary(reviewer, 'HR');
+}
+
+async function getPerformanceForm(req, formId) {
+  const user = await requirePerm(req, 'admin.manage');
+  if (user.role !== 'ADMIN') throw httpError('Only ADMIN can open performance records.', 403);
+  const id = Number(formId);
+  if (!Number.isSafeInteger(id) || id < 1) throw httpError('Choose a valid form.', 400);
+  const [[row]] = await pool.execute(`SELECT f.*, applicant.role AS submitter_role,
+    COALESCE(NULLIF(reviewer.full_name, ''), f.reviewed_by) AS reviewed_by_name,
+    reviewer.role AS reviewed_by_role FROM user_forms f
+    LEFT JOIN user_roles applicant ON applicant.email = f.user_email
+    LEFT JOIN user_roles reviewer ON reviewer.email = f.reviewed_by WHERE f.id = ?`, [id]);
+  if (!row) throw httpError('Form not found.', 404);
+  await logAudit(user.email, 'READ', String(id), 'Viewed form from HR Performance.');
+  return parseForm(row);
 }
 
 async function reviewUserForm(
@@ -851,6 +875,7 @@ async function reviewUserForm(
   const current = await getCurrentUser(req);
   if (!current) await requirePerm(req, 'forms.review');
   const reviewer = current;
+  if (reviewer.role === 'ADMIN') throw httpError('ADMIN can only view forms.', 403);
   if (!['APPROVED', 'REJECTED'].includes(decision)) {
     throw httpError('Choose Approved or Rejected.', 400);
   }
@@ -898,13 +923,15 @@ async function reviewUserForm(
       }
     } else {
       await requirePerm(req, 'forms.review');
-      if (!['HR', 'ADMIN'].includes(reviewer.role)) {
+      if (reviewer.role !== 'HR') {
         throw httpError(
-          'Only HR or Admin may review forms forwarded to the HR stage.',
+          'Only HR may review forms forwarded to the HR stage.',
           403
         );
       }
     }
+    if (['HR', 'ADMIN'].includes(reviewer.role))
+      await Tasks.assertOwner(connection, 'FORM', Number(formId), reviewer);
     validateApprovalSignature(
       isHead,
       decision,
@@ -940,6 +967,7 @@ async function reviewUserForm(
             `${rows[0].control_no} approved by the assigned Head HR`,
             connection
           );
+          await Tasks.sync(connection, 'FORM', Number(formId), reviewer.email, 'FORM_REVIEWED');
           await connection.commit();
           return { ok: true, status: 'APPROVED' };
         }
@@ -955,6 +983,7 @@ async function reviewUserForm(
           `${rows[0].control_no} signed and forwarded to HR/Admin`,
           connection
         );
+        await Tasks.sync(connection, 'FORM', Number(formId), reviewer.email, 'FORM_REVIEWED');
         await connection.commit();
         return { ok: true, status: 'PENDING', reviewStage: 'HR' };
       }
@@ -1062,6 +1091,7 @@ async function reviewUserForm(
       `${rows[0].control_no} marked ${decision}`,
       connection
     );
+    await Tasks.sync(connection, 'FORM', Number(formId), reviewer.email, 'FORM_REVIEWED');
     await connection.commit();
     return { ok: true, status: decision };
   } catch (error) {
@@ -1073,6 +1103,7 @@ async function reviewUserForm(
 }
 
 module.exports = {
+  getPerformanceForm,
   LEAVE_TYPES,
   validateLeaveForm,
   validateUserForm,

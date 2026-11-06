@@ -60,11 +60,13 @@ async function getInbox(req) {
     const reviewScope = buildReviewScope(user, stage);
     const [forms] = await pool.execute(
       `SELECT f.id, f.control_no, f.template_key, f.user_email, f.submitted_at,
-              f.status, f.review_stage,
+              f.status, f.review_stage, task.owner_email AS task_owner,
               CASE WHEN v.item_id IS NULL THEN 1 ELSE 0 END AS unseen,
               COALESCE(NULLIF(u.full_name, ''), f.user_email) AS applicant_name
        FROM user_forms f
        LEFT JOIN user_roles u ON u.email = f.user_email
+       LEFT JOIN hr_tasks task ON task.resource_type = 'FORM' AND task.resource_id = f.id
+         AND task.phase = IF(f.review_stage = 'HEAD' AND f.template_key <> 'nexus-accountability', 'HEAD', 'HR')
        LEFT JOIN inbox_views v
          ON v.user_email = ? AND v.item_type = 'FORM' AND v.item_id = f.id
        WHERE ${reviewScope.whereSql} AND LOWER(f.user_email) <> LOWER(?)
@@ -76,14 +78,14 @@ async function getInbox(req) {
         id: `form-${form.id}`,
         type: 'FORM',
         status: form.status === 'PENDING' ? 'ACTION_REQUIRED' : form.status,
-        unseen: Boolean(form.unseen),
+        unseen: Boolean(form.unseen) && (user.role !== 'HR' || !form.task_owner || form.task_owner.toLowerCase() === user.email.toLowerCase()),
         title: `${formTitle(form.template_key)}${form.status === 'PENDING' ? ' requires review' : ' reviewed'}`,
         message: `${form.applicant_name} submitted Serial Number ${form.control_no}.${form.status === 'PENDING' ? '' : ` Status: ${FormStatus.titleCase(form.status)}.`}`,
         createdAt: form.submitted_at,
         formId: form.id,
         controlNo: form.control_no,
         target,
-        reviewPermission: 'forms.review'
+        reviewPermission: user.role === 'ADMIN' ? 'forms.view' : 'forms.review'
       });
     });
   }
@@ -94,7 +96,7 @@ async function getInbox(req) {
             n.created_at AS createdAt, n.viewed_at AS viewedAt,
             i.id AS incidentId, i.case_number AS caseNumber, i.subject,
             i.reported_employee_name AS reportedEmployeeName,
-            i.reported_employee_email AS reportedEmployeeEmail, i.status,
+            i.reported_employee_email AS reportedEmployeeEmail, i.status, task.owner_email AS taskOwner,
             CASE
               WHEN i.status = 'PENDING SIGNATURE' AND n.notification_type = 'EMPLOYEE_SIGNATURE' AND employee_signature.incident_id IS NULL THEN 1
               WHEN i.status = 'PENDING SIGNATURE' AND n.notification_type = 'HEAD_SIGNATURE' AND head_signature.incident_id IS NULL THEN 1
@@ -102,6 +104,7 @@ async function getInbox(req) {
             END AS requiresAction
      FROM incident_notifications n
      JOIN incident_reports i ON i.id = n.incident_id
+     LEFT JOIN hr_tasks task ON task.resource_type = 'INCIDENT' AND task.resource_id = i.id AND task.phase = 'HR'
      LEFT JOIN incident_signatures employee_signature
        ON employee_signature.incident_id = i.id
        AND employee_signature.signatory_role = 'EMPLOYEE'
@@ -156,7 +159,9 @@ async function getInbox(req) {
       id: `incident-${notification.notificationId}`,
       type: 'INCIDENT',
       status: needsSignature ? 'ACTION_REQUIRED' : notification.status,
-      unseen: !notification.viewedAt,
+      unseen: !notification.viewedAt && (user.role !== 'HR' ||
+        !notification.taskOwner || notification.taskOwner.toLowerCase() === user.email.toLowerCase() ||
+        isReportedEmployee || isHeadSignature || notification.notificationType.startsWith('INFO_REQ_')),
       title:
         isEmployeeSignature || isHeadSignature
           ? needsSignature

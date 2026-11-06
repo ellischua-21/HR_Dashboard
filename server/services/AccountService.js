@@ -391,6 +391,7 @@ async function saveAccountChanges(req, changes) {
       );
     }
 
+    await require('./TaskService').releaseChangedHeadTasks(connection, admin.email);
     await connection.commit();
     return {
       ok: true,

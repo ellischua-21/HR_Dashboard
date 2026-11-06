@@ -290,7 +290,7 @@ async function getExecutiveSummary(req, filters) {
 }
 
 async function getFilterOptions(req) {
-  await requirePerm(req, 'dash.view');
+  await requirePerm(req, 'emp.read');
   const lists = await getLists();
   return {
     company: lists.Company_List,

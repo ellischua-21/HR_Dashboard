@@ -16,6 +16,8 @@ const inbox = require('./services/InboxService');
 const accounts = require('./services/AccountService');
 const userForms = require('./services/FormService');
 const incidents = require('./services/IncidentService');
+const tasks = require('./services/TaskService');
+const performance = require('./services/PerformanceService');
 const incidentArchive = require('./services/incident-management/Archive');
 const incidentConduct = require('./services/incident-management/Conduct');
 const { verifyPassword } = require('./utils/Password');
@@ -117,6 +119,13 @@ app.post('/api/logout', (req, res, next) => {
 });
 
 const methods = {
+  takeReviewTask: (req, type, id) => tasks.takeTask(req, type, id),
+  reassignReviewTask: (req, type, id, email, reason) => tasks.reassignTask(req, type, id, email, reason),
+  getReviewTaskRevision: (req) => tasks.getRevision(req),
+  getReviewTaskAssignees: (req, type, id) => tasks.assignees(req, type, id),
+  getHrPerformance: (req, filters) => performance.getDashboard(req, filters),
+  getPerformanceForm: (req, id) => userForms.getPerformanceForm(req, id),
+  getReviewTaskHistory: (req, id) => performance.history(req, id),
   getSession: (req) => getSession(req),
   getFilterOptions: (req) => dashboard.getFilterOptions(req),
   getDashboard: (req, filters) => dashboard.getDashboard(req, filters),
@@ -300,6 +309,7 @@ app.use((error, req, res, next) => {
 
 initializeDatabase()
   .then(async () => {
+    await tasks.releaseAdminOwnedTasks();
     const { processRegularizations } = require('./services/RegularizationService');
     await processRegularizations();
     setInterval(() => processRegularizations().catch((error) =>

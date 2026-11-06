@@ -212,7 +212,7 @@ async function getMyLeaveBalances(req, requestedYear) {
 }
 
 async function getReviewLeaveBalances(req, formId) {
-  const user = await requirePerm(req, 'forms.review');
+  const user = await requirePerm(req, 'inbox.read');
   if (!['HR', 'ADMIN'].includes(user.role))
     throw httpError('Access denied.', 403);
   const connection = await pool.getConnection();

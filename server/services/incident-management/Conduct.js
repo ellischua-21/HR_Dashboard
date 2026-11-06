@@ -5,7 +5,7 @@ const { manilaDate: today } = require('../../../shared/DateUtils');
 
 function isPolicyManager(user) {
   return (
-    ['HR', 'ADMIN'].includes(user.role) &&
+    user.role === 'HR' &&
     (user.perms || []).includes('incidents.coc.manage')
   );
 }
@@ -13,7 +13,7 @@ async function requirePolicyManager(req) {
   const user = await requirePerm(req, 'incidents.coc.manage');
   if (!isPolicyManager(user))
     throw httpError(
-      'Only authorized HR and ADMIN accounts can manage COC policies.',
+      'Only authorized HR accounts can manage COC policies.',
       403
     );
   return user;

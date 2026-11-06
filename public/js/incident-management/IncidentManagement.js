@@ -254,6 +254,7 @@ function incidentSignatureFor(signatures, role) {
 }
 
 function canSignIncidentAs(incident, role) {
+  if (incident.currentUserRole === 'ADMIN') return false;
   if (incident.signatures.some((signature) => signature.role === role))
     return false;
   if (role === 'EMPLOYEE')
@@ -269,7 +270,7 @@ function canSignIncidentAs(incident, role) {
       incident.assignedHeadEmail?.toLowerCase() ===
         incident.currentUserEmail.toLowerCase()
     );
-  return role === 'HR' && incident.status === 'SIGNED' && incident.canReview;
+  return role === 'HR' && incident.status === 'SIGNED' && incident.canReview && incident.canManageTask;
 }
 
 function renderIncidentSignature(
@@ -443,7 +444,7 @@ function renderIncidentReviewActions(incident, ui = {}) {
 
 function renderIncidentClosureAction(incident, ui = {}) {
   if (
-    !incident.canReview ||
+    !incident.canReview || !incident.canManageTask ||
     !['UNDER_REVIEW', 'UNDER INVESTIGATION'].includes(incident.status)
   )
     return null;
@@ -514,19 +515,6 @@ async function openIncidentCase(incidentId, options = {}) {
   )
     return;
   if (
-    incident.canReview &&
-    incident.status === 'EXPLANATION SENT' &&
-    incident.explanations.length
-  ) {
-    try {
-      await api('startIncidentEvaluation', incident.id);
-    } catch (error) {
-      const current = await api('getIncidentCase', incident.id);
-      if (current.status !== 'EVALUATION') throw error;
-    }
-    incident = await api('getIncidentCase', incident.id);
-  }
-  if (
     ticket !== incidentOpenRequest ||
     owner !== session?.email ||
     (options.archived &&
@@ -553,6 +541,7 @@ async function openIncidentCase(incidentId, options = {}) {
       )
     );
   }
+  if (incident.task && incident.status !== 'CLOSED') body.appendChild(TaskUI.render(incident.task, () => openIncidentCase(incident.id, options)));
   renderIncidentReport(body, incident);
   if (incident.policyReferences?.length) {
     const references = incidentElement('section', 'incident-case-section');
@@ -619,11 +608,11 @@ async function openIncidentCase(incidentId, options = {}) {
   body.appendChild(signatures);
   renderIncidentNte(body, incident, ui);
 
-  if (incident.canReview && incident.status === 'UNDER_REVIEW')
+  if (incident.canReview && incident.canManageTask && incident.status === 'UNDER_REVIEW')
     body.appendChild(renderIncidentReviewActions(incident, ui));
   window.IncidentInvestigation.render(body, incident, ui);
   window.IncidentTimeline.render(body, incident);
-  if (incident.canReview && incident.activity.length) {
+  if (incident.canViewReview && incident.activity.length) {
     const history = incidentElement('section', 'incident-case-section');
     history.appendChild(incidentElement('h3', '', 'Internal Case Activity'));
     const list = incidentElement('ol');

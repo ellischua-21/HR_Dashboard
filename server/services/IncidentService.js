@@ -1,3 +1,4 @@
+const Tasks = require('./TaskService');
 const { httpError } = require('../utils/HttpError');
 const { pool } = require('../db/database');
 const { requirePerm, requireEmployeeAccess } = require('../middleware/Auth');
@@ -46,8 +47,14 @@ const {
   formatDate
 } = require('../../shared/DateUtils');
 
-const FILING_ROLES = new Set(['SUPERVISOR', 'HEAD', 'HR', 'ADMIN']);
-const REVIEW_ROLES = new Set(['HR', 'ADMIN']);
+const FILING_ROLES = new Set(['SUPERVISOR', 'HEAD', 'HR']);
+const VIEW_ROLES = new Set(['HR', 'ADMIN']);
+const REVIEW_ROLES = new Set(['HR']);
+async function requireIncidentWriter(req) {
+  const user = await requirePerm(req, 'inbox.read');
+  if (user.role === 'ADMIN') throw httpError('ADMIN can only view incident records.', 403);
+  return user;
+}
 function requireIncidentRole(user, roles, message) {
   if (!roles.has(user.role)) throw httpError(message, 403);
 }
@@ -95,7 +102,7 @@ async function getIncidentFileContext(req) {
   requireIncidentRole(
     user,
     FILING_ROLES,
-    'Only SUPERVISOR, HEAD, HR, and ADMIN accounts can file an Incident Report.'
+    'Only SUPERVISOR, HEAD, and HR accounts can file an Incident Report.'
   );
   const reporter = await getReporterEmployee(pool, user.email);
   if (!reporter) throw httpError('Your account is not active.', 401);
@@ -118,7 +125,7 @@ async function searchIncidentEmployees(req, query, purpose = 'reported') {
     requireIncidentRole(
       user,
       FILING_ROLES,
-      'Only SUPERVISOR, HEAD, HR, and ADMIN accounts can file an Incident Report.'
+      'Only SUPERVISOR, HEAD, and HR accounts can file an Incident Report.'
     );
   }
   const term = normalizeText(String(query || ''), 'Search text', 100, false)
@@ -235,11 +242,11 @@ async function resolveAssignedHead(connection, employee) {
 }
 
 async function submitIncidentReport(req, input = {}) {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requireIncidentWriter(req);
   requireIncidentRole(
     user,
     FILING_ROLES,
-    'Only SUPERVISOR, HEAD, HR, and ADMIN accounts can file an Incident Report.'
+    'Only SUPERVISOR, HEAD, and HR accounts can file an Incident Report.'
   );
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw httpError('Enter valid Incident Report details.', 400);
@@ -522,7 +529,8 @@ async function getIncidentTrackingVersion(req, incidentId) {
   const [[row]] = await pool.execute(
     `SELECT CONCAT_WS(':', status, updated_at,
        (SELECT COALESCE(MAX(a.id), 0) FROM incident_activity a WHERE a.incident_id = incident_reports.id),
-       (SELECT COALESCE(MAX(s.signed_at), '') FROM incident_signatures s WHERE s.incident_id = incident_reports.id)) AS version
+       (SELECT COALESCE(MAX(s.signed_at), '') FROM incident_signatures s WHERE s.incident_id = incident_reports.id),
+       (SELECT COALESCE(MAX(t.updated_ms), 0) FROM hr_tasks t WHERE t.resource_type = 'INCIDENT' AND t.resource_id = incident_reports.id)) AS version
      FROM incident_reports WHERE id = ? AND ${scope.sql}`,
     [id, ...scope.values]
   );
@@ -534,7 +542,7 @@ async function listIncidentsForReview(req) {
   const user = await requirePerm(req, 'inbox.read');
   requireIncidentRole(
     user,
-    REVIEW_ROLES,
+    VIEW_ROLES,
     'Only HR and ADMIN accounts can review Incident Reports.'
   );
   await processOverdueIncidentNtes();
@@ -550,8 +558,8 @@ async function getIncidentReviewDashboard(req, input = {}) {
   const user = await requirePerm(req, 'inbox.read');
   requireIncidentRole(
     user,
-    REVIEW_ROLES,
-    'Only HR and ADMIN can manage Incident Reports.'
+    VIEW_ROLES,
+    'Only HR can manage Incident Reports.'
   );
   const filter = buildReviewFilter(input);
   const scope = incidentAccessScope(user);
@@ -581,7 +589,9 @@ async function getIncidentReviewDashboard(req, input = {}) {
             COALESCE((SELECT MAX(a.created_at) FROM incident_activity a WHERE a.incident_id = incident_reports.id), updated_at),
             COALESCE((SELECT MAX(s.signed_at) FROM incident_signatures s WHERE s.incident_id = incident_reports.id), updated_at)) AS updatedAt,
           ${HR_SIGNED_SQL} AS hrSigned,
-          EXISTS (SELECT 1 FROM incident_evaluations e WHERE e.incident_id = incident_reports.id) AS hasEvaluation
+          EXISTS (SELECT 1 FROM incident_evaluations e WHERE e.incident_id = incident_reports.id) AS hasEvaluation,
+          (SELECT COALESCE(NULLIF(u.full_name, ''), t.owner_email) FROM hr_tasks t LEFT JOIN user_roles u ON u.email = t.owner_email
+            WHERE t.resource_type = 'INCIDENT' AND t.resource_id = incident_reports.id AND t.phase = 'HR') AS taskOwner
        FROM incident_reports WHERE ${scope.sql} AND ${filter.sql}
        ORDER BY updatedAt DESC, incident_reports.id DESC
        ${input.allRows === true ? '' : `LIMIT ${filter.filters.pageSize} OFFSET ${offset}`}`,
@@ -652,6 +662,7 @@ async function recordIncidentActivity(
     details,
     connection
   );
+  await Tasks.sync(connection, 'INCIDENT', Number(incident.id), user.email, action);
   return result.insertId;
 }
 
@@ -687,11 +698,11 @@ async function notifyIncidentParties(connection, incident, type, actorEmail) {
 }
 
 async function transitionIncident(req, incidentId, action, details = '') {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requireIncidentWriter(req);
   requireIncidentRole(
     user,
     REVIEW_ROLES,
-    'Only HR and ADMIN can manage Incident Reports.'
+    'Only HR can manage Incident Reports.'
   );
   const id = Number(incidentId);
   if (!Number.isSafeInteger(id) || id < 1)
@@ -728,6 +739,7 @@ async function transitionIncident(req, incidentId, action, details = '') {
   try {
     await connection.beginTransaction();
     const incident = await getIncidentForAction(connection, id);
+    await Tasks.assertOwner(connection, 'INCIDENT', id, user);
     if (incident.status !== transition.from)
       throw httpError('This case has already changed status.', 409);
     if (
@@ -897,11 +909,11 @@ async function upsertIncidentNte(connection, user, incident, input) {
 }
 
 async function saveIncidentNteDraft(req, incidentId, input = {}) {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requireIncidentWriter(req);
   requireIncidentRole(
     user,
     REVIEW_ROLES,
-    'Only HR and ADMIN can prepare an NTE.'
+    'Only HR can prepare an NTE.'
   );
   const id = Number(incidentId);
   if (!Number.isSafeInteger(id) || id < 1)
@@ -910,6 +922,7 @@ async function saveIncidentNteDraft(req, incidentId, input = {}) {
   try {
     await connection.beginTransaction();
     const incident = await getIncidentForAction(connection, id);
+    await Tasks.assertOwner(connection, 'INCIDENT', id, user);
     if (!['UNDER_REVIEW', 'UNDER INVESTIGATION'].includes(incident.status))
       throw httpError(
         'An NTE can only be prepared during HR review or investigation.',
@@ -944,11 +957,11 @@ async function saveIncidentNteDraft(req, incidentId, input = {}) {
 }
 
 async function issueIncidentNte(req, incidentId, input = {}) {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requireIncidentWriter(req);
   requireIncidentRole(
     user,
     REVIEW_ROLES,
-    'Only HR and ADMIN can issue an NTE.'
+    'Only HR can issue an NTE.'
   );
   const signature = normalizeSignature(input.signature);
   const id = Number(incidentId);
@@ -958,6 +971,7 @@ async function issueIncidentNte(req, incidentId, input = {}) {
   try {
     await connection.beginTransaction();
     const incident = await getIncidentForAction(connection, id);
+    await Tasks.assertOwner(connection, 'INCIDENT', id, user);
     if (!['UNDER_REVIEW', 'UNDER INVESTIGATION'].includes(incident.status))
       throw httpError(
         'An NTE can only be issued during HR review or investigation.',
@@ -1025,7 +1039,7 @@ async function saveIncidentExplanationDraft(
   explanation,
   files = []
 ) {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requireIncidentWriter(req);
   const id = Number(incidentId);
   const text = normalizeText(
     String(explanation || ''),
@@ -1092,7 +1106,7 @@ async function submitIncidentExplanation(
   explanation,
   files = []
 ) {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requireIncidentWriter(req);
   const id = Number(incidentId);
   const text = normalizeText(String(explanation || ''), 'Explanation', 20000);
   const evidence = normalizeEvidence(files);
@@ -1180,17 +1194,18 @@ async function submitIncidentExplanation(
 }
 
 async function startIncidentEvaluation(req, incidentId) {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requireIncidentWriter(req);
   requireIncidentRole(
     user,
     REVIEW_ROLES,
-    'Only HR and ADMIN can start evaluation.'
+    'Only HR can start evaluation.'
   );
   const id = Number(incidentId);
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
     const incident = await getIncidentForAction(connection, id);
+    await Tasks.assertOwner(connection, 'INCIDENT', id, user);
     if (incident.status !== 'EXPLANATION SENT')
       throw httpError('This case is not awaiting explanation review.', 409);
     const [[submittedExplanation]] = await connection.execute(
@@ -1232,11 +1247,11 @@ async function startIncidentEvaluation(req, incidentId) {
 }
 
 async function saveIncidentEvaluation(req, incidentId, input = {}) {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requireIncidentWriter(req);
   requireIncidentRole(
     user,
     REVIEW_ROLES,
-    'Only HR and ADMIN can save evaluations.'
+    'Only HR can save evaluations.'
   );
   const id = Number(incidentId);
   const finding = String(input.finding || '');
@@ -1260,6 +1275,7 @@ async function saveIncidentEvaluation(req, incidentId, input = {}) {
   try {
     await connection.beginTransaction();
     const incident = await getIncidentForAction(connection, id);
+    await Tasks.assertOwner(connection, 'INCIDENT', id, user);
     if (incident.status !== 'EVALUATION')
       throw httpError('This case is not in evaluation.', 409);
     const [[decision]] = await connection.execute(
@@ -1367,11 +1383,11 @@ async function saveIncidentEvaluation(req, incidentId, input = {}) {
 }
 
 async function issueIncidentDecision(req, incidentId, input = {}) {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requireIncidentWriter(req);
   requireIncidentRole(
     user,
     REVIEW_ROLES,
-    'Only HR and ADMIN can approve and issue decisions.'
+    'Only HR can approve and issue decisions.'
   );
   const id = Number(incidentId);
   const signature = normalizeSignature(input.signature);
@@ -1398,6 +1414,7 @@ async function issueIncidentDecision(req, incidentId, input = {}) {
   try {
     await connection.beginTransaction();
     const incident = await getIncidentForAction(connection, id);
+    await Tasks.assertOwner(connection, 'INCIDENT', id, user);
     if (incident.status !== 'EVALUATION')
       throw httpError('This case is not ready for a final decision.', 409);
     const [[evaluation]] = await connection.execute(
@@ -1539,11 +1556,11 @@ async function issueIncidentDecision(req, incidentId, input = {}) {
 }
 
 async function closeIncidentDecision(req, incidentId, reason) {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requireIncidentWriter(req);
   requireIncidentRole(
     user,
     REVIEW_ROLES,
-    'Only HR and ADMIN can close a decided case.'
+    'Only HR can close a decided case.'
   );
   const id = Number(incidentId);
   const closureReason = normalizeText(
@@ -1555,6 +1572,7 @@ async function closeIncidentDecision(req, incidentId, reason) {
   try {
     await connection.beginTransaction();
     const incident = await getIncidentForAction(connection, id);
+    await Tasks.assertOwner(connection, 'INCIDENT', id, user);
     if (incident.status !== 'DECISION ISSUED')
       throw httpError(
         'Only an issued decision can be completed and closed.',
@@ -1608,7 +1626,7 @@ async function submitIncidentExplanationAddendum(
   statement,
   files = []
 ) {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requireIncidentWriter(req);
   const id = Number(incidentId);
   const text = normalizeText(
     String(statement || ''),
@@ -1807,7 +1825,7 @@ async function getIncidentNteEvidence(req, evidenceId) {
   const file = rows[0];
   if (!file) throw httpError('NTE attachment not found.', 404);
   if (
-    !REVIEW_ROLES.has(user.role) &&
+    !VIEW_ROLES.has(user.role) &&
     (file.nteStatus !== 'ISSUED' ||
       file.employeeEmail.toLowerCase() !== user.email.toLowerCase())
   )
@@ -1837,7 +1855,7 @@ async function getIncidentExplanationEvidence(req, evidenceId) {
   const file = rows[0];
   if (!file) throw httpError('Explanation attachment not found.', 404);
   if (
-    !REVIEW_ROLES.has(user.role) &&
+    !VIEW_ROLES.has(user.role) &&
     file.employeeEmail.toLowerCase() !== user.email.toLowerCase()
   )
     throw httpError(
@@ -1871,7 +1889,7 @@ async function getIncidentExplanationDraftEvidence(req, evidenceId) {
   const file = rows[0];
   if (!file) throw httpError('Draft attachment not found.', 404);
   if (
-    !REVIEW_ROLES.has(user.role) &&
+    !VIEW_ROLES.has(user.role) &&
     file.employeeEmail.toLowerCase() !== user.email.toLowerCase()
   )
     throw httpError('You do not have access to this draft attachment.', 403);
@@ -1901,7 +1919,7 @@ async function getIncidentExplanationAddendumEvidence(req, evidenceId) {
   const file = rows[0];
   if (!file) throw httpError('Additional statement attachment not found.', 404);
   if (
-    !REVIEW_ROLES.has(user.role) &&
+    !VIEW_ROLES.has(user.role) &&
     file.employeeEmail.toLowerCase() !== user.email.toLowerCase()
   )
     throw httpError('You do not have access to this attachment.', 403);
@@ -1918,8 +1936,8 @@ async function listIncidentRequestRecipients(req, incidentId) {
   const user = await requirePerm(req, 'inbox.read');
   requireIncidentRole(
     user,
-    REVIEW_ROLES,
-    'Only HR and ADMIN can manage Incident Reports.'
+    VIEW_ROLES,
+    'Only HR can manage Incident Reports.'
   );
   const [cases] = await pool.execute(
     'SELECT id, status FROM incident_reports WHERE id = ? LIMIT 1',
@@ -1956,11 +1974,11 @@ async function requestIncidentInformation(
 }
 
 async function requestIncidentInformationBatch(req, incidentId, requests) {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requireIncidentWriter(req);
   requireIncidentRole(
     user,
     REVIEW_ROLES,
-    'Only HR and ADMIN can manage Incident Reports.'
+    'Only HR can manage Incident Reports.'
   );
   const id = Number(incidentId);
   if (!Array.isArray(requests) || requests.length < 1 || requests.length > 50)
@@ -1981,6 +1999,7 @@ async function requestIncidentInformationBatch(req, incidentId, requests) {
   try {
     await connection.beginTransaction();
     const incident = await getIncidentForAction(connection, id);
+    await Tasks.assertOwner(connection, 'INCIDENT', id, user);
     if (incident.status !== 'UNDER INVESTIGATION')
       throw httpError(
         'Information can only be requested during investigation.',
@@ -2051,11 +2070,11 @@ async function addIncidentInvestigationNote(
   details,
   files = []
 ) {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requireIncidentWriter(req);
   requireIncidentRole(
     user,
     REVIEW_ROLES,
-    'Only HR and ADMIN can investigate Incident Reports.'
+    'Only HR can investigate Incident Reports.'
   );
   const id = Number(incidentId);
   const text = normalizeText(String(details || ''), 'Investigation note', 4000);
@@ -2064,6 +2083,7 @@ async function addIncidentInvestigationNote(
   try {
     await connection.beginTransaction();
     const incident = await getIncidentForAction(connection, id);
+    await Tasks.assertOwner(connection, 'INCIDENT', id, user);
     if (incident.status !== 'UNDER INVESTIGATION')
       throw httpError(
         'Investigation notes can only be added while the case is under investigation.',
@@ -2126,7 +2146,7 @@ async function respondToIncidentInformation(
   responseText,
   files = []
 ) {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requireIncidentWriter(req);
   const id = Number(incidentId),
     request = Number(requestId);
   if (
@@ -2276,7 +2296,7 @@ async function getIncidentCase(req, incidentId) {
              (LOWER(r.recipient_email) = LOWER(?) OR LOWER(r.requested_by) = LOWER(?))
          )
        ) ORDER BY id`,
-        [id, REVIEW_ROLES.has(user.role) ? 1 : 0, user.email, user.email]
+        [id, VIEW_ROLES.has(user.role) ? 1 : 0, user.email, user.email]
       ),
       pool.execute(
         `SELECT action, details, actor_email AS actorEmail, created_at AS createdAt,
@@ -2293,7 +2313,7 @@ async function getIncidentCase(req, incidentId) {
       )
     ]);
   const canViewNte =
-    REVIEW_ROLES.has(user.role) ||
+    VIEW_ROLES.has(user.role) ||
     incident.reportedEmployeeEmail.toLowerCase() === user.email.toLowerCase();
   let nte = null;
   let evaluation = null;
@@ -2316,7 +2336,7 @@ async function getIncidentCase(req, incidentId) {
                 signer_name AS signerName, signature_data AS signature, status,
                 issued_at AS issuedAt, overdue_at AS overdueAt
          FROM incident_ntes WHERE incident_id = ? AND (? = 1 OR status = 'ISSUED') LIMIT 1`,
-          [id, REVIEW_ROLES.has(user.role) ? 1 : 0]
+          [id, VIEW_ROLES.has(user.role) ? 1 : 0]
         ),
         pool.execute(
           `SELECT d.explanation, d.updated_at AS updatedAt
@@ -2331,7 +2351,7 @@ async function getIncidentCase(req, incidentId) {
          WHERE n.incident_id = ? ORDER BY submitted_at, e.id`,
           [id]
         ),
-        REVIEW_ROLES.has(user.role)
+        VIEW_ROLES.has(user.role)
           ? pool.execute(
               `SELECT previous_deadline AS previousDeadline,
                     extended_deadline AS extendedDeadline, reason,
@@ -2359,7 +2379,7 @@ async function getIncidentCase(req, incidentId) {
       [id]
     );
     addenda = addendumRows;
-    if (REVIEW_ROLES.has(user.role)) {
+    if (VIEW_ROLES.has(user.role)) {
       const [[evaluationRow]] = await pool.execute(
         `SELECT id, finding, findings, rule_id AS ruleId, violation_title AS violationTitle,
                 code_reference AS codeReference, severity, previous_offenses AS previousOffenses,
@@ -2402,7 +2422,7 @@ async function getIncidentCase(req, incidentId) {
       [id]
     );
     decision = decisionRows[0] || null;
-    if (decision && !REVIEW_ROLES.has(user.role)) decision.closureReason = null;
+    if (decision && !VIEW_ROLES.has(user.role)) decision.closureReason = null;
   }
   if (nte) {
     const [nteEvidence] = await pool.execute(
@@ -2460,7 +2480,7 @@ async function getIncidentCase(req, incidentId) {
     for (const reference of references) {
       if (
         reference.documentType === 'EVALUATION' &&
-        !REVIEW_ROLES.has(user.role) &&
+        !VIEW_ROLES.has(user.role) &&
         !decision
       )
         continue;
@@ -2476,6 +2496,7 @@ async function getIncidentCase(req, incidentId) {
       });
     }
   }
+  const task = await Tasks.taskInfo(pool, 'INCIDENT', id, user);
   return {
     ...incident,
     policyReferences,
@@ -2491,8 +2512,8 @@ async function getIncidentCase(req, incidentId) {
     participants,
     signatures,
     evidence,
-    activity: REVIEW_ROLES.has(user.role) ? activity : [],
-    informationRequests: REVIEW_ROLES.has(user.role)
+    activity: VIEW_ROLES.has(user.role) ? activity : [],
+    informationRequests: VIEW_ROLES.has(user.role)
       ? requests
       : requests.filter(
           (request) =>
@@ -2506,6 +2527,9 @@ async function getIncidentCase(req, incidentId) {
     explanations,
     explanationAddenda: addenda,
     deadlineExtensions: extensions,
+    task,
+    canManageTask: user.role === 'HR' && Boolean(task?.isMine && task.state === 'READY'),
+    canViewReview: VIEW_ROLES.has(user.role),
     canReview: REVIEW_ROLES.has(user.role),
     currentUserName: user.full_name || user.email,
     currentUserEmail: user.email,
@@ -2538,7 +2562,7 @@ async function getIncidentEvidence(req, evidenceId) {
   const evidence = rows[0];
   if (!evidence) throw httpError('Evidence file not found.', 404);
   if (
-    !REVIEW_ROLES.has(user.role) &&
+    !VIEW_ROLES.has(user.role) &&
     (evidence.requestId
       ? ![evidence.requestRecipient, evidence.requestCreator].some(
           (email) => email && email.toLowerCase() === user.email.toLowerCase()
@@ -2572,7 +2596,7 @@ async function markNotificationSeen(connection, incidentId, email, type) {
 }
 
 async function signIncidentCase(req, incidentId, signatoryRole, signatureData) {
-  const user = await requirePerm(req, 'inbox.read');
+  const user = await requireIncidentWriter(req);
   const id = Number(incidentId);
   if (!Number.isSafeInteger(id) || id < 1)
     throw httpError('Choose a valid Incident Report.', 400);
@@ -2583,7 +2607,7 @@ async function signIncidentCase(req, incidentId, signatoryRole, signatureData) {
     requireIncidentRole(
       user,
       REVIEW_ROLES,
-      'Only HR or ADMIN can sign for HR.'
+      'Only HR can sign for HR.'
     );
   }
 
@@ -2600,6 +2624,7 @@ async function signIncidentCase(req, incidentId, signatoryRole, signatureData) {
     const incident = rows[0];
     if (!incident) throw httpError('Incident Report not found.', 404);
 
+    if (signatoryRole === 'HR') await Tasks.assertOwner(connection, 'INCIDENT', id, user);
     if (signatoryRole === 'EMPLOYEE') {
       if (
         incident.reported_employee_email.toLowerCase() !==
@@ -2744,9 +2769,12 @@ async function getIncidentBadgeCounts(req) {
     track = Number(row.count);
   }
   let review = 0;
-  if (REVIEW_ROLES.has(user.role)) {
+  if (VIEW_ROLES.has(user.role)) {
     const [[row]] = await pool.execute(
-      `SELECT COUNT(*) AS count FROM incident_reports WHERE ${ACTIVE_CASE_SQL}`
+      `SELECT COUNT(*) AS count FROM incident_reports WHERE ${ACTIVE_CASE_SQL}
+       AND NOT EXISTS (SELECT 1 FROM hr_tasks t WHERE t.resource_type = 'INCIDENT' AND t.resource_id = incident_reports.id
+         AND t.owner_email IS NOT NULL AND LOWER(t.owner_email) <> LOWER(?) AND ? = 'HR')`,
+      [user.email, user.role]
     );
     review = Number(row.count);
   }

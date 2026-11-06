@@ -14,6 +14,7 @@ function notificationTitle(type) {
     CASE_CLOSED: 'Incident case closed'
   };
   if (titles[type]) return titles[type];
+  if (type.startsWith('TASK_')) return 'Incident review assigned to you';
   if (type.startsWith('NTE_DUE_'))
     return 'NTE explanation deadline approaching';
   if (type.startsWith('NTE_OVERDUE')) return 'NTE explanation is overdue';
