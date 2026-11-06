@@ -4,7 +4,7 @@ const { pool } = require('../db/database');
 async function getAccountEmployee(email, connection = pool, lock = false) {
   const [rows] = await connection.execute(
     `SELECT record_id, name, personal_email, emp_no, position, department,
-            status, record_status, date_employed, regularized_on
+            status, record_status, date_employed, regularized_on, \`rank\`
      FROM employees
      WHERE LOWER(TRIM(personal_email)) = LOWER(TRIM(?))
        AND COALESCE(record_status, 'Active') <> 'Archived'

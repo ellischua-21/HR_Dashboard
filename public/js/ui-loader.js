@@ -1,12 +1,17 @@
 const loaderScript = document.currentScript;
 const assetVersion = new URL(loaderScript.src).searchParams.get('v') || 'dev';
 const appBaseUrl = new URL('../', loaderScript.src);
-const stylesheet = document.getElementById('app-styles');
-if (stylesheet)
-  stylesheet.href = new URL(
-    `css/Styles.css?v=${encodeURIComponent(assetVersion)}`,
-    appBaseUrl
-  );
+for (const [id, path] of [
+  ['app-styles', 'css/Styles.css'],
+  ['app-theme', 'css/Theme.css']
+]) {
+  const stylesheet = document.getElementById(id);
+  if (stylesheet)
+    stylesheet.href = new URL(
+      `${path}?v=${encodeURIComponent(assetVersion)}`,
+      appBaseUrl
+    );
+}
 
 (async function loadDashboard() {
   const finishLoading = AppLoading.begin();

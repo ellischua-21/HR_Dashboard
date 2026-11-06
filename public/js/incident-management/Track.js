@@ -160,24 +160,16 @@
           : messages[incident.status] || 'Case progress is shown above.'
       )
     );
-    const report = el('details', 'incident-track-report');
-    report.open = ['PENDING SIGNATURE', 'SIGNED'].includes(incident.status);
-    report.appendChild(
-      el('summary', '', 'Incident Report and permitted supporting evidence')
-    );
+    const report = el('div', 'incident-track-report');
     ui.renderReport(report, incident);
     content.appendChild(report);
     const pads = [];
-    // HR reviewers need the HR signature control here once employee and head
-    // signatures are complete. Review-only actions remain on the Review page.
+    // Keep the permitted signatures and actions visible beside the case details.
     const view = incident;
     const controls = { reload: select };
-    const signatories = el('details', 'incident-track-report');
-    signatories.open = ['PENDING SIGNATURE', 'SIGNED'].includes(
-      incident.status
-    );
+    const signatories = el('section', 'incident-case-section');
     signatories.appendChild(
-      el('summary', '', 'Required signatories and completion status')
+      el('h3', '', 'Required Signatories And Completion Status')
     );
     signatories.appendChild(
       el(

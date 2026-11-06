@@ -18,6 +18,7 @@ notifications, and account management.
 
 - `public/index.html` is the application shell. `public/js/ui-loader.js` loads view fragments and controllers in dependency order, using one asset version.
 - `public/views/` contains page markup; `public/js/` contains page controllers; `public/css/Styles.css` contains the shared design system.
+- `public/css/Theme.css` applies the shared visual theme across roles. It owns surface colors, accents, borders, shadows, and interaction states. Keep table dimensions, frozen-column offsets, cell alignment, scroll heights, form field order, and popup geometry in `Styles.css` and the existing views. Table color variables keep frozen and unfrozen cells consistent without changing their layout. Printable documents retain their existing formatting; incident progress retains its circular markers and state labels.
 - `EmployeeDashboard.js` is the STAFF/SUPERVISOR/HEAD landing page. It uses the shared employee details renderer from `Employees.js` and `AttendanceUI.js` for time fields and scan popovers. Self-service endpoints derive the employee from the authenticated session; they accept no employee selector. Daily attendance reuses the HR attendance calculation and cache, matching the employee number and registered name across scanner accounts.
 - `public/js/UI.js`, `AppConfirm.js`, `EmployeeSearch.js`, and `SignaturePad.js` provide reusable browser behavior. `Main.js` owns navigation, route setup, session initialization, and page action guards.
 - `public/js/incident-management/` separates filing/case composition (`IncidentManagement.js`), document layouts (`Documents.js`), NTEs and explanations (`Notice.js`), evaluation and decisions (`Evaluation.js`), investigations (`Investigation.js`), and the Track, Review, History, and Code of Conduct page controllers.
@@ -110,6 +111,13 @@ Only an account with the `ADMIN` role sees **Manage Accounts** and can approve o
 The searchable Reports To field offers active or pending SUPERVISOR accounts for STAFF, and HEAD accounts for SUPERVISOR. Approve the assigned reviewer before approving their subordinate's account. ADMIN can change saved assignments in Manage Accounts. STAFF forms go to their Supervisor then HR; SUPERVISOR forms go to their Head then HR; HEAD forms go directly to HR. At API startup, legacy USER, MANAGER, and EXECUTIVE accounts are migrated to STAFF; HR_STAFF and HR_ADMIN migrate to HR; SYSTEM_ADMIN migrates to ADMIN. Bootstrap the initial administrator with the `create-user` command above. Grant **ADMIN** only to trusted administrators.
 
 ## User forms and leave requests
+
+Paid SL/VL eligibility is centralized in `LeaveService.js`: employment status must
+be Regular, and employee rank must be present and above Rank and File. The same
+rule gates annual grants, visible balances, paid submissions, and final approval.
+Existing ledger records are retained; an ineligible employee's available balance
+is zero. Six-month automatic regularization changes employment status but grants
+allowances only when the employee also meets the rank requirement.
 
 STAFF, SUPERVISOR and HEAD sign in to a personal dashboard, review submission status, filter by status or form type, and open the **Forms** tab. A STAFF, SUPERVISOR or HEAD account can edit a submitted form only while it is pending with its assigned reviewer; saving changes requires a new electronic signature. Forms rejected by the assigned reviewer or already forwarded to HR/Admin cannot be edited. Available templates use generic names: **Leave Application**, **Authority to Deduct**, **Time-In/Out Correction Request**, **Official Business / Travel Request**, **Overtime Request**, and **Time In/Out Record**. Forms collect the applicant's required details, their electronic signature, and their approved account name automatically. New submissions receive a serial number in `PREFIX-YEAR-SEQUENCE` format, with a separate sequence per form type and Manila calendar year. Each form type starts at `000001` in a new year. Prefixes and sequence widths are configured on each template in `shared/FormTemplates.js`. Previously assigned serial numbers are retained. Submitting a form does not open the print dialog; users can print or save a PDF later from their dashboard.
 

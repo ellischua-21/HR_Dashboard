@@ -457,6 +457,10 @@ function buildFormCatalog() {
   FORM_TEMPLATES.forEach((template) => {
     const card = document.createElement('article');
     card.className = 'panel form-template';
+    const icon = document.createElement('span');
+    icon.className = 'form-catalog-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = '▤';
     const title = document.createElement('h2');
     title.textContent = template.title;
     const description = document.createElement('p');
@@ -471,7 +475,7 @@ function buildFormCatalog() {
         ? openLeaveForm()
         : openTemplateForm(template);
     actions.appendChild(open);
-    card.append(title, description, actions);
+    card.append(icon, title, description, actions);
     catalog.appendChild(card);
   });
 }

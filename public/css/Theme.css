@@ -1,0 +1,511 @@
+/* Visual theme only. Table geometry and form layouts belong to Styles.css.
+   Keep table widths, offsets, padding, heights, overflow and positioning out of this file. */
+:root {
+  --ui-clay: #a65138;
+  --ui-clay-soft: #f8e4d5;
+  --ui-sage: #526839;
+  --ui-sage-soft: #edf0e4;
+  --ui-gold-soft: #faf0d9;
+  --ui-surface: #fffdf9;
+  --ui-surface-soft: #faf6f0;
+  --ui-shadow: 0 4px 16px rgb(85 55 34 / 5%);
+  --control-radius: 7px;
+}
+
+@media screen {
+  body {
+    background: var(--paper);
+  }
+  #main > header {
+    color: var(--brand);
+  }
+  #nav a,
+  #nav .nav-group > summary {
+    border-radius: 6px;
+  }
+  #nav a:focus-visible,
+  #nav summary:focus-visible {
+    outline: 2px solid #e9a189;
+    outline-offset: -2px;
+  }
+
+  .panel:where(:not(.employee-dashboard-card)) {
+    --section-accent: var(--ui-clay);
+    border-color: #e4d8ce;
+    border-radius: 12px;
+    background: var(--ui-surface);
+    box-shadow:
+      inset 0 3px 0 var(--section-accent),
+      var(--ui-shadow);
+  }
+  .grid > .panel:nth-child(3n + 2),
+  .account-lists > .panel:nth-child(2n),
+  .incident-coc-columns > .panel:nth-child(2),
+  .password-panel {
+    --section-accent: #768758;
+  }
+  .grid > .panel:nth-child(3n),
+  #view-attendance > .panel {
+    --section-accent: #ce9440;
+  }
+  .panel h2 {
+    color: var(--ink);
+  }
+
+  /* Metrics can have stronger color; record tables remain quiet. */
+  .kpis {
+    background: transparent;
+    border-color: transparent;
+    gap: 12px;
+  }
+  .kpi {
+    background: var(--ui-surface);
+    border: 1px solid #e4d8ce;
+    border-radius: 10px;
+    box-shadow: var(--ui-shadow);
+  }
+  .kpi.hero {
+    background: var(--ui-clay-soft);
+    border-color: #e4c0a9;
+    color: #773d2c;
+  }
+  .kpi.hero:nth-child(2) {
+    background: var(--ui-sage-soft);
+    border-color: #d5ddc3;
+    color: #42552e;
+  }
+  .kpi.hero span {
+    color: #65584b;
+  }
+  .kpi:nth-child(3) {
+    background: var(--ui-gold-soft);
+    border-color: #e9d8ad;
+  }
+  .user-form-stat,
+  .incident-review-counters article {
+    border-color: #e4d8ce;
+    border-radius: 10px;
+    background: var(--ui-surface-soft);
+    box-shadow: var(--ui-shadow);
+  }
+  .user-form-stat:first-child,
+  .incident-review-counters article:first-child {
+    background: var(--ui-clay-soft);
+    border-color: #e4c0a9;
+  }
+  .user-form-stat:nth-child(3),
+  .incident-review-counters article:nth-child(2) {
+    background: var(--ui-sage-soft);
+    border-color: #d5ddc3;
+  }
+  .user-form-stat:nth-child(2),
+  .incident-review-counters article:nth-child(3) {
+    background: var(--ui-gold-soft);
+    border-color: #e9d8ad;
+  }
+  .user-form-stat:nth-child(3) strong,
+  .incident-review-counters article:nth-child(2) strong {
+    color: #42552e;
+  }
+  .user-form-stat:nth-child(2) strong,
+  .incident-review-counters article:nth-child(3) strong {
+    color: #80571b;
+  }
+
+  #view-dashboard .grid .panel > h2,
+  #ex_charts .panel > h2 {
+    color: #6d4430;
+  }
+  .user-form-stat:nth-child(4),
+  .incident-review-counters article:nth-child(6) {
+    background: #f7e8e3;
+    border-color: #e7c8bf;
+  }
+  .user-form-stat:nth-child(4) strong,
+  .incident-review-counters article:nth-child(6) strong {
+    color: #8e3f33;
+  }
+  #view-dashboard .grid .panel:nth-child(3n + 2) > h2,
+  #ex_charts .panel:nth-child(3n + 2) > h2 {
+    color: var(--ui-sage);
+  }
+
+  .filters {
+    background: var(--ui-surface-soft);
+    border-color: #e4d8ce;
+    border-radius: 10px;
+  }
+  .toolbar label,
+  .filters label,
+  .fgrid label,
+  .password-form label {
+    color: #6e5d50;
+  }
+  button:where(
+    :not(
+      .ghost,
+      .incident-track-option,
+      .incident-suggestion,
+      .head-search-results button,
+      .incident-review-categories button,
+      .attendance-time-logs-toggle
+    )
+  ) {
+    background-color: var(--ui-clay);
+    color: #fffaf4;
+  }
+  button:where(
+      :not(
+        .ghost,
+        .incident-track-option,
+        .incident-suggestion,
+        .head-search-results button,
+        .incident-review-categories button,
+        .attendance-time-logs-toggle
+      )
+    ):not(:disabled):hover {
+    background-color: #8b402b;
+  }
+  button.ghost:where(:not(.hr-head-toggle)) {
+    background-color: var(--ui-surface);
+    border-color: #a76b50;
+    color: #8b402b;
+  }
+  button.ghost:where(:not(.hr-head-toggle)):not(:disabled):hover,
+  button.ghost:where(:not(.hr-head-toggle))[aria-expanded='true'] {
+    background-color: #f8e6da;
+  }
+  button:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+  button:disabled {
+    box-shadow: none;
+  }
+  .app-confirm-accept.danger {
+    background-color: #9b3542;
+    color: #fff;
+  }
+  .app-confirm-accept.danger:not(:disabled):hover {
+    background-color: #802936;
+  }
+  input,
+  select,
+  textarea {
+    accent-color: var(--ui-clay);
+  }
+  input:not([type='checkbox']):not([type='radio']):not([type='hidden']),
+  select,
+  textarea {
+    border-color: #d9cbbf;
+  }
+  input:not([type='checkbox']):not([type='radio']):not(
+      [type='hidden']
+    ):focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid #b57659;
+    outline-offset: 1px;
+  }
+  input[readonly],
+  textarea[readonly],
+  .incident-form input[readonly] {
+    background-color: #f3eee7;
+    color: #65594d;
+  }
+  .signature-pad {
+    background: #fff;
+    border-color: #d9cbbf;
+  }
+
+  /* One row color flows through all frozen and unfrozen cells. Geometry is untouched. */
+  .tablewrap {
+    --table-head-bg: #eee3d5;
+    --table-row-bg: #fffdf9;
+    --table-hover-bg: #f5eadd;
+    background: var(--table-row-bg);
+    border-color: #e4d8ce;
+    border-radius: 8px;
+  }
+  .tablewrap tbody > tr {
+    --table-row-bg: #fffdf9;
+  }
+  .tablewrap tbody > tr:nth-child(even) {
+    --table-row-bg: #faf7f2;
+  }
+  .tablewrap tbody > tr:hover {
+    --table-row-bg: var(--table-hover-bg);
+  }
+  .tablewrap tbody > tr > td {
+    background-color: var(--table-row-bg);
+    border-bottom-color: #eee5dd;
+  }
+  .tablewrap thead > tr > th {
+    color: #5f4c3c;
+    border-bottom-color: #d9c7b6;
+  }
+  /* Existing employee/attendance status colors retain their meanings. */
+  .badge:not(.ok):not(.off):not([class*='employee-status-']) {
+    background-color: #f0e5d9;
+    color: #75442f;
+  }
+
+  .form-template {
+    background-color: var(--ui-surface);
+  }
+  .form-template:nth-child(2n) {
+    --section-accent: #768758;
+  }
+  .form-template:nth-child(3n) {
+    --section-accent: #ce9440;
+  }
+  .form-template > h2 {
+    color: var(--brand);
+  }
+  .form-template:nth-child(2n) > h2 {
+    color: var(--ui-sage);
+  }
+  .form-catalog-icon {
+    display: grid;
+    place-items: center;
+    align-self: start;
+    width: 40px;
+    height: 40px;
+    margin-bottom: 12px;
+    border-radius: 10px;
+    background: #f8e6da;
+    color: var(--ui-clay);
+    font-size: 25px;
+  }
+  .form-template:nth-child(2n) .form-catalog-icon {
+    background: #e9eddf;
+    color: var(--ui-sage);
+  }
+  #r_form > fieldset,
+  .incident-form fieldset,
+  .hr-leave-balances,
+  .leave-pay-fieldset {
+    border-color: #e4d8ce;
+    border-radius: 10px;
+    background-color: var(--ui-surface);
+  }
+  #r_form > fieldset,
+  #r_account_access {
+    --registration-accent: var(--ui-clay);
+    background-color: var(--ui-surface);
+    border-color: #d9c2af;
+    border-radius: 12px;
+    box-shadow:
+      inset 0 3px 0 var(--registration-accent),
+      0 5px 16px rgb(85 55 34 / 7%);
+  }
+  #r_form > fieldset:nth-child(2n) {
+    --registration-accent: #768758;
+  }
+  #r_form > fieldset > legend {
+    background-color: var(--ui-surface);
+    color: var(--registration-accent);
+    border-radius: 4px;
+  }
+  .incident-form legend,
+  .hr-leave-balances legend,
+  .leave-pay-fieldset legend {
+    color: #8b402b;
+  }
+
+  dialog {
+    border-color: #dfccbc;
+    border-radius: 12px;
+    background-color: var(--ui-surface);
+    box-shadow: 0 18px 60px rgb(59 48 43 / 24%);
+  }
+  dialog::backdrop {
+    background-color: rgb(59 48 43 / 48%);
+  }
+  .report-detail-section,
+  .incident-case-section {
+    border-color: #e4d8ce;
+    border-radius: 10px;
+    background-color: var(--ui-surface);
+  }
+  .report-detail-section h3,
+  .incident-case-section h3 {
+    color: #75442f;
+  }
+  .incident-case-field {
+    border-bottom-color: #e9ded2;
+  }
+  .incident-case-field strong {
+    color: #726356;
+  }
+  .panel.incident-track-content-panel {
+    background: #f5efeb;
+    box-shadow: none;
+  }
+  .incident-detail-panel {
+    --detail-accent: var(--ui-clay);
+    border-color: #dac6b4;
+    background: var(--ui-surface);
+    box-shadow:
+      inset 0 3px 0 var(--detail-accent),
+      0 5px 16px rgb(85 55 34 / 7%);
+  }
+  .incident-party-details > .incident-detail-panel:nth-child(2) {
+    --detail-accent: #768758;
+  }
+  .incident-detail-panel .incident-case-field {
+    background: var(--ui-surface-soft);
+    border-color: #eee3d9;
+  }
+  .incident-review-filters {
+    border-color: #e4d8ce;
+    border-radius: 8px;
+    background-color: #faf6f0;
+  }
+  .incident-review-filters summary {
+    color: #75442f;
+  }
+  .incident-review-categories button[aria-pressed='true'] {
+    background: var(--ui-clay);
+    color: #fffaf4;
+    border-color: var(--ui-clay);
+  }
+  .incident-review-case {
+    border-color: #e4d8ce;
+    border-radius: 10px;
+    background: var(--ui-surface);
+    box-shadow: inset 3px 0 0 #c49872;
+  }
+  .incident-review-status {
+    background: var(--ui-clay-soft);
+    color: #773d2c;
+  }
+  .incident-track-stage-message,
+  .incident-track-closure {
+    background: #f8eee2;
+    border-left-color: var(--ui-clay);
+    color: #674d38;
+  }
+  .incident-evaluation-context {
+    background: var(--ui-sage-soft);
+    border-color: #d5ddc3;
+    border-radius: 8px;
+  }
+  .incident-public-timeline li::marker {
+    color: #768758;
+  }
+  .incident-public-timeline time {
+    color: #726356;
+  }
+
+  /* Preserve the eight circular markers, connectors, scroll area and state labels. */
+  .incident-track-marker {
+    border-color: #ddcbb8;
+    background: #faf4eb;
+    color: #7b6a58;
+    box-shadow: 0 2px 5px rgb(85 55 34 / 6%);
+  }
+  .incident-track-step::after {
+    border-color: #e0d1bf;
+  }
+  .incident-track-step.is-completed .incident-track-marker {
+    background: #e8efdc;
+    border-color: #768758;
+    color: #42552e;
+  }
+  .incident-track-step.is-completed::after {
+    border-color: #768758;
+  }
+  .incident-track-step.is-current .incident-track-marker {
+    background: var(--ui-clay);
+    border-color: var(--ui-clay);
+    color: #fffaf4;
+    box-shadow:
+      0 0 0 5px #f4dfce,
+      0 4px 10px rgb(166 81 56 / 18%);
+  }
+  .incident-track-step.is-current > strong,
+  .incident-track-step.is-current .incident-track-state {
+    color: #8b402b;
+  }
+  .incident-track-step.is-skipped .incident-track-marker,
+  .incident-track-step.is-discontinued .incident-track-marker {
+    background: #f3eee7;
+    border-color: #c5b8a7;
+    color: #7c7061;
+  }
+  .incident-track-step.is-closed .incident-track-marker {
+    background: var(--ui-gold-soft);
+    border-color: #bd8a35;
+    color: #80571b;
+  }
+
+  .announcement-card {
+    border-color: #e4d8ce;
+    border-radius: 10px;
+    background: var(--ui-surface);
+    box-shadow:
+      inset 3px 0 0 #c49872,
+      var(--ui-shadow);
+  }
+  .announcement-card:nth-child(2n) {
+    box-shadow:
+      inset 3px 0 0 #8a9b68,
+      var(--ui-shadow);
+  }
+  .announcement-card h3 {
+    color: #75442f;
+  }
+  .attendance-time-logs {
+    border-color: #dfccbc;
+    border-radius: 10px;
+    background: var(--ui-surface);
+    box-shadow: 0 8px 24px rgb(59 48 43 / 16%);
+  }
+  .attendance-time-log-header {
+    color: #726356;
+    border-bottom-color: #e4d8ce;
+  }
+  .attendance-time-log-item + .attendance-time-log-item {
+    border-top-color: #eee5dd;
+  }
+  .attendance-time-logs-toggle:hover,
+  .attendance-time-logs-toggle[aria-expanded='true'] {
+    background: #f8e6da;
+  }
+  .head-search-results,
+  .incident-suggestions {
+    border-color: #dfccbc;
+    border-radius: 8px;
+    background: var(--ui-surface);
+  }
+  .login-card {
+    border-color: #e4c0a9;
+    border-radius: 16px;
+    background: var(--ui-surface);
+    box-shadow:
+      inset 0 4px 0 var(--ui-clay),
+      0 16px 45px rgb(85 55 34 / 10%);
+  }
+  .login-card h1 {
+    color: #75442f;
+  }
+}
+
+@media screen and (prefers-reduced-motion: no-preference) and (hover: hover) {
+  .panel,
+  .kpi,
+  .user-form-stat,
+  .announcement-card {
+    transition: box-shadow 160ms ease;
+  }
+  .panel:where(:not(.employee-dashboard-card)):hover {
+    box-shadow:
+      inset 0 3px 0 var(--section-accent, #a65138),
+      0 7px 22px rgb(85 55 34 / 8%);
+  }
+  .kpi:hover,
+  .user-form-stat:hover {
+    box-shadow: 0 6px 18px rgb(85 55 34 / 10%);
+  }
+}

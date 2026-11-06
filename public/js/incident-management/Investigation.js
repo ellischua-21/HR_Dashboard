@@ -84,10 +84,8 @@
       section.appendChild(card);
     });
     if (incident.canReview && incident.activity.length) {
-      const updates = el('details');
-      updates.appendChild(
-        el('summary', '', 'Authorized investigation updates')
-      );
+      const updates = el('section');
+      updates.appendChild(el('h4', '', 'Authorized Investigation Updates'));
       const list = el('ul');
       incident.activity
         .filter((entry) =>

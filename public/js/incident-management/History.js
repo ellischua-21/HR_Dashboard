@@ -3,7 +3,6 @@
     el = ui.element;
   const byId = (id) => document.getElementById(id);
   const state = {
-    page: 1,
     search: '',
     caseNumber: '',
     from: '',
@@ -37,7 +36,6 @@
         allRows: true
       });
       if (ticket !== request || session?.email !== account) return;
-      state.page = data.page;
       body.replaceChildren();
       data.cases.forEach((incident) => {
         const row = el('tr');
@@ -79,7 +77,6 @@
       ++request;
       byId('ir-history-filters').reset();
       Object.assign(state, {
-        page: 1,
         search: '',
         caseNumber: '',
         from: '',
@@ -101,13 +98,11 @@
       ['outcome', 'outcome']
     ])
       state[key] = byId(`ir-history-${id}`).value;
-    state.page = 1;
     fetchCases();
   };
   byId('ir-history-clear').onclick = () => {
     byId('ir-history-filters').reset();
     Object.assign(state, {
-      page: 1,
       search: '',
       caseNumber: '',
       from: '',

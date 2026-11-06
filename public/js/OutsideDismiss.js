@@ -3,7 +3,26 @@
   const dirtyDialogs = new WeakSet();
   const sidebar = document.getElementById('side');
   const menuButton = document.getElementById('menuBtn');
+  const navigation = document.getElementById('nav');
   let backdropStart = null;
+
+  function openNavigationGroup(selected = null) {
+    navigation.querySelectorAll('.nav-group').forEach((group) => {
+      group.open = group === selected;
+    });
+    requestAnimationFrame(() => window.positionNavigationNotificationDots?.());
+  }
+
+  // Switch groups on click, after its target is fixed. Collapsing on pointerdown
+  // shifts the sidebar before the click and can activate the wrong summary.
+  navigation.addEventListener('click', (event) => {
+    const summary =
+      event.target instanceof Element ? event.target.closest('summary') : null;
+    const group = summary?.parentElement;
+    if (!group?.matches('.nav-group') || !navigation.contains(group)) return;
+    event.preventDefault();
+    openNavigationGroup(group.open ? null : group);
+  });
 
   function setSidebarOpen(open) {
     document.body.classList.toggle('open', open);
@@ -85,9 +104,7 @@
         !menuButton.contains(target)
       )
         setSidebarOpen(false);
-      document.querySelectorAll('#nav .nav-group[open]').forEach((group) => {
-        if (!group.contains(target)) group.open = false;
-      });
+      if (!navigation.contains(target)) openNavigationGroup();
       const feedback = document.querySelector('.feedback-popup:not([hidden])');
       if (feedback && !feedback.contains(target)) window.AppFeedback?.clear();
     },
@@ -124,6 +141,7 @@
   });
 
   window.AppOutsideDismiss = {
+    openNavigationGroup,
     closeSidebar: () => setSidebarOpen(false),
     clearDirty: (dialog) => dirtyDialogs.delete(dialog)
   };

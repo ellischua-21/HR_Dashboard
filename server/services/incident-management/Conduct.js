@@ -157,7 +157,6 @@ async function snapshotCasePolicy(
 }
 
 module.exports = {
-  readCodeProvisions,
   readMatrix,
   matrixActionForOccurrence,
   getIncidentCodeGuide,

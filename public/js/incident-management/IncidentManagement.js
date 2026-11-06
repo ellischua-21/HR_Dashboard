@@ -204,7 +204,10 @@ function appendCaseField(parent, label, value) {
 }
 
 function appendIncidentFieldGroup(parent, title, fields) {
-  const section = incidentElement('section', 'incident-case-section');
+  const section = incidentElement(
+    'section',
+    'incident-case-section incident-detail-panel'
+  );
   section.appendChild(incidentElement('h3', '', title));
   const grid = incidentElement('div', 'incident-case-grid');
   fields.forEach(([label, value]) => appendCaseField(grid, label, value));
@@ -216,7 +219,10 @@ function appendIncidentParticipantList(parent, type, participants) {
   const people = participants.filter(
     (person) => person.participantType === type
   );
-  const section = incidentElement('section', 'incident-case-section');
+  const section = incidentElement(
+    'section',
+    'incident-case-section incident-detail-panel'
+  );
   section.appendChild(
     incidentElement(
       'h3',
@@ -341,13 +347,14 @@ function renderIncidentReport(body, incident) {
     }
   });
   body.appendChild(print);
-  appendIncidentFieldGroup(body, 'Reporter Details', [
+  const parties = incidentElement('div', 'incident-party-details');
+  appendIncidentFieldGroup(parties, 'Reporter Details', [
     ['Reported By', incident.reporterName],
     ['Department', incident.department],
     ['Position', incident.position],
     ['Date of Report', DateUtils.formatDate(incident.dateReported)]
   ]);
-  appendIncidentFieldGroup(body, 'Reported Employee Details', [
+  appendIncidentFieldGroup(parties, 'Reported Employee Details', [
     ['Employee Being Reported', incident.reportedEmployeeName],
     ['Employee ID', incident.reportedEmployeeId],
     ['Employee Department', incident.reportedEmployeeDepartment],
@@ -359,6 +366,7 @@ function renderIncidentReport(body, incident) {
       incident.assignedHeadEmail || 'None assigned'
     ]
   ]);
+  body.appendChild(parties);
   appendIncidentFieldGroup(body, 'Incident Details', [
     ['Status', incident.status],
     ['Subject', incident.subject],
@@ -367,7 +375,10 @@ function renderIncidentReport(body, incident) {
     ['Time', DateUtils.formatTime(incident.incidentTime)]
   ]);
 
-  const narrative = incidentElement('section', 'incident-case-section');
+  const narrative = incidentElement(
+    'section',
+    'incident-case-section incident-detail-panel'
+  );
   narrative.appendChild(incidentElement('h3', '', 'Incident Description'));
   narrative.appendChild(
     incidentElement('p', 'incident-case-text', incident.description)
@@ -377,7 +388,10 @@ function renderIncidentReport(body, incident) {
   appendIncidentParticipantList(body, 'INVOLVED', incident.participants);
   appendIncidentParticipantList(body, 'WITNESS', incident.participants);
 
-  const evidenceSection = incidentElement('section', 'incident-case-section');
+  const evidenceSection = incidentElement(
+    'section',
+    'incident-case-section incident-detail-panel'
+  );
   evidenceSection.appendChild(incidentElement('h3', '', 'Supporting Evidence'));
   if (!incident.evidence.length) {
     evidenceSection.appendChild(
@@ -531,14 +545,13 @@ async function openIncidentCase(incidentId, options = {}) {
     const progress = incidentElement('section', 'incident-review-progress');
     body.appendChild(progress);
     window.IncidentProgress.render(progress, incident);
-    if (incident.status === 'CLOSED')
-      body.appendChild(
-        incidentElement(
-          'p',
-          'note',
-          'Archived case. This workspace is read-only.'
-        )
-      );
+    body.appendChild(
+      incidentElement(
+        'p',
+        'note',
+        'Archived case. This workspace is read-only.'
+      )
+    );
   }
   renderIncidentReport(body, incident);
   if (incident.policyReferences?.length) {
@@ -604,7 +617,7 @@ async function openIncidentCase(incidentId, options = {}) {
     ui
   );
   body.appendChild(signatures);
-  renderIncidentNte(body, incident, padSetup, ui);
+  renderIncidentNte(body, incident, ui);
 
   if (incident.canReview && incident.status === 'UNDER_REVIEW')
     body.appendChild(renderIncidentReviewActions(incident, ui));

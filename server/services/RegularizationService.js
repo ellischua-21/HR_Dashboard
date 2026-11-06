@@ -19,11 +19,16 @@ async function processRegularizations() {
         "UPDATE employees SET status = 'Regular', regularized_on = DATE_ADD(date_employed, INTERVAL 6 MONTH), modified_by = 'system', modified_at = ? WHERE record_id = ? AND status = 'Probationary'",
         [manilaDate(), employee.record_id]
       );
-      await logAudit('system', 'EMPLOYEE_REGULARIZED', employee.record_id,
-        'Employment status automatically changed from Probationary to Regular.', connection);
+      await logAudit(
+        'system',
+        'EMPLOYEE_REGULARIZED',
+        employee.record_id,
+        'Employment status automatically changed from Probationary to Regular.',
+        connection
+      );
     }
     const [regularEmployees] = await connection.execute(
-      "SELECT record_id, status, date_employed, regularized_on, record_status FROM employees WHERE status = 'Regular' AND COALESCE(record_status, 'Active') <> 'Archived' FOR UPDATE"
+      "SELECT record_id, status, date_employed, regularized_on, record_status, `rank` FROM employees WHERE status = 'Regular' AND COALESCE(record_status, 'Active') <> 'Archived' FOR UPDATE"
     );
     for (const employee of regularEmployees)
       await grantCurrentAllowances(connection, employee);

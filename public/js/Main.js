@@ -525,13 +525,15 @@ function go(n) {
   document
     .querySelectorAll('#nav a')
     .forEach((a) => a.classList.toggle('on', a.dataset.id === n[0]));
+  let activeGroup = null;
   document.querySelectorAll('#nav .nav-group').forEach((group) => {
     const containsActiveLink = Boolean(
       group.querySelector(`a[data-id="${n[0]}"]`)
     );
     group.classList.toggle('has-active', containsActiveLink);
-    if (containsActiveLink) group.open = true;
+    if (containsActiveLink) activeGroup = group;
   });
+  window.AppOutsideDismiss.openNavigationGroup(activeGroup);
   $('title').textContent = n[0] === 'accounts' ? 'Manage Accounts' : n[1];
   document.querySelectorAll('.view').forEach((v) => (v.hidden = true));
   if (n[0] === 'dashboard') {

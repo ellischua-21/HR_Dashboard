@@ -203,8 +203,6 @@ const methods = {
     incidents.signIncidentCase(req, incidentId, role, signature),
   transitionIncident: (req, incidentId, action, details) =>
     incidents.transitionIncident(req, incidentId, action, details),
-  listIncidentCodeProvisions: (req) =>
-    incidents.listIncidentCodeProvisions(req),
   saveIncidentNteDraft: (req, incidentId, data) =>
     incidents.saveIncidentNteDraft(req, incidentId, data),
   issueIncidentNte: (req, incidentId, data) =>
@@ -215,8 +213,6 @@ const methods = {
     incidents.submitIncidentExplanation(req, incidentId, explanation, files),
   startIncidentEvaluation: (req, incidentId) =>
     incidents.startIncidentEvaluation(req, incidentId),
-  getIncidentEvaluationContext: (req, incidentId, ruleId) =>
-    incidents.getIncidentEvaluationContext(req, incidentId, ruleId),
   saveIncidentEvaluation: (req, incidentId, data) =>
     incidents.saveIncidentEvaluation(req, incidentId, data),
   issueIncidentDecision: (req, incidentId, data) =>
@@ -228,24 +224,6 @@ const methods = {
       req,
       incidentId,
       statement,
-      files
-    ),
-  extendIncidentDeadline: (req, incidentId, deadline, reason) =>
-    incidents.extendIncidentDeadline(req, incidentId, deadline, reason),
-  recordExternalIncidentExplanation: (
-    req,
-    incidentId,
-    explanation,
-    channel,
-    receivedAt,
-    files
-  ) =>
-    incidents.recordExternalIncidentExplanation(
-      req,
-      incidentId,
-      explanation,
-      channel,
-      receivedAt,
       files
     ),
   listDailyNteReminders: (req) => incidents.listDailyNteReminders(req),

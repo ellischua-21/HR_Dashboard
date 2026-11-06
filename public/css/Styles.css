@@ -608,7 +608,7 @@ button.ghost {
 .tablewrap {
   isolation: isolate;
   overflow-x: auto;
-  background: #fff;
+  background: var(--table-row-bg, #fff);
   border: 1px solid var(--rule);
   border-radius: 6px;
 }
@@ -638,13 +638,13 @@ button.ghost {
   position: sticky;
   top: 0;
   z-index: 3;
-  background: #eee5dd;
+  background: var(--table-head-bg, #eee5dd);
 }
 .tablewrap:not(.attendance-table-scroll) > table tr > :first-child:not(:only-child) {
   position: sticky;
   left: 0;
   z-index: 2;
-  background: #fff;
+  background: var(--table-row-bg, #fff);
   box-shadow: 2px 0 4px rgb(23 32 51 / 12%);
 }
 .tablewrap:not(.attendance-table-scroll) > table thead tr > th:first-child:not(:only-child) {
@@ -652,10 +652,10 @@ button.ghost {
   top: 0;
   left: 0;
   z-index: 4;
-  background: #eee5dd;
+  background: var(--table-head-bg, #eee5dd);
 }
 .tablewrap:not(.attendance-table-scroll) > table tbody tr:hover > :first-child {
-  background: #fbf4ed;
+  background: var(--table-hover-bg, #fbf4ed);
 }
 .report-table-scroll > .report-table {
   min-width: 0;
@@ -671,7 +671,7 @@ button.ghost {
 }
 .report-table-master tr > :nth-child(-n + 4):not(:only-child) {
   position: sticky;
-  background: #fff;
+  background: var(--table-row-bg, #fff);
   z-index: 2;
 }
 .report-table-master tr > :nth-child(1) { left: 0; }
@@ -682,9 +682,9 @@ button.ghost {
   position: sticky;
   top: 0;
   z-index: 5;
-  background: #eee5dd;
+  background: var(--table-head-bg, #eee5dd);
 }
-.report-table-master tbody tr:hover > :nth-child(-n + 4) { background: #fbf4ed; }
+.report-table-master tbody tr:hover > :nth-child(-n + 4) { background: var(--table-hover-bg, #fbf4ed); }
 .report-details-toggle { min-width: 0; padding: 4px 8px; }
 .report-employee-dialog { width: min(94vw, 1000px); max-height: 90vh; overflow: auto; }
 .report-detail-section { border: 1px solid var(--rule); border-radius: 6px; padding: 14px; margin: 12px 0; }
@@ -732,7 +732,7 @@ button.ghost {
   height: 48px;
   white-space: normal;
   line-height: 1.25;
-  background: #eee5dd;
+  background: var(--table-head-bg, #eee5dd);
 }
 .attendance-table th:nth-child(1),
 .attendance-table td:nth-child(1) { width: 130px; min-width: 130px; }
@@ -774,15 +774,15 @@ button.ghost {
 }
 .attendance-table tbody tr td:nth-child(-n + 3) {
   z-index: 2;
-  background: #fff;
+  background: var(--table-row-bg, #fff);
   cursor: default;
 }
 .attendance-table tbody tr:hover td:nth-child(-n + 3) {
-  background: #fbf4ed;
+  background: var(--table-hover-bg, #fbf4ed);
 }
 .attendance-table thead th:nth-child(-n + 3) {
   z-index: 4;
-  background: #eee5dd;
+  background: var(--table-head-bg, #eee5dd);
 }
 .attendance-table thead th:nth-child(3),
 .attendance-table tbody tr td:nth-child(3) {
@@ -1822,6 +1822,7 @@ legend {
 }
 .password-panel {
   max-width: 640px;
+  margin-inline: auto;
   margin-bottom: 16px;
 }
 .password-form {
@@ -2281,6 +2282,17 @@ legend {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px 20px;
 }
+.incident-party-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.incident-party-details > * { min-width: 0; }
+.incident-detail-panel > h3 { padding-bottom: 10px; margin-bottom: 14px; border-bottom: 1px solid var(--rule); }
+.incident-detail-panel .incident-case-field { padding: 10px; border: 1px solid var(--rule); border-radius: 7px; }
+@media (max-width: 1100px) {
+  .incident-party-details { grid-template-columns: minmax(0, 1fr); }
+}
 .incident-case-field {
   display: grid;
   gap: 3px;
@@ -2569,11 +2581,6 @@ legend {
 }
 .incident-track-report {
   margin: 18px 0;
-}
-.incident-track-report > summary {
-  cursor: pointer;
-  font-weight: 600;
-  padding: 10px 0;
 }
 .incident-track-content-panel label {
   margin: 10px 0;

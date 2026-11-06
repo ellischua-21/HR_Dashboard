@@ -24,7 +24,6 @@ const {
 } = require('./incident-management/Review');
 
 const {
-  readCodeProvisions,
   readMatrix,
   matrixActionForOccurrence,
   snapshotCasePolicy
@@ -701,7 +700,7 @@ async function transitionIncident(req, incidentId, action, details = '') {
     String(details || ''),
     'Reason or findings',
     4000,
-    action !== 'INVESTIGATION_STARTED'
+    action !== 'START_INVESTIGATION'
   );
   const transitions = {
     CLOSE_DOCUMENTATION: {
@@ -777,11 +776,6 @@ async function hasPendingIncidentInformationRequests(connection, incidentId) {
     [incidentId]
   );
   return Boolean(pending);
-}
-
-async function listIncidentCodeProvisions(req) {
-  await requirePerm(req, 'inbox.read');
-  return readCodeProvisions();
 }
 
 async function getPrimaryIncidentSubjectId(connection, incidentId) {
@@ -1237,86 +1231,6 @@ async function startIncidentEvaluation(req, incidentId) {
   }
 }
 
-async function getIncidentEvaluationContext(req, incidentId, ruleId) {
-  const user = await requirePerm(req, 'inbox.read');
-  requireIncidentRole(
-    user,
-    REVIEW_ROLES,
-    'Only HR and ADMIN can evaluate cases.'
-  );
-  const id = Number(incidentId);
-  const selectedRuleId = Number(ruleId);
-  if (
-    !Number.isSafeInteger(id) ||
-    id < 1 ||
-    !Number.isSafeInteger(selectedRuleId) ||
-    selectedRuleId < 1
-  )
-    throw httpError('Choose a valid case and Code of Conduct rule.', 400);
-  const [incidents] = await pool.execute(
-    `SELECT reported_employee_email AS employeeEmail, status FROM incident_reports WHERE id = ?`,
-    [id]
-  );
-  const incident = incidents[0];
-  if (!incident) throw httpError('Incident Report not found.', 404);
-  if (incident.status !== 'EVALUATION')
-    throw httpError('This case is not in evaluation.', 409);
-  const [rules] = await pool.execute(
-    `SELECT r.id, r.provision_id AS provisionId, r.violation_title AS violationTitle,
-            r.severity, r.occurrence_scope AS occurrenceScope,
-            r.occurrence_window_days AS occurrenceWindowDays,
-            p.provision_code AS provisionCode, p.title AS provisionTitle
-     FROM incident_code_rules r JOIN incident_code_provisions p ON p.id = r.provision_id
-     WHERE r.id = ? AND r.active = 1 AND p.active = 1 LIMIT 1`,
-    [selectedRuleId]
-  );
-  const rule = rules[0];
-  if (!rule)
-    throw httpError('The selected Code of Conduct rule is unavailable.', 404);
-  const conditions = ['LOWER(employee_email) = LOWER(?)', 'incident_id <> ?'];
-  const params = [incident.employeeEmail, id];
-  if (rule.occurrenceScope === 'SAME_RULE') {
-    conditions.push('rule_id = ?');
-    params.push(rule.id);
-  } else if (rule.occurrenceScope === 'SAME_SEVERITY') {
-    conditions.push('severity = ?');
-    params.push(rule.severity);
-  }
-  if (rule.occurrenceWindowDays) {
-    conditions.push(
-      `finalized_at >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL ${Number(rule.occurrenceWindowDays)} DAY)`
-    );
-  }
-  const [history] = await pool.execute(
-    `SELECT incident_id AS incidentId, violation_title AS violationTitle,
-            code_reference AS codeReference, severity, corrective_action AS correctiveAction,
-            effective_date AS effectiveDate, finalized_at AS finalizedAt
-     FROM incident_disciplinary_history WHERE ${conditions.join(' AND ')}
-     ORDER BY finalized_at DESC, id DESC`,
-    params
-  );
-  const [actions] = await pool.execute(
-    `SELECT prior_offenses AS priorOffenses, decision_type AS decisionType,
-            corrective_action AS correctiveAction, details
-     FROM incident_code_rule_actions WHERE rule_id = ? ORDER BY prior_offenses`,
-    [rule.id]
-  );
-  const priorOffenses = history.length;
-  const suggestion =
-    actions
-      .filter((action) => Number(action.priorOffenses) <= priorOffenses)
-      .sort((a, b) => Number(b.priorOffenses) - Number(a.priorOffenses))[0] ||
-    null;
-  return {
-    rule,
-    priorOffenses,
-    history,
-    actions,
-    suggestedAction: suggestion?.correctiveAction || '',
-    suggestedActionDetails: suggestion?.details || ''
-  };
-}
-
 async function saveIncidentEvaluation(req, incidentId, input = {}) {
   const user = await requirePerm(req, 'inbox.read');
   requireIncidentRole(
@@ -1765,148 +1679,6 @@ async function submitIncidentExplanationAddendum(
     );
     await connection.commit();
     return { ok: true, addendumId: result.insertId };
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
-}
-
-async function extendIncidentDeadline(req, incidentId, newDeadline, reason) {
-  const user = await requirePerm(req, 'inbox.read');
-  requireIncidentRole(
-    user,
-    REVIEW_ROLES,
-    'Only HR and ADMIN can approve an explanation extension.'
-  );
-  const date = normalizeDate(newDeadline, 'extended deadline');
-  const details = normalizeText(String(reason || ''), 'Extension reason', 2000);
-  const id = Number(incidentId);
-  const connection = await pool.getConnection();
-  try {
-    await connection.beginTransaction();
-    const incident = await getIncidentForAction(connection, id);
-    if (incident.status !== 'NTE ISSUED')
-      throw httpError(
-        'Extensions can only be recorded while awaiting an explanation.',
-        409
-      );
-    const [[nte]] = await connection.execute(
-      `SELECT id, DATE_FORMAT(deadline_date, '%Y-%m-%d') AS deadlineDate
-       FROM incident_ntes WHERE incident_id = ? AND status = 'ISSUED' FOR UPDATE`,
-      [id]
-    );
-    if (!nte || date <= nte.deadlineDate)
-      throw httpError('The extension must move the deadline later.', 400);
-    const [extension] = await connection.execute(
-      `INSERT INTO incident_deadline_extensions (nte_id, previous_deadline, extended_deadline, reason, approved_by)
-       VALUES (?, ?, ?, ?, ?)`,
-      [nte.id, nte.deadlineDate, date, details, user.email]
-    );
-    await connection.execute(
-      `UPDATE incident_ntes SET deadline_date = ?, overdue_at = NULL WHERE id = ?`,
-      [date, nte.id]
-    );
-    await recordIncidentActivity(
-      connection,
-      user,
-      incident,
-      'DEADLINE_EXTENDED',
-      `Deadline extended to ${formatDate(date)}: ${details}`
-    );
-    await notifyAccount(
-      connection,
-      id,
-      incident.reported_employee_email,
-      `NTE_EXT_${extension.insertId}`,
-      user.email
-    );
-    await connection.commit();
-    return { ok: true, deadlineDate: date };
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
-}
-
-async function recordExternalIncidentExplanation(
-  req,
-  incidentId,
-  explanation,
-  channel,
-  receivedAt,
-  files = []
-) {
-  const user = await requirePerm(req, 'inbox.read');
-  requireIncidentRole(
-    user,
-    REVIEW_ROLES,
-    'Only HR and ADMIN can record an external explanation.'
-  );
-  const text = normalizeText(String(explanation || ''), 'Explanation', 20000);
-  const channelText = normalizeText(
-    String(channel || ''),
-    'Authorized channel',
-    191
-  );
-  const received = new Date(receivedAt);
-  if (!receivedAt || Number.isNaN(received.getTime()))
-    throw httpError('Enter the actual received date and time.', 400);
-  const evidence = normalizeEvidence(files);
-  const id = Number(incidentId);
-  const connection = await pool.getConnection();
-  try {
-    await connection.beginTransaction();
-    const incident = await getIncidentForAction(connection, id);
-    if (incident.status !== 'NTE ISSUED')
-      throw httpError('This case is not awaiting an explanation.', 409);
-    const [[nte]] = await connection.execute(
-      `SELECT id FROM incident_ntes WHERE incident_id = ? AND status = 'ISSUED' FOR UPDATE`,
-      [id]
-    );
-    if (!nte) throw httpError('The issued NTE could not be found.', 404);
-    const [result] = await connection.execute(
-      `INSERT INTO incident_explanations (nte_id, submitted_by, explanation, source, other_channel, submitted_at)
-       VALUES (?, ?, ?, 'OTHER_CHANNEL', ?, ?)`,
-      [
-        nte.id,
-        user.email,
-        text,
-        channelText,
-        received.toISOString().slice(0, 19).replace('T', ' ')
-      ]
-    );
-    for (const file of evidence)
-      await connection.execute(
-        `INSERT INTO incident_explanation_evidence (explanation_id, file_name, mime_type, byte_size, file_data, uploaded_by)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-        [
-          result.insertId,
-          file.fileName,
-          file.mimeType,
-          file.fileData.length,
-          file.fileData,
-          user.email
-        ]
-      );
-    await connection.execute(
-      `UPDATE incident_reports SET status = 'EXPLANATION SENT' WHERE id = ?`,
-      [id]
-    );
-    await recordIncidentActivity(
-      connection,
-      user,
-      incident,
-      'EXPLANATION_RECEIVED_EXTERNALLY',
-      `Explanation received through ${channelText}.`,
-      { documentReference: 'EXPLANATION:' + result.insertId }
-    );
-    await notifyReviewers(connection, id, 'EXPLANATION_SENT', user.email);
-    await connection.commit();
-    return { ok: true, explanationId: result.insertId };
   } catch (error) {
     await connection.rollback();
     throw error;
@@ -3075,19 +2847,15 @@ module.exports = {
   getIncidentEvidence,
   signIncidentCase,
   transitionIncident,
-  listIncidentCodeProvisions,
   saveIncidentNteDraft,
   issueIncidentNte,
   saveIncidentExplanationDraft,
   submitIncidentExplanation,
   startIncidentEvaluation,
-  getIncidentEvaluationContext,
   saveIncidentEvaluation,
   issueIncidentDecision,
   closeIncidentDecision,
   submitIncidentExplanationAddendum,
-  extendIncidentDeadline,
-  recordExternalIncidentExplanation,
   processOverdueIncidentNtes,
   listDailyNteReminders,
   getIncidentNteEvidence,

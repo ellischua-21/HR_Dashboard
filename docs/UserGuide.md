@@ -116,6 +116,16 @@ Draw your signature in the signature box using a mouse. Use **Clear signature** 
 | Overtime Request                   | The overtime schedule and reason.                                                                                        |
 | Time In/Out Record                 | Daily time and break records.                                                                              
 
+Paid Sick Leave and Vacation Leave allowances require **Regular** employment
+status and an employee rank above **Rank and File**. Probationary employees and
+Rank and File employees have no allowance. Eligibility uses the employee rank
+recorded by HR, regardless of the account's login role.
+
+Eligible employees receive five days of each allowance per calendar year, with
+no carryover. The Leave Application shows the remaining balances and selects
+Without Pay when the selected allowance is unavailable. Eligibility and balance
+are checked again at final approval.
+
 ### Understand where a form goes
 
 - STAFF forms go to the assigned Supervisor, then to HR for final review.

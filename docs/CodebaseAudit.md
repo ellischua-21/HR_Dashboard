@@ -91,3 +91,25 @@ interface does not call it.
   before deployment, particularly for historical cases and migrations.
 
 Restart the Node.js API and refresh the browser after applying this cleanup.
+
+## Follow-up cleanup — 6 November 2026
+
+- Removed the standalone design previews after the approved design was applied.
+- Removed unused theme selectors, an unused color variable, and unused markup
+  hooks. Corrected the Review filter heading selector to match its nested markup.
+- Removed frontend pagination state from Incident Review, History, and Violation
+  History, which use scrolling lists and request all rows. Backend pagination
+  remains available.
+- Removed the obsolete Review workspace close call, a repeated CLOSED condition,
+  and an outdated argument in the NTE renderer call.
+- Corrected the investigation transition validation so starting an investigation
+  does not require a note; closure notes remain required.
+- Retired the unused public APIs for COC provision listing, legacy rule-based
+  evaluation context, deadline extensions, and recording external explanations.
+  Removed their route entries, service implementations, and unused exports/imports.
+- Preserved historical data readers, policy snapshots, original document fields,
+  existing extension and external-explanation records, and legacy time-record
+  conversion. These let older submissions remain readable after form and policy
+  changes. No database records or tables were deleted.
+- The structural checker passes with the previews removed; it required no change.
+  No test suite was run or new tests added for this cleanup.

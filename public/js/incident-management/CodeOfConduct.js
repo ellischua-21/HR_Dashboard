@@ -8,7 +8,6 @@
   let guideRequest = 0;
   let historyRequest = 0;
   let employeeEmail = '';
-  let page = 1;
 
   const feedback = (message, error = false) => ui.feedback(message, error);
   const canSearchHistory = () =>
@@ -102,11 +101,9 @@
     try {
       const data = await api('listIncidentViolations', {
         employeeEmail,
-        page,
         allRows: true
       });
       if (ticket !== historyRequest || owner !== session?.email) return;
-      page = data.page;
       const body = byId('ir-violation-rows');
       body.replaceChildren();
       data.records.forEach((record) => {
@@ -155,7 +152,6 @@
       actor = session.email;
       employeeSearch.reset();
       employeeEmail = session.email;
-      page = 1;
       ++guideRequest;
       ++historyRequest;
       guide = null;
@@ -179,7 +175,6 @@
       feedback('Select an employee from the suggestions.', true);
       return;
     }
-    page = 1;
     loadHistory();
   };
   byId('ir-violation-own').onclick = () => {
@@ -188,7 +183,6 @@
     byId('ir-violation-employee').value = '';
     byId('ir-violation-options').replaceChildren();
     byId('ir-violation-options').hidden = true;
-    page = 1;
     loadHistory();
   };
   byId('ir-coc-matrix-form').onsubmit = async (event) => {

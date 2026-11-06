@@ -5,8 +5,7 @@
   const state = {
     category: 'ONGOING',
     stage: 'ALL',
-    search: '',
-    page: 1
+    search: ''
   };
   let actor = '';
   let listRequest = 0;
@@ -45,7 +44,6 @@
         byId(`ir-review-${name}`).textContent = value.toLocaleString();
       }
     }
-    state.page = data.page;
     const list = byId('ir-review-list');
     const scrollTop = list.scrollTop;
     list.replaceChildren();
@@ -108,8 +106,6 @@
         category: state.category,
         stage: state.stage,
         search: state.search,
-        page: state.page,
-        pageSize: 25,
         allRows: true
       });
       if (ticket !== listRequest || owner !== session?.email) return;
@@ -137,12 +133,10 @@
     if (actor !== session.email) {
       actor = session.email;
       ++listRequest;
-      close();
       Object.assign(state, {
         category: 'ONGOING',
         stage: 'ALL',
-        search: '',
-        page: 1
+        search: ''
       });
     }
     syncFilters();
@@ -151,7 +145,6 @@
   }
 
   const applyFilters = () => {
-    state.page = 1;
     fetchList().catch(() => {});
   };
   document.querySelectorAll('[data-review-category]').forEach((button) => {
