@@ -1,6 +1,6 @@
 # HR Dashboard User Guide
 
-Updated: 11/02/2026
+Updated: 11/06/2026
 
 ## Contents
 
@@ -28,6 +28,23 @@ An ADMIN must approve a new account before it can sign in. If you need an accoun
 or cannot remember your password, contact HR or the system administrator.
 
 ## 2. Find your menus
+
+STAFF, SUPERVISOR, and HEAD accounts open on **Dashboard** after signing in.
+You can return to it using the first item in the menu.
+
+- **Employee Profile** shows your main personal details. Select **View Full Profile**
+  to expand the details recorded during employee registration. These details are
+  read-only; ask HR if they need correcting.
+- **Job Details** shows your job title, department, direct manager, work location,
+  and start date.
+- **Daily Attendance** shows your Time In, AM Out/In, Lunch Out/In, PM Out/In,
+  and Time Out. Use the arrows to change day or choose a date from the calendar.
+  Select **Refresh** to retrieve the latest records. A dash means no time is available.
+- Select **Time Logs** at the top of Daily Attendance to see each scan, its device name,
+  and device serial number. Click outside that box or press Escape to close it.
+
+Your dashboard displays only your own profile and attendance. HR and ADMIN keep
+their existing dashboard and attendance list.
 
 | Account | Main features |
 | ------- | ------------- |

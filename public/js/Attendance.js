@@ -1,36 +1,20 @@
 (function () {
   let configured = false;
   let pending = false;
-  let openLogButton = null;
+  const timeLogs = AttendanceUI.createTimeLogPopover($('attendance-time-logs'));
   const columns = [
     ['firstName', 'First Name'],
     ['lastName', 'Last Name'],
     ['employeeNo', 'ID'],
     ['department', 'Department'],
-    ['timeIn', 'Time In'],
-    ['amBreakOut', 'AM Out'],
-    ['amBreakIn', 'AM In'],
-    ['lunchOut', 'Lunch Out'],
-    ['lunchIn', 'Lunch In'],
-    ['pmBreakOut', 'PM Out'],
-    ['pmBreakIn', 'PM In'],
-    ['timeOut', 'Time Out'],
+    ...AttendanceUI.timeFields,
     ['workHours', 'Work Hours'],
     ['dataSource', 'Data Source'],
     ['device', 'Device Name'],
     ['status', 'Status'],
     ['timeLogs', 'Time Logs']
   ];
-  const timeColumns = new Set([
-    'timeIn',
-    'amBreakOut',
-    'amBreakIn',
-    'lunchOut',
-    'lunchIn',
-    'pmBreakOut',
-    'pmBreakIn',
-    'timeOut'
-  ]);
+  const timeColumns = new Set(AttendanceUI.timeFields.map(([key]) => key));
   const statusColors = {
     'on-time': 'is-normal',
     late: 'is-late',
@@ -39,12 +23,7 @@
     absent: 'is-absent'
   };
 
-  function formatEmployeeName(value) {
-    return String(value || '').replace(/\p{L}[\p{L}\p{M}]*/gu, (word) => {
-      if (word !== word.toLocaleUpperCase() && word !== word.toLocaleLowerCase()) return word;
-      return word.toLocaleLowerCase().replace(/^\p{L}/u, (letter) => letter.toLocaleUpperCase());
-    });
-  }
+  const formatEmployeeName = AttendanceUI.formatEmployeeName;
 
   function setPending(value) {
     pending = value;
@@ -69,80 +48,11 @@
       weekday.textContent = '';
       return;
     }
-    const [year, month, day] = input.value.split('-').map(Number);
-    weekday.textContent = new Intl.DateTimeFormat('en-US', {
-      weekday: 'long'
-    }).format(new Date(year, month - 1, day));
-  }
-
-  function closeTimeLogs(restoreFocus = false) {
-    const button = openLogButton;
-    if (button) button.setAttribute('aria-expanded', 'false');
-    openLogButton = null;
-    $('attendance-time-logs').hidden = true;
-    if (restoreFocus && button) button.focus();
-  }
-
-  function showTimeLogs(button, record) {
-    if (openLogButton === button) {
-      closeTimeLogs();
-      return;
-    }
-    closeTimeLogs();
-    const panel = $('attendance-time-logs');
-    panel.replaceChildren();
-    const header = document.createElement('div');
-    header.className = 'attendance-time-log-header';
-    for (const label of ['Time', 'Device Name', 'Device Serial No.']) {
-      const heading = document.createElement('strong');
-      heading.textContent = label;
-      header.appendChild(heading);
-    }
-    panel.appendChild(header);
-    const logs = record.timeLogs || [];
-    if (!logs.length) {
-      const empty = document.createElement('p');
-      empty.textContent = 'No time logs available.';
-      panel.appendChild(empty);
-    }
-    for (const log of logs) {
-      const item = document.createElement('div');
-      item.className = 'attendance-time-log-item';
-      const time = document.createElement('span');
-      const formatted = DateUtils.formatTime(log.time) || '—';
-      time.textContent = /^\d{2}$/.test(log.seconds || '')
-        ? formatted.replace(/ (AM|PM)$/, `:${log.seconds} $1`)
-        : formatted;
-      const serial = document.createElement('span');
-      serial.textContent = log.deviceSerialNo || '—';
-      const device = document.createElement('span');
-      device.textContent = log.device || '—';
-      item.append(time, device, serial);
-      panel.appendChild(item);
-    }
-    panel.hidden = false;
-    const anchor = button.getBoundingClientRect();
-    const bounds = panel.getBoundingClientRect();
-    const left = Math.max(
-      8,
-      Math.min(
-        anchor.right - bounds.width,
-        window.innerWidth - bounds.width - 8
-      )
-    );
-    const below = anchor.bottom + 4;
-    const top =
-      below + bounds.height <= window.innerHeight - 8
-        ? below
-        : Math.max(8, anchor.top - bounds.height - 4);
-    panel.style.left = `${left}px`;
-    panel.style.top = `${top}px`;
-    openLogButton = button;
-    button.setAttribute('aria-expanded', 'true');
+    weekday.textContent = AttendanceUI.weekday(input.value);
   }
 
   function drawTable(rows, emptyMessage) {
-    closeTimeLogs();
+    timeLogs.close();
     const header = document.createElement('tr');
     columns.forEach(([, label]) => {
       const cell = document.createElement('th');
@@ -184,7 +94,9 @@
             'aria-label',
             `Show time logs for ${employee || 'employee'}`
           );
-          button.addEventListener('click', () => showTimeLogs(button, record));
+          button.addEventListener('click', () =>
+            timeLogs.toggle(button, record)
+          );
           cell.appendChild(button);
           row.appendChild(cell);
           return;
@@ -207,10 +119,12 @@
           return;
         }
         let value = record[key];
-        if (key === 'firstName' || key === 'lastName') value = formatEmployeeName(value);
+        if (key === 'firstName' || key === 'lastName')
+          value = formatEmployeeName(value);
         if (timeColumns.has(key)) value = DateUtils.formatTime(value);
         const cell = AppUI.tableCell(value || '—');
-        if (['firstName', 'lastName', 'department'].includes(key)) cell.classList.add('attendance-wrap-cell');
+        if (['firstName', 'lastName', 'department'].includes(key))
+          cell.classList.add('attendance-wrap-cell');
         row.appendChild(cell);
       });
       const statusCell =
@@ -265,22 +179,6 @@
     });
   }
 
-  document.addEventListener('click', (event) => {
-    if (
-      openLogButton &&
-      !openLogButton.contains(event.target) &&
-      !$('attendance-time-logs').contains(event.target)
-    )
-      closeTimeLogs();
-  });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && openLogButton) closeTimeLogs(true);
-  });
-  document
-    .querySelector('.attendance-table-scroll')
-    .addEventListener('scroll', () => closeTimeLogs());
-  window.addEventListener('resize', () => closeTimeLogs());
-
   async function loadRecords(query, refresh = false) {
     if (pending || !configured) return;
     setPending(true);
@@ -327,9 +225,7 @@
     if (pending || !configured) return;
     const picker = $('attendance-date');
     if (!picker.reportValidity()) return;
-    picker.value = new Date(picker.valueAsNumber + offset * 86400000)
-      .toISOString()
-      .slice(0, 10);
+    picker.value = AttendanceUI.shiftDate(picker.value, offset);
     updateAttendanceWeekday();
     loadRecords(currentFilters());
   }

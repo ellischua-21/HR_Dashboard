@@ -98,6 +98,7 @@ const NAV = [
   ['account-settings', 'Change Password', 'account.password']
 ];
 const USER_NAV = [
+  ['employee-dashboard', 'Dashboard', 'employee.self'],
   ['user-dashboard', 'Submitted Forms', 'forms.self'],
   ['inbox', 'Inbox', 'inbox.read'],
   ['user-forms', 'Forms', 'forms.self'],
@@ -307,12 +308,17 @@ async function init() {
         )
         .forEach(addNavLink);
     } else {
+      visibleNavItems
+        .filter((n) => n[0] === 'employee-dashboard')
+        .forEach(addNavLink);
       addNavGroup('Forms', formItems, true);
       addNavGroup(
         'Incident Management',
         window.INCIDENT_MANAGEMENT_NAVIGATION.forRole(session.role)
       );
-      visibleNavItems.forEach(addNavLink);
+      visibleNavItems
+        .filter((n) => n[0] !== 'employee-dashboard')
+        .forEach(addNavLink);
     }
     $('nav').addEventListener('scroll', positionNavigationNotificationDots, {
       passive: true
@@ -513,6 +519,7 @@ function addLoginInput(form, labelText, name, type, autocomplete, required) {
 }
 
 function go(n) {
+  window.AttendanceUI?.closeAll();
   window.AppOutsideDismiss.closeSidebar();
   showErr('');
   document

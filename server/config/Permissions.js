@@ -32,13 +32,20 @@ const ROLE_PERMS = {
     'account.password'
   ],
   HEAD: [
+    'employee.self',
     'forms.self',
     'forms.review',
     'announcements.read',
     'inbox.read',
     'account.password'
   ],
-  STAFF: ['forms.self', 'announcements.read', 'inbox.read', 'account.password']
+  STAFF: [
+    'employee.self',
+    'forms.self',
+    'announcements.read',
+    'inbox.read',
+    'account.password'
+  ]
 };
 
 const ACCOUNT_ROLE_MAP = {

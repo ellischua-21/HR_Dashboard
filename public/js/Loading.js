@@ -17,11 +17,14 @@
     const byId = (id) => document.getElementById(id);
     const app = byId('app');
     const attendance = byId('view-attendance');
+    const employeeDashboard = byId('view-employee-dashboard');
     const target =
       app && !app.hidden
         ? attendance && !attendance.hidden
           ? byId('attendance-loading')
-          : byId('busy')
+          : employeeDashboard && !employeeDashboard.hidden
+            ? byId('employee-attendance-loading')
+            : byId('busy')
         : byId('bootstrap-status') ||
           document.querySelector('#login-screen button[type="submit"]');
     if (target && indicator.parentElement !== target)

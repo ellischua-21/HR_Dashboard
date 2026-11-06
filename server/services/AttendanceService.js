@@ -1,5 +1,6 @@
 const { requirePerm } = require('../middleware/Auth');
 const { httpError } = require('../utils/HttpError');
+const { pool } = require('../db/database');
 const { isValidDate, manilaDate } = require('../../shared/DateUtils');
 const {
   ATTENDANCE_RULES,
@@ -18,6 +19,7 @@ const text = (value) =>
     ? String(value).slice(0, 200)
     : '';
 const attendanceCache = new Map();
+const attendanceLoads = new Map();
 const PROVIDER_PAGE_SIZE = 200;
 const MAX_PROVIDER_ROWS = 10000;
 const BREAK_RULES = {
@@ -518,55 +520,71 @@ async function getAttendanceContext(req) {
   return providers.configuration();
 }
 
-async function listAttendance(req, input) {
-  await requireAttendanceAccess(req);
-  const query = normalizeQuery(input);
+async function readAttendance(query, refresh = false) {
   const cacheKey = JSON.stringify([
     query.dateFrom,
     query.dateTo,
     query.employee
   ]);
   const now = Date.now();
-  if (input?.refresh === true) attendanceCache.delete(cacheKey);
+  if (refresh) attendanceCache.delete(cacheKey);
   let cached = attendanceCache.get(cacheKey);
   if (!cached || cached.expiresAt <= now) {
-    cached = null;
-    const configuration = providers.configuration();
-    if (!configuration.configured)
-      throw httpError(
-        'Complete the Hik-Connect account settings in .env and restart the Node.js server.',
-        409
-      );
-    const batches = await Promise.all(
-      providers.accounts.map(async ({ client, name }) => {
-        try {
-          return await loadAccountAttendance(client, query);
-        } catch (error) {
-          throw httpError(
-            name +
-              ': ' +
-              (error.status ? error.message : 'Could not load attendance.'),
-            error.status || 422
-          );
-        }
-      })
-    );
-    const allRows = batches.flatMap((batch) => batch.rows);
-    const summaryAvailable = batches.every((batch) => batch.summaryAvailable);
-    const departments = [
-      ...new Set(allRows.map((row) => row.department).filter(Boolean))
-    ].sort((a, b) => a.localeCompare(b));
-    cached = {
-      rows: allRows,
-      departments,
-      summaryAvailable,
-      fetchedAt: new Date().toISOString(),
-      expiresAt: Date.now() + 60000
-    };
-    attendanceCache.set(cacheKey, cached);
-    while (attendanceCache.size > 5)
-      attendanceCache.delete(attendanceCache.keys().next().value);
+    if (attendanceLoads.has(cacheKey)) return attendanceLoads.get(cacheKey);
+    const pending = loadAttendance(query, cacheKey);
+    attendanceLoads.set(cacheKey, pending);
+    try {
+      return await pending;
+    } finally {
+      attendanceLoads.delete(cacheKey);
+    }
   }
+  return cached;
+}
+
+async function loadAttendance(query, cacheKey) {
+  const configuration = providers.configuration();
+  if (!configuration.configured)
+    throw httpError(
+      'Complete the Hik-Connect account settings in .env and restart the Node.js server.',
+      409
+    );
+  const batches = await Promise.all(
+    providers.accounts.map(async ({ client, name }) => {
+      try {
+        return await loadAccountAttendance(client, query);
+      } catch (error) {
+        throw httpError(
+          name +
+            ': ' +
+            (error.status ? error.message : 'Could not load attendance.'),
+          error.status || 422
+        );
+      }
+    })
+  );
+  const allRows = batches.flatMap((batch) => batch.rows);
+  const summaryAvailable = batches.every((batch) => batch.summaryAvailable);
+  const departments = [
+    ...new Set(allRows.map((row) => row.department).filter(Boolean))
+  ].sort((a, b) => a.localeCompare(b));
+  const cached = {
+    rows: allRows,
+    departments,
+    summaryAvailable,
+    fetchedAt: new Date().toISOString(),
+    expiresAt: Date.now() + 60000
+  };
+  attendanceCache.set(cacheKey, cached);
+  while (attendanceCache.size > 5)
+    attendanceCache.delete(attendanceCache.keys().next().value);
+  return cached;
+}
+
+async function listAttendance(req, input) {
+  await requireAttendanceAccess(req);
+  const query = normalizeQuery(input);
+  const cached = await readAttendance(query, input?.refresh === true);
   const statuses = [
     ...new Set(
       cached.rows.flatMap((row) =>
@@ -600,9 +618,99 @@ async function listAttendance(req, input) {
   };
 }
 
+async function getMyDailyAttendance(req, input = {}) {
+  const user = await requirePerm(req, 'employee.self');
+  if (!input || typeof input !== 'object' || Array.isArray(input))
+    throw httpError('Choose a valid attendance date.', 400);
+  const query = normalizeQuery({ dateFrom: input.date, dateTo: input.date });
+  const [[employee]] = await pool.execute(
+    'SELECT emp_no, first_name, last_name FROM employees WHERE record_id = ? LIMIT 1',
+    [user.employee_id]
+  );
+  if (!employee?.emp_no)
+    throw httpError('Your employee number is missing. Contact HR.', 409);
+  if (!providers.configuration().configured)
+    throw httpError('Attendance is unavailable. Contact HR.', 409);
+  const cached = await readAttendance(query, input.refresh === true);
+  const numbered = cached.rows.filter(
+    (row) =>
+      row.employeeNo.trim() === String(employee.emp_no).trim() &&
+      row.date === query.dateFrom
+  );
+  // Scanner IDs are account-scoped. Check the employee's registered name as well
+  // so a matching ID in another provider account cannot reveal somebody else's scans.
+  const words = (value) =>
+    String(value || '')
+      .normalize('NFKD')
+      .replace(/\p{M}/gu, '')
+      .toLowerCase()
+      .match(/[\p{L}\p{N}]+/gu) || [];
+  const identity = words(
+    `${employee.first_name || ''} ${employee.last_name || ''}`
+  );
+  const rows = numbered.filter((row) => {
+    const name = words(`${row.firstName} ${row.lastName}`);
+    return identity.length > 0 && identity.every((word) => name.includes(word));
+  });
+  if (numbered.length && !rows.length)
+    throw httpError(
+      'Your scanner identity does not match your employee record. Contact HR.',
+      409
+    );
+  const events = rows
+    .flatMap((row) =>
+      (row.timeLogs || []).map((log) => {
+        const timestamp = `${query.dateFrom}T${log.time}:${log.seconds || '00'}+08:00`;
+        return {
+          ...log,
+          eventTimestamp: timestamp,
+          sortTime: manilaParts(timestamp).sortTime
+        };
+      })
+    )
+    .sort((a, b) => a.sortTime - b.sortTime);
+  const times = events.length
+    ? inferDailyAttendance(events, {})
+    : {
+        timeIn:
+          rows
+            .map((row) => row.timeIn)
+            .filter(Boolean)
+            .sort()[0] || '',
+        timeOut:
+          rows
+            .map((row) => row.timeOut)
+            .filter(Boolean)
+            .sort()
+            .at(-1) || ''
+      };
+  const keys = [
+    'timeIn',
+    'amBreakOut',
+    'amBreakIn',
+    'lunchOut',
+    'lunchIn',
+    'pmBreakOut',
+    'pmBreakIn',
+    'timeOut'
+  ];
+  return {
+    date: query.dateFrom,
+    times: Object.fromEntries(keys.map((key) => [key, times[key] || ''])),
+    timeLogs: events.map(({ time, seconds, device, deviceSerialNo }) => ({
+      time,
+      seconds,
+      device,
+      deviceSerialNo
+    })),
+    fetchedAt: cached.fetchedAt
+  };
+}
+
 module.exports = {
   getAttendanceContext,
   listAttendance,
+  getMyDailyAttendance,
   normalizeQuery,
   normalizeRecords,
   normalizeDailySummaries,

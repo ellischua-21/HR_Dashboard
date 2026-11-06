@@ -188,17 +188,11 @@ function formatReportValue(value, type, key) {
   return DateUtils.formatField(value, type);
 }
 
-async function showEmployeeDetails(report, row, { manage = false } = {}) {
-  await ensureMeta();
+function renderEmployeeDetails(details, report, row) {
   const values = Object.fromEntries(
     report.columnKeys.map((key, index) => [key, row[index]])
   );
-  const details = $('report-employee-details');
   details.replaceChildren();
-  $('report-employee-title').textContent = values.name || 'Employee Details';
-  $('p_edit').hidden = !manage || !can('emp.write');
-  $('p_print').hidden = !manage;
-  $('p_archive').hidden = !manage || !can('emp.archive');
   const rendered = new Set();
   const renderSection = (title, keys) => {
     const section = el('section', undefined, 'report-detail-section');
@@ -244,6 +238,20 @@ async function showEmployeeDetails(report, row, { manage = false } = {}) {
     'Record Information',
     report.columnKeys.filter((key) => !rendered.has(key))
   );
+  return values;
+}
+
+async function showEmployeeDetails(report, row, { manage = false } = {}) {
+  await ensureMeta();
+  const values = renderEmployeeDetails(
+    $('report-employee-details'),
+    report,
+    row
+  );
+  $('report-employee-title').textContent = values.name || 'Employee Details';
+  $('p_edit').hidden = !manage || !can('emp.write');
+  $('p_print').hidden = !manage;
+  $('p_archive').hidden = !manage || !can('emp.archive');
   $('report-employee-dialog').showModal();
 }
 

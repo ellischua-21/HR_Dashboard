@@ -18,6 +18,7 @@ notifications, and account management.
 
 - `public/index.html` is the application shell. `public/js/ui-loader.js` loads view fragments and controllers in dependency order, using one asset version.
 - `public/views/` contains page markup; `public/js/` contains page controllers; `public/css/Styles.css` contains the shared design system.
+- `EmployeeDashboard.js` is the STAFF/SUPERVISOR/HEAD landing page. It uses the shared employee details renderer from `Employees.js` and `AttendanceUI.js` for time fields and scan popovers. Self-service endpoints derive the employee from the authenticated session; they accept no employee selector. Daily attendance reuses the HR attendance calculation and cache, matching the employee number and registered name across scanner accounts.
 - `public/js/UI.js`, `AppConfirm.js`, `EmployeeSearch.js`, and `SignaturePad.js` provide reusable browser behavior. `Main.js` owns navigation, route setup, session initialization, and page action guards.
 - `public/js/incident-management/` separates filing/case composition (`IncidentManagement.js`), document layouts (`Documents.js`), NTEs and explanations (`Notice.js`), evaluation and decisions (`Evaluation.js`), investigations (`Investigation.js`), and the Track, Review, History, and Code of Conduct page controllers.
 - Review supplies analytics, filters, and the case list. View buttons and inbox links select the case in Track for every role. Shared renderers provide the authorized actions and documents; History opens completed cases as read-only archives.

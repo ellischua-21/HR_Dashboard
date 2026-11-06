@@ -6,7 +6,8 @@ const {
 const { CFG } = require('../config/Config');
 const { normalizePagination } = require('../utils/Pagination');
 const { pool, getLists, nextSequence, quote } = require('../db/database');
-const { requireEmployeeAccess } = require('../middleware/Auth');
+const { requireEmployeeAccess, requirePerm } = require('../middleware/Auth');
+const { httpError } = require('../utils/HttpError');
 const { logAudit } = require('./AuditService');
 const { sanitize, validateEmployee } = require('../utils/Validation');
 const { withCalc, normalizeEmployee } = require('./DashboardService');
@@ -96,6 +97,40 @@ async function getEmployee(req, recordId) {
 async function getFormOptions(req) {
   await requireEmployeeAccess(req, 'emp.read');
   return getLists();
+}
+
+async function getMyEmployeeProfile(req) {
+  const user = await requirePerm(req, 'employee.self');
+  const [rows] = await pool.execute(
+    "SELECT * FROM employees WHERE record_id = ? AND COALESCE(record_status, 'Active') <> 'Archived' LIMIT 1",
+    [user.employee_id]
+  );
+  if (!rows.length)
+    throw httpError('Your employee record is unavailable. Contact HR.', 404);
+  const fields = EMP_FIELDS.filter(
+    (field) => !F.has(field, 'C') && field[0] !== 'docs'
+  ).concat([
+    ['name', 'Name Of Employee', 'text'],
+    ['age', 'Age', 'number']
+  ]);
+  const profile = withCalc(normalizeEmployee(rows[0]));
+  const [managers] = await pool.execute(
+    `SELECT COALESCE(NULLIF(e.name, ''), NULLIF(manager.full_name, ''), manager.email) AS name
+     FROM user_roles account JOIN user_roles manager ON manager.email = account.assigned_head_email
+     LEFT JOIN employees e ON LOWER(TRIM(e.personal_email)) = LOWER(TRIM(manager.email))
+       AND COALESCE(e.record_status, 'Active') <> 'Archived'
+     WHERE account.email = ? LIMIT 1`,
+    [user.email]
+  );
+  return {
+    employee: Object.fromEntries(
+      fields.map(([key]) => [key, profile[key] ?? ''])
+    ),
+    fields: fields
+      .filter(([key]) => key !== 'name')
+      .map(([key, label, type]) => ({ key, label, type })),
+    directManager: managers[0]?.name || profile.reports_to || ''
+  };
 }
 
 async function getFormMeta(req) {
@@ -190,10 +225,15 @@ async function saveEmployee(req, data = {}) {
         ]
       );
       if (old.status !== 'Regular' && next.status === 'Regular')
-        await connection.execute('UPDATE employees SET regularized_on = ? WHERE record_id = ?',
-          [manilaDate(), old.record_id]);
+        await connection.execute(
+          'UPDATE employees SET regularized_on = ? WHERE record_id = ?',
+          [manilaDate(), old.record_id]
+        );
       else if (old.status === 'Regular' && next.status !== 'Regular')
-        await connection.execute('UPDATE employees SET regularized_on = NULL WHERE record_id = ?', [old.record_id]);
+        await connection.execute(
+          'UPDATE employees SET regularized_on = NULL WHERE record_id = ?',
+          [old.record_id]
+        );
       await logAudit(
         user.email,
         'UPDATE',
@@ -223,8 +263,10 @@ async function saveEmployee(req, data = {}) {
       keys.map((key) => dbValue(F.get(key), record[key]))
     );
     if (record.status === 'Regular')
-      await connection.execute('UPDATE employees SET regularized_on = ? WHERE record_id = ?',
-        [manilaDate(), recordId]);
+      await connection.execute(
+        'UPDATE employees SET regularized_on = ? WHERE record_id = ?',
+        [manilaDate(), recordId]
+      );
     await logAudit(
       user.email,
       'CREATE',
@@ -289,6 +331,7 @@ async function archiveEmployee(req, recordId) {
 module.exports = {
   listEmployees,
   getEmployee,
+  getMyEmployeeProfile,
   getFormOptions,
   getFormMeta,
   saveEmployee,

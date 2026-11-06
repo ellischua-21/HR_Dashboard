@@ -899,6 +899,245 @@ button.ghost {
   margin: 8px 0;
 }
 .attendance-table-info { margin: 8px 0 0; }
+#view-employee-dashboard {
+  container-type: inline-size;
+  --employee-clay: #a65138;
+  --employee-sage: #526839;
+}
+.employee-welcome {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  overflow: hidden;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+  border: 1px solid #e4c0a9;
+  border-radius: 16px;
+  background: linear-gradient(115deg, #f3d2bb, #faeadc 65%, #e6ebd8);
+}
+.employee-welcome::before {
+  content: '';
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  right: 30px;
+  top: -90px;
+  border: 22px solid rgb(166 81 56 / 8%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.employee-greeting {
+  position: relative;
+  margin: 0;
+  color: #6d3326;
+  font-size: clamp(1.4rem, 1.1rem + 0.8vw, 1.9rem);
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.employee-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 52px;
+  height: 52px;
+  border: 3px solid #fff4eb;
+  border-radius: 50%;
+  background: #a65138;
+  color: #fffaf4;
+  font-size: 20px;
+  font-weight: 600;
+  position: relative;
+}
+.employee-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: clamp(14px, 1.5vw, 20px);
+  align-items: start;
+}
+.employee-dashboard-grid > *, .employee-dashboard-profile > * { min-width: 0; }
+.employee-dashboard-profile { display: grid; gap: 18px; }
+.employee-dashboard-grid .employee-dashboard-card {
+  margin: 0;
+  padding: clamp(16px, 1.6vw, 22px);
+  border: 1px solid #e4d8ce;
+  border-top: 4px solid var(--employee-clay);
+  border-radius: 12px;
+  background: #fffdf9;
+  box-shadow: 0 4px 16px rgb(85 55 34 / 5%);
+  transition: box-shadow 160ms ease, border-color 160ms ease;
+}
+.employee-dashboard-card:hover { box-shadow: 0 7px 22px rgb(85 55 34 / 9%); }
+.employee-dashboard-grid .employee-profile-card { border-top-color: #768758; }
+.employee-dashboard-grid .employee-daily-attendance { border-top-color: #ce9440; }
+.employee-dashboard-card h2.employee-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1.3;
+}
+.employee-card-heading svg {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  padding: 6px;
+  border-radius: 9px;
+  color: var(--employee-clay);
+  background: #f8e6da;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.employee-profile-card .employee-card-heading svg { color: var(--employee-sage); background: #e9eddf; }
+.employee-daily-attendance .employee-card-heading svg { color: #90611c; background: #f7ecd1; }
+.employee-dashboard-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.employee-dashboard-details > div {
+  min-width: 0;
+  min-height: 64px;
+  padding: 10px 12px;
+  border: 1px solid #eee3d9;
+  border-radius: 8px;
+  background: #faf6f0;
+}
+.employee-dashboard-details dt {
+  margin-bottom: 3px;
+  color: #726356;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.employee-dashboard-details dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.employee-job-card .employee-dashboard-details > div:first-child {
+  grid-column: 1 / -1;
+  border-color: #efd8c8;
+  background: #f9e9dc;
+}
+.employee-job-card .employee-dashboard-details > div:first-child dd { color: #773d2c; font-size: 17px; }
+.employee-profile-expanded { margin-top: 14px; }
+.employee-profile-expanded > summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #d9dfc8;
+  border-radius: 8px;
+  background: #edf0e4;
+  color: #42552e;
+  cursor: pointer;
+  list-style: none;
+  font-size: 14px;
+  font-weight: 500;
+}
+.employee-profile-expanded > summary::-webkit-details-marker { display: none; }
+.employee-profile-expanded > summary::after { content: '+'; font-size: 20px; line-height: 1; }
+.employee-profile-expanded[open] > summary::after { content: '\2212'; }
+.employee-profile-expanded > summary:hover { background: #e3e9d5; }
+.employee-profile-expanded > summary:focus-visible { outline: 2px solid var(--employee-sage); outline-offset: 3px; }
+.employee-profile-expanded .report-detail-section { padding: 12px; background: #fffdf9; border-color: #e4d8ce; }
+.employee-profile-expanded .report-detail-section h3 { font-size: 15px; }
+.employee-profile-expanded .report-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.employee-attendance-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.employee-attendance-heading h2.employee-card-heading { margin: 0; }
+.employee-time-logs-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+.employee-time-logs-button span { transition: transform 160ms ease; }
+.employee-time-logs-button[aria-expanded='true'] { background: #f8e6da; }
+.employee-time-logs-button[aria-expanded='true'] span { transform: rotate(180deg); }
+.employee-attendance-filters {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: end;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.employee-attendance-filters > label { width: auto; max-width: none; min-width: 0; }
+.employee-attendance-filters > button { width: 44px; min-height: 44px; padding: 6px; font-size: 22px; }
+.employee-attendance-filters .date-time-entry > input[type='text'],
+.employee-attendance-filters .date-time-entry-picker { min-height: 44px; }
+.employee-attendance-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+.employee-attendance-weekday { color: #75614c; margin: 0; font-size: 13px; }
+.employee-refresh-action { display: flex; align-items: center; gap: 8px; }
+.employee-refresh-action button { min-height: 44px; }
+.employee-refresh-action .loading-slot { display: inline-flex; align-items: center; width: 16px; }
+.employee-daily-times { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 0; }
+.employee-daily-times > div {
+  display: grid;
+  grid-template-columns: minmax(85px, 110px) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 1px solid #eee3d9;
+  border-radius: 8px;
+  background: #faf6f0;
+  transition: background 150ms ease;
+}
+.employee-daily-times > div:hover { background: #f4ebdf; }
+.employee-daily-times dt { color: #69594b; font-size: 14px; }
+.employee-daily-times dd {
+  justify-self: start;
+  min-width: 100px;
+  margin: 0;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: #fffdf9;
+  color: #713e2c;
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.employee-daily-times dd.is-empty { color: #8b7e70; font-weight: 400; }
+.employee-daily-times > div:first-child, .employee-daily-times > div:last-child { border-color: #e6c9b4; background: #f8e9dc; }
+@container (max-width: 760px) {
+  .employee-dashboard-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@container (max-width: 420px) {
+  .employee-welcome { padding: 16px; }
+  .employee-dashboard-details, .employee-profile-expanded .report-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .employee-daily-times > div { grid-template-columns: minmax(0, 100px) minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .employee-dashboard-card, .employee-daily-times > div, .employee-time-logs-button span { transition: none; }
+}
 .date-time-entry {
   display: inline-flex;
   position: relative;

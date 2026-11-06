@@ -826,7 +826,7 @@ async function submitLeaveRequest(event) {
     const wasEdited = Boolean(formBeingEdited);
     formBeingEdited = null;
     if (wasEdited) await loadMyForms();
-    else go(USER_NAV[0]);
+    else go(FORM_NAV.find(([id]) => id === 'user-dashboard'));
     AppFeedback.success(
       wasEdited ? 'Changes saved successfully.' : 'Submitted successfully.'
     );
@@ -1440,7 +1440,7 @@ async function submitTemplateForm(event) {
     const wasEdited = Boolean(formBeingEdited);
     formBeingEdited = null;
     if (wasEdited) await loadMyForms();
-    else go(USER_NAV[0]);
+    else go(FORM_NAV.find(([id]) => id === 'user-dashboard'));
     AppFeedback.success(
       wasEdited ? 'Changes saved successfully.' : 'Submitted successfully.'
     );
