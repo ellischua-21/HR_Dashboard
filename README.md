@@ -21,12 +21,12 @@ notifications, and account management.
 - `public/css/Theme.css` applies the shared visual theme across roles. It owns surface colors, accents, borders, shadows, and interaction states. Keep table dimensions, frozen-column offsets, cell alignment, scroll heights, form field order, and popup geometry in `Styles.css` and the existing views. Table color variables keep frozen and unfrozen cells consistent without changing their layout. Printable documents retain their existing formatting; incident progress retains its circular markers and state labels.
 - `EmployeeDashboard.js` is the STAFF/SUPERVISOR/HEAD landing page. It uses the shared employee details renderer from `Employees.js` and `AttendanceUI.js` for time fields and scan popovers. Self-service endpoints derive the employee from the authenticated session; they accept no employee selector. Daily attendance reuses the HR attendance calculation and cache, matching the employee number and registered name across scanner accounts.
 - `public/js/UI.js`, `AppConfirm.js`, `EmployeeSearch.js`, and `SignaturePad.js` provide reusable browser behavior. `Main.js` owns navigation, route setup, session initialization, and page action guards.
-- `public/js/incident-management/` separates filing/case composition (`IncidentManagement.js`), document layouts (`Documents.js`), NTEs and explanations (`Notice.js`), evaluation and decisions (`Evaluation.js`), investigations (`Investigation.js`), and the Track, Review, History, and Code of Conduct page controllers.
+- `public/js/incident-management/Workflow.js` renders current filing and section-based actions using shared controls. `IncidentManagement.js` connects pages and supplies legacy document rendering; `Notice.js`, `Evaluation.js`, and `Investigation.js` retain read-only historical content. Track, Review, History, and Code of Conduct have separate controllers.
 - Review supplies analytics, filters, and the case list. View buttons and inbox links select the case in Track for every role. Shared renderers provide the authorized actions and documents; History opens completed cases as read-only archives.
-- `CodeOfConduct.js` owns the matrix, its configuration editor, and violation history. HR can search another employee's finalized records; other accounts see their own records. Authorized HR/ADMIN accounts edit rows and save changes directly; the saved matrix is immediately used by the guide. Historical case policy references are retained on the server.
+- `CodeOfConduct.js` owns the matrix, its configuration editor, and violation history. HR/ADMIN can search employee records; other roles see their own history. Authorized HR accounts edit the matrix and save changes directly. Captured historical policy references remain available.
 - `shared/` contains browser/API form templates, status/edit rules, and Manila date/working-day calculations. New shared browser files must be added to the Apache allowlist and the asset loader.
 - `server/server.js` wires API methods and evidence routes. `server/config/` defines employee fields and permissions, `server/middleware/Auth.js` enforces authentication and permissions, and `server/services/` owns domain workflows.
-- `server/services/incident-management/` contains case visibility/tracking, Review filters, archives, COC policy storage, notification writers, safe activity timelines, and incident input validation. `IncidentService.js` coordinates lifecycle transactions.
+- `server/services/incident-management/` contains workflow services, section permissions, role-specific queues, case tracking, legacy timeline visibility, notification writers, matrix rules, and input validation. `IncidentWorkflowService.js` is the public facade; `IncidentService.js` is read-only legacy support.
 - `server/utils/` contains shared sanitization, employee data conversion, pagination/filter validation, attachment responses, password hashing, and HTTP errors.
 - `server/db/database.js` initializes the schema and compatibility migrations. Historical policy, signature, and case-subject records are retained.
 - `scripts/` contains setup, account/sample-data tools, and structural checks. `tests/` contains unit and controller regression tests, with mocked database/network access.
@@ -106,7 +106,7 @@ Only an account with the `ADMIN` role sees **Manage Accounts** and can approve o
 - **STAFF**: a personal dashboard for submitted-form history and status, plus form templates. STAFF cannot access employee records or the HR dashboard.
 - **SUPERVISOR** and **HEAD**: the STAFF dashboard and form templates, plus **Review Requests** for assigned forms. Supervisors review assigned STAFF forms, while Heads review assigned SUPERVISOR forms. Both can sign and forward a request or reject it with a reason.
 - **HR**: dashboard, full employee registration and record read/write, and reports, plus **Manage Forms** for requests forwarded to HR. The designated Head HR can also review forms submitted by other HR accounts. HR and ADMIN have the same complete employee fields; no separate sensitive-data permission is required.
-- **ADMIN**: account management and full employee-record access; view-only access to forms and incidents, with HR task assignment/reassignment and performance monitoring.
+- **ADMIN**: account management, full employee-record access, View Forms, and HR performance monitoring. Department-assigned ADMIN HEADs can file/review incidents; designated Management approvers approve recommendations. Other incident access is view-only and limited to available cases.
 
 The searchable Reports To field offers active or pending SUPERVISOR accounts for STAFF, and HEAD accounts for SUPERVISOR. Approve the assigned reviewer before approving their subordinate's account. ADMIN can change saved assignments in Manage Accounts. STAFF forms go to their Supervisor then HR; SUPERVISOR forms go to their Head then HR; HEAD forms go directly to HR. At API startup, legacy USER, MANAGER, and EXECUTIVE accounts are migrated to STAFF; HR_STAFF and HR_ADMIN migrate to HR; SYSTEM_ADMIN migrates to ADMIN. Bootstrap the initial administrator with the `create-user` command above. Grant **ADMIN** only to trusted administrators.
 
@@ -140,7 +140,43 @@ For manual account provisioning, bootstrap or recovery administrators can use `n
 - All roles have an Inbox. STAFF, SUPERVISOR and HEAD see new and previously acknowledged HR announcements. Supervisors and Heads see forms assigned to them; HR and ADMIN see forms at the HR review stage; the Head HR also sees forms submitted by other HR accounts. Reviewed form notifications remain in the Inbox. Inbox filters support item type and status, and form items open the shared Manage Forms tab.
 - Existing report, import, export, employee privacy, audit, and role-permission rules are enforced by the API, not by the browser.
 
+## Incident Management workflow
+
+- `IncidentWorkflowService.js` is the API facade. `incident-management/WorkflowReports.js`
+  handles grouped filing and document reads; `WorkflowActions.js` enforces transitions;
+  `WorkflowAccess.js` centralizes case authorization, evidence, activity, and transaction
+  handling. `WorkflowQueries.js` owns role-specific lists, badges, and daily reminders.
+- `IncidentWorkflowSchema.js` adds versioned section records and case groups through
+  the existing startup initializer. Existing incidents remain version 1 and read-only;
+  `IncidentService.js` retains their document readers, without retired write logic.
+- Configure department HEAD/ADMIN reviewers and a Management approver in Manage
+  Accounts using its existing Save Changes button. Startup seeds the supplied
+  department defaults only when matching active accounts exist; missing HEAD accounts
+  stay unassigned. HR and Human Resources employee department labels route to ADMIN 2.
+  The Heads department supports two ADMIN reviewers, who alone can
+  claim cases involving a HEAD or a HEAD's filing against STAFF in their own department.
+  Reporters, reported employees, and witnesses cannot take those reviews. Any active
+  ADMIN can be selected as Management approver.
+- Only the designated Head HR can file as HR. Their reports route to the ADMIN assigned
+  to the HR department; an uninvolved HR account handles the later evaluation.
+- New cases share IR Filed, NTE Issued, and Closed circles across roles. Multiple IRs
+  from one filing session share case progress but retain separate notices and outcomes.
+- The sample NTE's sections I–VIII define the forms. The issuer signs VI; the reported
+  employee signs receipt in VI and their explanation in VII. Five calendar days start
+  from receipt. Read models and attachment endpoints enforce section-level access.
+- HR tasks begin only after explanation submission. Hearings, employee information
+  requests, and Management approval pause HR working-time clocks. Final action requires
+  recorded Management approval. Finalized outcomes reuse the existing disciplinary
+  history and configurable matrix; document snapshots preserve prior recommendations.
+- `shared/IncidentWorkflow.js` supplies the same classifications, evidence choices,
+  review indicators, and directive to browser and server. The existing signature pad,
+  employee search, Inbox, popup, feedback, and task timing components are reused.
+
 ## Checks and sample records
+
+The existing incident tests describe the retired workflow. They have not been
+rewritten or run during this rework, following the request to avoid test work.
+Use the updated user guide for manual verification of the new workflow.
 
 ### HR review ownership and performance
 
@@ -174,11 +210,13 @@ For manual account provisioning, bootstrap or recovery administrators can use `n
   signature permissions remain separate. Head HR form reviews also use claims.
 - Timer timestamps come from the server. `shared/WorkTime.js` supplies the same
   Monday–Friday, Manila 08:00–18:30 calculation to server and display clocks.
-  External-response waits pause timing; completion and reassignment checkpoint
+  Employee-response waits, hearings, and Management approval pause incident timing;
+  completion and reassignment checkpoint
   earned time transactionally. Browser presence is not required. Public holidays
   are not excluded automatically. Durations measure turnaround, not effort.
-- ADMIN retains HR-level viewing access using `forms.view` and case-level read
-  rules, while mutation endpoints reject ADMIN regardless of extra permissions.
+- ADMIN retains form viewing access using `forms.view`. Incident access follows
+  assigned cases; ADMINs acting as department HEADs may file/review and designated
+  Management approvers may approve recommendations. Unassigned ADMINs are view-only.
   Performance statistics exclude ADMIN; old task activity remains in the audit
   history. Open tasks previously taken by ADMIN are released at API startup.
 - Task ownership and earnings are retained per reviewer across transfers. ADMIN

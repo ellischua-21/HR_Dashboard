@@ -1,5 +1,6 @@
 (function () {
   const labels = {
+    'IR FILED': 'IR Filed',
     'PENDING SIGNATURE': 'Pending Signature',
     SIGNED: 'Signed',
     UNDER_REVIEW: 'Under Review',
@@ -36,12 +37,18 @@
       (stage) => stage.key === tracking.currentStage
     );
     root.replaceChildren(
-      el('h3', '', `${incident.caseNumber} · ${incident.subject}`),
+      el(
+        'h3',
+        '',
+        `${incident.caseReference || incident.caseNumber} · ${incident.subject}`
+      ),
       el(
         'p',
         '',
         tracking.closed
-          ? `Closed · ${tracking.completedProcess ? 'Decision issued' : `Closed during ${current.label.toLowerCase()}`}`
+          ? incident.workflowVersion === 2
+            ? 'Case Closed'
+            : `Closed · ${tracking.completedProcess ? 'Decision issued' : `Closed during ${current.label.toLowerCase()}`}`
           : `Current stage: ${current.label}`
       )
     );

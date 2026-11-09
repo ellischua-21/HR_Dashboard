@@ -6,7 +6,11 @@ let hrHeadChanged = false;
 let accountSaveBusy = false;
 
 function hasAccountChanges() {
-  return pendingHeadAssignments.size > 0 || hrHeadChanged;
+  return (
+    pendingHeadAssignments.size > 0 ||
+    hrHeadChanged ||
+    Boolean(window.IncidentAssignments?.dirty())
+  );
 }
 
 function updateAccountSaveButton() {
@@ -16,9 +20,13 @@ function updateAccountSaveButton() {
   document.querySelectorAll('.hr-head-toggle').forEach((toggle) => {
     toggle.disabled = accountSaveBusy || toggle.dataset.inactive === 'true';
   });
-  document.querySelectorAll('.account-head-assignment').forEach((select) => {
-    select.disabled = accountSaveBusy;
-  });
+  document
+    .querySelectorAll(
+      '.account-head-assignment, #incident-department-assignments select, #incident-management-approver'
+    )
+    .forEach((select) => {
+      select.disabled = accountSaveBusy;
+    });
 }
 
 function stagedHrHeadEmail(accounts) {
@@ -42,12 +50,16 @@ async function saveAccountChanges() {
         ([email, headEmail]) => ({ email, headEmail })
       ),
       hrHeadChanged,
-      hrHeadEmail: pendingHrHeadEmail || null
+      hrHeadEmail: pendingHrHeadEmail || null,
+      incidentConfiguration: window.IncidentAssignments?.dirty()
+        ? window.IncidentAssignments.value()
+        : undefined
     });
     pendingHeadAssignments.clear();
     pendingHrHeadEmail = undefined;
     hrHeadChanged = false;
     await loadAccountManagement();
+    await window.IncidentAssignments?.load();
     AppFeedback.success('Saved successfully.');
   } catch (error) {
     showErr(error.message || String(error));
@@ -272,6 +284,7 @@ VIEWS.accounts = guard(async () => {
   hrHeadChanged = false;
   updateAccountSaveButton();
   await loadAccountManagement();
+  await window.IncidentAssignments?.load();
 });
 VIEWS['account-requests'] = guard(loadAccountRequests);
 $('am_refresh').onclick = async () => {

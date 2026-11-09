@@ -78,7 +78,11 @@ async function getInbox(req) {
         id: `form-${form.id}`,
         type: 'FORM',
         status: form.status === 'PENDING' ? 'ACTION_REQUIRED' : form.status,
-        unseen: Boolean(form.unseen) && (user.role !== 'HR' || !form.task_owner || form.task_owner.toLowerCase() === user.email.toLowerCase()),
+        unseen:
+          Boolean(form.unseen) &&
+          (user.role !== 'HR' ||
+            !form.task_owner ||
+            form.task_owner.toLowerCase() === user.email.toLowerCase()),
         title: `${formTitle(form.template_key)}${form.status === 'PENDING' ? ' requires review' : ' reviewed'}`,
         message: `${form.applicant_name} submitted Serial Number ${form.control_no}.${form.status === 'PENDING' ? '' : ` Status: ${FormStatus.titleCase(form.status)}.`}`,
         createdAt: form.submitted_at,
@@ -96,21 +100,30 @@ async function getInbox(req) {
             n.created_at AS createdAt, n.viewed_at AS viewedAt,
             i.id AS incidentId, i.case_number AS caseNumber, i.subject,
             i.reported_employee_name AS reportedEmployeeName,
-            i.reported_employee_email AS reportedEmployeeEmail, i.status, task.owner_email AS taskOwner,
+            i.reported_employee_email AS reportedEmployeeEmail, i.status, i.workflow_version AS workflowVersion, task.owner_email AS taskOwner,
             CASE
-              WHEN i.status = 'PENDING SIGNATURE' AND n.notification_type = 'EMPLOYEE_SIGNATURE' AND employee_signature.incident_id IS NULL THEN 1
-              WHEN i.status = 'PENDING SIGNATURE' AND n.notification_type = 'HEAD_SIGNATURE' AND head_signature.incident_id IS NULL THEN 1
+              WHEN i.workflow_version <> 2 OR i.status = 'CLOSED' THEN 0
+              WHEN n.notification_type = 'IR_SUBMITTED' AND w.phase = 'HEAD' AND
+                (LOWER(i.assigned_head_email) = LOWER(n.recipient_email) OR
+                  (w.head_pool = 1 AND i.assigned_head_email IS NULL AND ${user.role === 'ADMIN' ? 1 : 0} = 1
+                    AND EXISTS (SELECT 1 FROM incident_department_reviewers hd WHERE hd.department = 'Heads'
+                      AND LOWER(hd.reviewer_email) = LOWER(n.recipient_email)))) THEN 1
+              WHEN n.notification_type = 'NTE_ISSUED' AND w.phase = 'EMPLOYEE'
+                AND LOWER(i.reported_employee_email) = LOWER(n.recipient_email) THEN 1
+              WHEN n.notification_type = 'EXPLANATION_SENT' AND w.phase = 'HR' AND ${user.role === 'HR' ? 1 : 0} = 1
+                AND LOWER(i.reporter_email) <> LOWER(n.recipient_email) AND LOWER(i.reported_employee_email) <> LOWER(n.recipient_email)
+                AND NOT EXISTS (SELECT 1 FROM incident_participants ip JOIN employees pe ON pe.record_id=ip.employee_record_id
+                  WHERE ip.incident_id=i.id AND LOWER(pe.personal_email)=LOWER(n.recipient_email)) THEN 1
+              WHEN n.notification_type LIKE 'MANAGEMENT_%' AND w.phase = 'MANAGEMENT' AND LOWER(w.management_email) = LOWER(n.recipient_email) THEN 1
+              WHEN n.notification_type LIKE 'INFO_REQ_%' AND information_request.status = 'PENDING' THEN 1
               ELSE 0
             END AS requiresAction
      FROM incident_notifications n
      JOIN incident_reports i ON i.id = n.incident_id
      LEFT JOIN hr_tasks task ON task.resource_type = 'INCIDENT' AND task.resource_id = i.id AND task.phase = 'HR'
-     LEFT JOIN incident_signatures employee_signature
-       ON employee_signature.incident_id = i.id
-       AND employee_signature.signatory_role = 'EMPLOYEE'
-     LEFT JOIN incident_signatures head_signature
-       ON head_signature.incident_id = i.id
-       AND head_signature.signatory_role = 'HEAD'
+     LEFT JOIN incident_workflows w ON w.incident_id = i.id
+     LEFT JOIN incident_information_requests information_request ON information_request.incident_id = i.id
+       AND n.notification_type = CONCAT('INFO_REQ_', information_request.id)
      WHERE n.recipient_email = ? AND ${incidentScope.sql}
        AND NOT EXISTS (
          SELECT 1 FROM incident_activity actor_activity
@@ -150,7 +163,7 @@ async function getInbox(req) {
       signatureCases.has(Number(notification.incidentId))
     )
       return;
-    const needsSignature = Boolean(notification.requiresAction);
+    const needsAction = Boolean(notification.requiresAction);
     const isEmployeeSignature =
       notification.notificationType === 'EMPLOYEE_SIGNATURE' &&
       isReportedEmployee;
@@ -158,18 +171,32 @@ async function getInbox(req) {
     items.push({
       id: `incident-${notification.notificationId}`,
       type: 'INCIDENT',
-      status: needsSignature ? 'ACTION_REQUIRED' : notification.status,
-      unseen: !notification.viewedAt && (user.role !== 'HR' ||
-        !notification.taskOwner || notification.taskOwner.toLowerCase() === user.email.toLowerCase() ||
-        isReportedEmployee || isHeadSignature || notification.notificationType.startsWith('INFO_REQ_')),
+      status:
+        Number(notification.workflowVersion) !== 2
+          ? 'LEGACY'
+          : needsAction
+            ? 'ACTION_REQUIRED'
+            : notification.status,
+      unseen:
+        !notification.viewedAt &&
+        (user.role !== 'HR' ||
+          !notification.taskOwner ||
+          notification.taskOwner.toLowerCase() === user.email.toLowerCase() ||
+          isReportedEmployee ||
+          isHeadSignature ||
+          notification.notificationType.startsWith('INFO_REQ_')),
       title:
-        isEmployeeSignature || isHeadSignature
-          ? needsSignature
-            ? isHeadSignature
-              ? 'Incident Report filed. Requires your review and signature'
-              : 'Incident Report filed. Requires your acknowledgment and signature'
-            : 'Incident Report filed'
-          : notificationTitle(notification.notificationType),
+        Number(notification.workflowVersion) === 2
+          ? notification.notificationType === 'IR_SUBMITTED' && needsAction
+            ? 'Incident Report filed. Requires your review'
+            : notificationTitle(notification.notificationType)
+          : isEmployeeSignature || isHeadSignature
+            ? needsAction
+              ? isHeadSignature
+                ? 'Incident Report filed. Requires your review and signature'
+                : 'Incident Report filed. Requires your acknowledgment and signature'
+              : 'Incident Report filed'
+            : notificationTitle(notification.notificationType),
       message:
         notification.notificationType === 'NTE_ISSUED'
           ? `${notification.caseNumber} has advanced. Open HRIS to view information available to your account.`

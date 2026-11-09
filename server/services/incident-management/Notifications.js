@@ -3,6 +3,7 @@ function notificationTitle(type) {
     EMPLOYEE_SIGNATURE: 'Incident Report requires your acknowledgment',
     HEAD_SIGNATURE: 'Incident Report requires your review and signature',
     IR_SUBMITTED: 'Incident Report filed',
+    NTE_RECEIVED: 'NTE receipt acknowledged',
     HR_REVIEW_READY: 'Required signatures completed',
     HR_REVIEW_STARTED: 'HR review started',
     INVESTIGATION_STARTED: 'Incident investigation started',
@@ -15,6 +16,12 @@ function notificationTitle(type) {
   };
   if (titles[type]) return titles[type];
   if (type.startsWith('TASK_')) return 'Incident review assigned to you';
+  if (type.startsWith('EXT_REQ_')) return 'NTE extension requested';
+  if (type.startsWith('EXT_DONE_')) return 'NTE extension request processed';
+  if (type.startsWith('HEARING_SET_')) return 'Incident hearing scheduled';
+  if (type.startsWith('HEARING_DONE_')) return 'Incident hearing completed';
+  if (type.startsWith('MANAGEMENT_')) return 'Incident recommendation requires Management approval';
+  if (type.startsWith('MGMT_DONE_')) return 'Management processed the incident recommendation';
   if (type.startsWith('NTE_DUE_'))
     return 'NTE explanation deadline approaching';
   if (type.startsWith('NTE_OVERDUE')) return 'NTE explanation is overdue';

@@ -47,19 +47,29 @@ async function source(db, type, id, lock = false) {
             row.head_reviewer_email === user.email))
     };
   }
+  if (Number(row.workflow_version) !== 2) return null;
+  const [[workflow]] = await db.execute(
+    'SELECT phase, explanation_submitted_at, hearing_status FROM incident_workflows WHERE incident_id = ?',
+    [id]
+  );
+  if (!workflow?.explanation_submitted_at) return null;
   const [[requests]] = await db.execute(
     `SELECT COUNT(*) AS count FROM incident_information_requests
     WHERE incident_id = ? AND status = 'PENDING'`,
     [id]
   );
   const waiting =
-    row.status === 'PENDING SIGNATURE'
-      ? 'Awaiting employee / assigned reviewer signatures'
-      : row.status === 'NTE ISSUED'
-        ? 'Awaiting employee explanation'
+    workflow.hearing_status === 'SCHEDULED'
+      ? 'Awaiting hearing completion'
+      : workflow.phase === 'MANAGEMENT'
+        ? 'Awaiting Management approval'
         : Number(requests.count)
           ? 'Awaiting requested information'
           : '';
+  const [participants] = await db.execute(
+    `SELECT e.personal_email FROM incident_participants p JOIN employees e ON e.record_id=p.employee_record_id WHERE p.incident_id=?`,
+    [id]
+  );
   return {
     type,
     id,
@@ -68,7 +78,14 @@ async function source(db, type, id, lock = false) {
     done: row.status === 'CLOSED',
     waiting,
     canTake: (user) =>
-      reviewers.has(user.role) && row.status !== 'PENDING SIGNATURE'
+      reviewers.has(user.role) &&
+      ![
+        row.reporter_email,
+        row.reported_employee_email,
+        ...participants.map((p) => p.personal_email)
+      ]
+        .filter(Boolean)
+        .some((email) => email.toLowerCase() === user.email.toLowerCase())
   };
 }
 async function event(
@@ -318,6 +335,8 @@ async function changeOwner(
     const current = await source(db, type, id, true);
     if (!current || current.done)
       throw httpError('This task is not available for review.', 409);
+    if (reassign && type === 'INCIDENT')
+      await assertIncidentAssignmentScope(db, id, user);
     await sync(db, type, id, user.email);
     const [[task]] = await db.execute(
       `SELECT * FROM hr_tasks WHERE resource_type = ? AND resource_id = ? AND phase = ? FOR UPDATE`,
@@ -411,6 +430,8 @@ async function assignees(req, type, resourceId) {
     throw httpError('Only ADMIN can assign review tasks.', 403);
   const current = await source(pool, type, identity(type, resourceId));
   if (!current || current.done) return [];
+  if (type === 'INCIDENT')
+    await assertIncidentAssignmentScope(pool, Number(resourceId), user);
   const [rows] = await pool.execute(
     "SELECT email, full_name, role, is_hr_head, active FROM user_roles WHERE active = 1 AND role = 'HR' ORDER BY full_name, email"
   );
@@ -421,6 +442,19 @@ async function assignees(req, type, resourceId) {
       name: account.full_name || account.email,
       role: account.role
     }));
+}
+async function assertIncidentAssignmentScope(db, id, user) {
+  const access = require('./incident-management/WorkflowAccess');
+  const row = await access.load(db, id),
+    rights = await access.access(db, user, row);
+  if (
+    !(await access.adminHead(db, user.email)) ||
+    !(rights.assigned || rights.manager)
+  )
+    throw httpError(
+      'Only an ADMIN HEAD assigned to this incident may reassign its HR task.',
+      403
+    );
 }
 // Reporting-line changes release a Head HR task so the new authorized Head HR
 // still explicitly takes it. Already-earned time stays with the previous owner.
@@ -451,7 +485,7 @@ async function releaseOwner(db, task, actor, reason) {
 async function releaseAdminOwnedTasks() {
   const [candidates] =
     await pool.execute(`SELECT t.id, t.resource_type, t.resource_id FROM hr_tasks t
-    JOIN user_roles u ON u.email = t.owner_email WHERE u.role = 'ADMIN' AND t.state <> 'COMPLETED'`);
+    JOIN user_roles u ON u.email = t.owner_email WHERE u.role = 'ADMIN' AND t.state NOT IN ('COMPLETED','ARCHIVED')`);
   for (const candidate of candidates) {
     const db = await pool.getConnection();
     try {

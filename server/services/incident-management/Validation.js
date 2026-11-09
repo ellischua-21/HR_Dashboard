@@ -1,5 +1,5 @@
 const { httpError } = require('../../utils/HttpError');
-const { isValidDate, addWorkingDays } = require('../../../shared/DateUtils');
+const { isValidDate } = require('../../../shared/DateUtils');
 
 const MAX_EVIDENCE_FILES = 10;
 const MAX_EVIDENCE_FILE_BYTES = 8 * 1024 * 1024;
@@ -102,56 +102,10 @@ function normalizeEvidence(files = []) {
   });
 }
 
-function normalizeNteInput(input = {}) {
-  if (!input || typeof input !== 'object' || Array.isArray(input))
-    throw httpError('Enter valid NTE details.', 400);
-  const provisionId = input.provisionId ? Number(input.provisionId) : null;
-  const allegation = normalizeText(
-    String(input.allegation || ''),
-    'Allegation details',
-    12000
-  );
-  const issuanceDate = normalizeDate(input.issuanceDate, 'issuance date');
-  const receiptDate = normalizeDate(input.receiptDate, 'receipt date');
-  const workingDays = Number(input.responseWorkingDays);
-  if (!Number.isInteger(workingDays) || workingDays < 1 || workingDays > 60)
-    throw httpError(
-      'The response period must be from 1 to 60 working days.',
-      400
-    );
-  const deadlineDate = input.deadlineDate
-    ? normalizeDate(input.deadlineDate, 'explanation deadline')
-    : addWorkingDays(receiptDate, workingDays);
-  if (receiptDate < issuanceDate)
-    throw httpError(
-      'The receipt date cannot be before the issuance date.',
-      400
-    );
-  if (deadlineDate < receiptDate)
-    throw httpError(
-      'The explanation deadline cannot be before the receipt date.',
-      400
-    );
-  if (
-    provisionId !== null &&
-    (!Number.isSafeInteger(provisionId) || provisionId < 1)
-  )
-    throw httpError('Choose a valid Code of Conduct provision.', 400);
-  return {
-    provisionId,
-    allegation,
-    issuanceDate,
-    receiptDate,
-    workingDays,
-    deadlineDate
-  };
-}
-
 module.exports = {
   normalizeText,
   normalizeDate,
   normalizeTime,
   normalizeSignature,
-  normalizeEvidence,
-  normalizeNteInput
+  normalizeEvidence
 };

@@ -383,7 +383,7 @@ function renderInbox() {
     const card = el('article', undefined, 'announcement-card inbox-card');
     const heading = el('div', undefined, 'inbox-heading');
     heading.appendChild(el('h3', item.title));
-    heading.appendChild(el('span', FormStatus.titleCase(item.status), 'badge'));
+    heading.appendChild(el('span', item.type === 'INCIDENT' ? window.IncidentProgress.label(item.status) : FormStatus.titleCase(item.status), 'badge'));
     card.appendChild(heading);
     card.appendChild(el('p', item.message, 'announcement-message'));
     const detail =

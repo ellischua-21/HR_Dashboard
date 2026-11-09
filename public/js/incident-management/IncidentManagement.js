@@ -1,85 +1,9 @@
 let pendingIncidentCaseId = null;
-let incidentFileContext = null;
-
 const incidentElement = (tag, className = '', text = undefined) =>
   el(tag, text, className);
 const setIncidentFeedback = window.AppUI.feedback;
-
-const incidentEmployeeSearches = [];
-function wireIncidentSearch(input, employeeId, suggestions, purpose) {
-  const search = window.createEmployeeSearch({
-    input,
-    suggestions,
-    search: (query) => api('searchIncidentEmployees', query, purpose),
-    getOwner: () => session?.email,
-    details: (employee) => [
-      `Employee ID: ${employee.employeeId}`,
-      employee.employeeNo,
-      employee.department,
-      employee.position
-    ],
-    onClear: () => {
-      employeeId.value = '';
-    },
-    onSelect: (employee) => {
-      employeeId.value = employee.employeeId;
-    }
-  });
-  incidentEmployeeSearches.push(search);
-}
-
-function buildParticipantInputs(containerId, title) {
-  const container = document.getElementById(containerId);
-  container.replaceChildren();
-  const fields = [];
-  for (let number = 1; number <= 3; number += 1) {
-    const field = incidentElement('div', 'incident-search-field');
-    const label = incidentElement('label', '', `${number}. ${title}`);
-    const input = incidentElement('input');
-    input.type = 'search';
-    input.id = `${containerId}-${number}`;
-    label.htmlFor = input.id;
-    const employeeId = incidentElement('input');
-    employeeId.type = 'hidden';
-    const suggestions = incidentElement('div', 'incident-suggestions');
-    suggestions.setAttribute('role', 'listbox');
-    suggestions.hidden = true;
-    field.append(label, input, employeeId, suggestions);
-    wireIncidentSearch(input, employeeId, suggestions, 'participant');
-    container.appendChild(field);
-    fields.push({ input, employeeId });
-  }
-  return fields;
-}
-
-const incidentPersonInputs = buildParticipantInputs(
-  'ir-persons-involved',
-  'Person involved'
-);
-const incidentWitnessInputs = buildParticipantInputs('ir-witnesses', 'Witness');
-const reportedEmployeeInput = document.getElementById('ir-reported-employee');
-const reportedEmployeeId = document.getElementById('ir-reported-employee-id');
-wireIncidentSearch(
-  reportedEmployeeInput,
-  reportedEmployeeId,
-  document.getElementById('ir-reported-employee-options'),
-  'reported'
-);
-
 async function loadIncidentFile() {
-  try {
-    incidentFileContext = await api('getIncidentFileContext');
-    document.getElementById('ir-reporter-name').value =
-      incidentFileContext.reporter.name;
-    document.getElementById('ir-reporter-department').value =
-      incidentFileContext.reporter.department;
-    document.getElementById('ir-reporter-position').value =
-      incidentFileContext.reporter.position;
-    document.getElementById('ir-date-reported').value =
-      incidentFileContext.dateReported;
-  } catch (error) {
-    setIncidentFeedback(error.message || String(error), true);
-  }
+  await window.IncidentWorkflow.loadFile();
 }
 
 function formatIncidentBytes(bytes) {
@@ -124,75 +48,6 @@ function incidentFileMimeType(file) {
     }[extension] || ''
   );
 }
-
-function participantValues(fields) {
-  return fields.map(({ input, employeeId }) => ({
-    employeeId: employeeId.value,
-    name: input.value.trim()
-  }));
-}
-
-async function submitIncidentReport(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const button = document.getElementById('ir-submit');
-  const files = [...document.getElementById('ir-evidence').files];
-
-  if (!reportedEmployeeId.value) {
-    setIncidentFeedback(
-      'Select the reported employee from the suggestions.',
-      true
-    );
-    return;
-  }
-  button.disabled = true;
-  try {
-    const evidence = await readIncidentEvidenceFiles(files);
-    const result = await api('submitIncidentReport', {
-      reportedEmployeeId: reportedEmployeeId.value,
-      subject: document.getElementById('ir-subject').value,
-      incidentDate: document.getElementById('ir-incident-date').value,
-      location: document.getElementById('ir-location').value,
-      incidentTime: document.getElementById('ir-time').value,
-      description: document.getElementById('ir-description').value,
-      personsInvolved: participantValues(incidentPersonInputs),
-      witnesses: participantValues(incidentWitnessInputs),
-      comments: document.getElementById('ir-comments').value,
-      evidence
-    });
-    form.reset();
-    document.getElementById('ir-reporter-name').value =
-      incidentFileContext.reporter.name;
-    document.getElementById('ir-reporter-department').value =
-      incidentFileContext.reporter.department;
-    document.getElementById('ir-reporter-position').value =
-      incidentFileContext.reporter.position;
-    incidentEmployeeSearches.forEach((search) => search.reset());
-    document.getElementById('ir-evidence-list').textContent = '';
-    setIncidentFeedback(
-      `Incident Report submitted. Case ${result.caseNumber}.`
-    );
-    document.getElementById('ir-date-reported').value = result.dateReported;
-    await window.refreshInboxBadge().catch((error) => console.error(error));
-    await refreshIncidentBadges().catch((error) => console.error(error));
-  } catch (error) {
-    setIncidentFeedback(error.message || String(error), true);
-  } finally {
-    button.disabled = false;
-  }
-}
-
-document.getElementById('ir-evidence').addEventListener('change', (event) => {
-  const files = [...event.currentTarget.files];
-  document.getElementById('ir-evidence-list').textContent = files.length
-    ? files
-        .map((file) => `${file.name} (${formatIncidentBytes(file.size)})`)
-        .join(' · ')
-    : 'No evidence attached.';
-});
-document
-  .getElementById('incident-file-form')
-  .addEventListener('submit', submitIncidentReport);
 
 function appendCaseField(parent, label, value) {
   const item = incidentElement('div', 'incident-case-field');
@@ -249,92 +104,25 @@ function appendIncidentParticipantList(parent, type, participants) {
   parent.appendChild(section);
 }
 
-function incidentSignatureFor(signatures, role) {
-  return signatures.find((signature) => signature.role === role);
-}
-
-function canSignIncidentAs(incident, role) {
-  if (incident.currentUserRole === 'ADMIN') return false;
-  if (incident.signatures.some((signature) => signature.role === role))
-    return false;
-  if (role === 'EMPLOYEE')
-    return (
-      incident.status === 'PENDING SIGNATURE' &&
-      incident.reportedEmployeeEmail.toLowerCase() ===
-        incident.currentUserEmail.toLowerCase()
-    );
-  if (role === 'HEAD')
-    return (
-      incident.status === 'PENDING SIGNATURE' &&
-      ['SUPERVISOR', 'HEAD', 'HR'].includes(incident.currentUserRole) &&
-      incident.assignedHeadEmail?.toLowerCase() ===
-        incident.currentUserEmail.toLowerCase()
-    );
-  return role === 'HR' && incident.status === 'SIGNED' && incident.canReview && incident.canManageTask;
-}
-
-function renderIncidentSignature(
-  parent,
-  incident,
-  role,
-  label,
-  padSetup,
-  ui = {}
-) {
-  const signature = incidentSignatureFor(incident.signatures, role);
-  const section = incidentElement('section', 'incident-signature-field');
-  section.appendChild(incidentElement('h3', '', label));
-  if (signature) {
-    const image = incidentElement('img', 'incident-signature-image');
-    image.src = signature.signature;
-    image.alt = `${label} signature`;
-    section.appendChild(image);
-    section.appendChild(
-      incidentElement(
-        'p',
-        'note',
-        `Signed by ${signature.signerEmail} · ${DateUtils.formatDateTime(signature.signedAt)}`
-      )
-    );
-  } else if (canSignIncidentAs(incident, role)) {
-    section.firstElementChild.dataset.requiredLabel = '';
-    const canvas = incidentElement(
-      'canvas',
-      'signature-pad incident-signature-pad'
-    );
-    canvas.width = 560;
-    canvas.height = 120;
-    canvas.setAttribute('aria-label', `Sign as ${label}`);
-    const controls = incidentElement('div', 'actions');
-    const clear = incidentElement('button', 'ghost', 'Clear signature');
-    const sign = incidentElement('button', '', 'Sign');
-    clear.type = sign.type = 'button';
-    controls.append(clear, sign);
-    section.append(canvas, controls);
-    padSetup.push(() => {
-      const pad = window.createSignaturePad(canvas, clear);
-      sign.addEventListener('click', async () => {
-        sign.disabled = true;
-        try {
-          const data = pad.toDataURL();
-          if (!data) throw new Error('Draw your signature first.');
-          await api('signIncidentCase', incident.id, role, data);
-          await window
-            .refreshInboxBadge()
-            .catch((error) => console.error(error));
-          await refreshIncidentBadges().catch((error) => console.error(error));
-          await (ui.reload || openIncidentCase)(incident.id);
-        } catch (error) {
-          setIncidentFeedback(error.message || String(error), true);
-        } finally {
-          sign.disabled = false;
-        }
-      });
-    });
-  } else {
-    section.appendChild(incidentElement('p', 'note', 'Signature pending.'));
-  }
-  parent.appendChild(section);
+function renderIncidentSignature(parent, incident, role, title) {
+  const signature = incident.signatures.find((item) => item.role === role);
+  if (!signature) return;
+  const box = incidentElement('section', 'incident-signature-field');
+  box.appendChild(incidentElement('h3', '', title));
+  const image = incidentElement('img', 'incident-signature-image');
+  image.src = signature.signature;
+  image.alt = title;
+  box.append(
+    image,
+    incidentElement(
+      'p',
+      'note',
+      signature.signerEmail +
+        ' · ' +
+        DateUtils.formatDateTime(signature.signedAt)
+    )
+  );
+  parent.appendChild(box);
 }
 
 function renderIncidentReport(body, incident) {
@@ -418,236 +206,51 @@ function renderIncidentReport(body, incident) {
 }
 
 let incidentOpenRequest = 0;
-function renderIncidentReviewActions(incident, ui = {}) {
-  const workflow = incidentElement('section', 'incident-case-section');
-  workflow.appendChild(incidentElement('h3', '', 'HR Review'));
-  const actions = incidentElement('div', 'actions');
-  const investigate = incidentElement(
-    'button',
-    '',
-    'Require further investigation'
-  );
-  investigate.type = 'button';
-  investigate.onclick = () =>
-    runIncidentTransition(incident, 'START_INVESTIGATION', '', ui);
-  actions.appendChild(investigate);
-  workflow.append(
-    incidentElement(
-      'p',
-      'note',
-      'Further investigation moves the case to the investigation stage.'
-    ),
-    actions
-  );
-  return workflow;
-}
-
-function renderIncidentClosureAction(incident, ui = {}) {
-  if (
-    !incident.canReview || !incident.canManageTask ||
-    !['UNDER_REVIEW', 'UNDER INVESTIGATION'].includes(incident.status)
-  )
-    return null;
-  const isInvestigation = incident.status === 'UNDER INVESTIGATION';
-  const workflow = incidentElement('section', 'incident-case-section');
-  const toggle = incidentElement('button', 'ghost', 'Close for documentation');
-  toggle.type = 'button';
-  const reason = incidentElement('textarea');
-  reason.rows = 3;
-  reason.maxLength = 4000;
-  reason.placeholder = isInvestigation
-    ? 'Investigation findings and reason for closure (required)'
-    : 'Reason for closing the case (required)';
-  reason.dataset.requiredIndicator = 'true';
-  const reasonLabel = incidentElement('label', '', 'Reason For Closure');
-  reasonLabel.appendChild(reason);
-  const panel = incidentElement('div', 'incident-case-section');
-  panel.hidden = true;
-  const confirmClose = incidentElement('button', '', 'Confirm closure');
-  confirmClose.type = 'button';
-  toggle.onclick = () => {
-    panel.hidden = !panel.hidden;
-    toggle.textContent = panel.hidden
-      ? 'Close for documentation'
-      : 'Hide closure form';
-  };
-  confirmClose.onclick = () => {
-    if (!reason.value.trim()) {
-      AppErrors.show(
-        isInvestigation
-          ? 'Enter the investigation findings and reason for closure.'
-          : 'Enter a reason for closing the case.'
-      );
-      reason.focus();
-      return;
-    }
-    runIncidentTransition(
-      incident,
-      isInvestigation ? 'CLOSE_INVESTIGATION' : 'CLOSE_DOCUMENTATION',
-      reason.value,
-      ui
-    );
-  };
-  panel.append(
-    incidentElement(
-      'p',
-      'note',
-      'Closing for documentation requires a reason. It does not record a disciplinary violation.'
-    ),
-    reasonLabel,
-    confirmClose
-  );
-  workflow.append(toggle, panel);
-  return workflow;
-}
-
-async function openIncidentCase(incidentId, options = {}) {
-  const ticket = ++incidentOpenRequest;
-  const owner = session?.email;
-  let incident = await api('getIncidentCase', incidentId);
-  if (options.archived && incident.status !== 'CLOSED')
-    throw new Error('This case has not been closed. Open it in Track.');
-  if (
-    ticket !== incidentOpenRequest ||
-    owner !== session?.email ||
-    (options.archived &&
-      document.getElementById('view-incident-history').hidden)
-  )
-    return;
-  if (
-    ticket !== incidentOpenRequest ||
-    owner !== session?.email ||
-    (options.archived &&
-      document.getElementById('view-incident-history').hidden)
-  )
-    return;
-  const body = document.getElementById('ir-case-body');
-  const ui = { reload: (id) => openIncidentCase(id, options) };
-  const padSetup = [];
-  body.replaceChildren();
-  window.AppOutsideDismiss.clearDirty(
-    document.getElementById('ir-case-dialog')
-  );
-  document.getElementById('ir-case-title').textContent = incident.caseNumber;
-  if (incident.status === 'CLOSED') {
-    const progress = incidentElement('section', 'incident-review-progress');
-    body.appendChild(progress);
-    window.IncidentProgress.render(progress, incident);
-    body.appendChild(
-      incidentElement(
-        'p',
-        'note',
-        'Archived case. This workspace is read-only.'
-      )
-    );
-  }
-  if (incident.task && incident.status !== 'CLOSED') body.appendChild(TaskUI.render(incident.task, () => openIncidentCase(incident.id, options)));
-  renderIncidentReport(body, incident);
-  if (incident.policyReferences?.length) {
-    const references = incidentElement('section', 'incident-case-section');
-    references.appendChild(
-      incidentElement('h3', '', 'Recorded policy references')
-    );
-    for (const reference of incident.policyReferences)
-      references.appendChild(
-        incidentElement(
-          'p',
-          '',
-          reference.documentType +
-            ': ' +
-            (reference.version
-              ? reference.version +
-                ' · Effective ' +
-                DateUtils.formatDate(reference.effectiveDate)
-              : 'Captured working configuration (unpublished)') +
-            ' · ' +
-            DateUtils.formatDateTime(reference.capturedAt)
-        )
-      );
-    body.appendChild(references);
-  }
-
-  const signatures = incidentElement('section', 'incident-case-section');
-  signatures.appendChild(
-    incidentElement('h3', '', 'Acknowledgment Signatures')
-  );
-  signatures.appendChild(
-    incidentElement(
-      'p',
-      'note',
-      'A signature acknowledges receipt of this report; it does not indicate admission of wrongdoing.'
-    )
-  );
-  renderIncidentSignature(
-    signatures,
-    incident,
-    'EMPLOYEE',
-    'Employee Signature',
-    padSetup,
-    ui
-  );
-  if (incident.assignedHeadEmail)
-    renderIncidentSignature(
-      signatures,
-      incident,
+function renderLegacyIncident(parent, incident) {
+  parent.appendChild(incidentElement('p', 'badge', 'Read-Only Legacy Record'));
+  renderIncidentReport(parent, incident);
+  for (const [role, title] of [
+    ['EMPLOYEE', 'Employee Signature'],
+    [
       'HEAD',
       incident.assignedReviewerRole === 'SUPERVISOR'
         ? 'Supervisor Signature'
-        : 'Head Signature',
-      padSetup,
-      ui
-    );
-  renderIncidentSignature(
-    signatures,
-    incident,
-    'HR',
-    'HRD Signature',
-    padSetup,
-    ui
-  );
-  body.appendChild(signatures);
-  renderIncidentNte(body, incident, ui);
-
-  if (incident.canReview && incident.canManageTask && incident.status === 'UNDER_REVIEW')
-    body.appendChild(renderIncidentReviewActions(incident, ui));
-  window.IncidentInvestigation.render(body, incident, ui);
-  window.IncidentTimeline.render(body, incident);
-  if (incident.canViewReview && incident.activity.length) {
+        : 'Head Signature'
+    ],
+    ['HR', 'HR Signature']
+  ])
+    renderIncidentSignature(parent, incident, role, title);
+  renderIncidentNte(parent, incident);
+  window.IncidentInvestigation.render(parent, incident);
+  renderIncidentEvaluation(parent, incident);
+  renderIncidentDecision(parent, incident);
+  window.IncidentTimeline.render(parent, incident);
+  if (incident.activity?.length) {
     const history = incidentElement('section', 'incident-case-section');
-    history.appendChild(incidentElement('h3', '', 'Internal Case Activity'));
-    const list = incidentElement('ol');
-    incident.activity.forEach((entry) => {
-      const item = incidentElement(
-        'li',
-        '',
-        `${entry.action.replaceAll('_', ' ')} — ${entry.details} · ${entry.actorEmail} · ${DateUtils.formatDateTime(entry.createdAt)}`
-      );
-      if (
-        entry.previousStatus &&
-        entry.newStatus &&
-        entry.previousStatus !== entry.newStatus
-      )
-        item.appendChild(
-          incidentElement(
-            'p',
-            'note',
-            `${window.IncidentProgress.label(entry.previousStatus)} → ${window.IncidentProgress.label(entry.newStatus)}`
-          )
-        );
-      if (entry.documentReference)
-        item.appendChild(incidentElement('p', 'note', entry.documentReference));
-      list.appendChild(item);
-    });
-    history.appendChild(list);
-    body.appendChild(history);
+    history.appendChild(incidentElement('h3', '', 'Internal Activity History'));
+    for (const entry of incident.activity)
+      appendIncidentFieldGroup(history, FormStatus.titleCase(entry.action), [
+        ['Performed By', entry.actorEmail],
+        ['Date And Time', DateUtils.formatDateTime(entry.createdAt)],
+        ['Remarks', entry.details]
+      ]);
+    parent.appendChild(history);
   }
+}
 
-  renderIncidentEvaluation(body, incident, padSetup, ui);
-  renderIncidentDecision(body, incident, ui);
-
+async function openIncidentCase(incidentId) {
+  const ticket = ++incidentOpenRequest,
+    owner = session?.email;
+  const incident = await api('getIncidentCase', incidentId);
+  if (ticket !== incidentOpenRequest || owner !== session?.email) return;
+  if (incident.workflowVersion === 2)
+    return window.openIncidentRoute(incident.id, 'incident-track');
+  document.getElementById('ir-case-title').textContent = incident.caseNumber;
+  const body = document.getElementById('ir-case-body');
+  body.replaceChildren();
+  renderLegacyIncident(body, incident);
   const dialog = document.getElementById('ir-case-dialog');
   if (!dialog.open) dialog.showModal();
-  window.requestAnimationFrame(() => padSetup.forEach((setup) => setup()));
 }
 
 async function readIncidentEvidenceFiles(fileList) {
@@ -667,41 +270,6 @@ async function readIncidentEvidenceFiles(fileList) {
       dataUrl: await readIncidentFile(file)
     }))
   );
-}
-
-async function runIncidentTransition(incident, action, details, ui = {}) {
-  if (
-    action.startsWith('CLOSE_') &&
-    !(await window.appConfirm(
-      'Close this case? This decision will be recorded in the case history.',
-      { title: 'Close case', confirmText: 'Close case', danger: true }
-    ))
-  )
-    return;
-  try {
-    const result = await api(
-      'transitionIncident',
-      incident.id,
-      action,
-      details
-    );
-    await window.refreshInboxBadge().catch(() => {});
-    await refreshIncidentBadges();
-    if (
-      document.getElementById('view-incident-track') &&
-      !document.getElementById('view-incident-track').hidden
-    )
-      await loadIncidentTrack();
-    if (
-      document.getElementById('view-incident-history') &&
-      !document.getElementById('view-incident-history').hidden
-    )
-      await loadIncidentHistory();
-    await (ui.reload || openIncidentCase)(incident.id);
-    setIncidentFeedback(`Case updated: ${result.status}.`);
-  } catch (error) {
-    setIncidentFeedback(error.message || String(error), true);
-  }
 }
 
 async function loadIncidentTrack() {
@@ -725,7 +293,11 @@ async function loadIncidentReview() {
 async function refreshIncidentBadges() {
   const counts = await api('getIncidentBadgeCounts');
   window.updateIncidentNotificationDot(
-    ['HR', 'ADMIN'].includes(session.role) ? counts.review : counts.track
+    session.role === 'HEAD'
+      ? counts.track + counts.review
+      : ['HR', 'ADMIN'].includes(session.role)
+        ? counts.review
+        : counts.track
   );
   [
     [document.getElementById('incident-track-count'), counts.track],
@@ -754,14 +326,12 @@ window.openIncidentRoute = openIncidentRoute;
 window.refreshIncidentBadges = refreshIncidentBadges;
 window.IncidentCaseUI = {
   renderReport: renderIncidentReport,
+  renderLegacy: renderLegacyIncident,
   renderSignature: renderIncidentSignature,
   renderNte: renderIncidentNte,
   renderEvaluation: renderIncidentEvaluation,
-  renderReviewActions: renderIncidentReviewActions,
-  renderClosureAction: renderIncidentClosureAction,
   renderDecision: renderIncidentDecision,
   readEvidenceFiles: readIncidentEvidenceFiles,
-  transition: runIncidentTransition,
   element: incidentElement,
   feedback: setIncidentFeedback
 };

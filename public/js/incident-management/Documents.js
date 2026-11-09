@@ -1,4 +1,4 @@
-// Print and download layouts for Incident Report, NTE, explanation, and decision documents.
+// Printable layouts for legacy Incident Reports, notices, and decisions.
 function escapeIncidentHtml(value) {
   return String(value || '').replace(
     /[&<>"']/g,

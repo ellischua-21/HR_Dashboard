@@ -76,6 +76,7 @@
     }
     if (
       session.role === 'ADMIN' &&
+      task.canReassign !== false &&
       task.state !== 'COMPLETED' &&
       task.stage !== 'PENDING SIGNATURE'
     ) {

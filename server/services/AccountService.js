@@ -391,6 +391,7 @@ async function saveAccountChanges(req, changes) {
       );
     }
 
+    if (input.incidentConfiguration) await require('./incident-management/WorkflowConfiguration').save(req, input.incidentConfiguration, connection);
     await require('./TaskService').releaseChangedHeadTasks(connection, admin.email);
     await connection.commit();
     return {

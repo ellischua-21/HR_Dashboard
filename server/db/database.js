@@ -874,6 +874,7 @@ async function initializeDatabase() {
     PRIMARY KEY (counter_name)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
+  await require('./IncidentWorkflowSchema').initializeIncidentWorkflowSchema(pool);
   await require('./TaskSchema').initializeTaskSchema(pool);
 
   const insertLookup =

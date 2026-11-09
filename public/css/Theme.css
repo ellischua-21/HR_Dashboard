@@ -350,6 +350,9 @@
       inset 0 3px 0 var(--detail-accent),
       0 5px 16px rgb(85 55 34 / 7%);
   }
+  .incident-form .incident-report-core-section {
+    box-shadow: none;
+  }
   .incident-party-details > .incident-detail-panel:nth-child(2) {
     --detail-accent: #768758;
   }

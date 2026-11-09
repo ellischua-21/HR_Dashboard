@@ -1,3 +1,4 @@
+const WorkTime = require('../../shared/WorkTime');
 // Preserve task history; remove only the retired duration-target configuration.
 async function initializeTaskSchema(pool) {
   await pool.query(`CREATE TABLE IF NOT EXISTS hr_tasks (
@@ -68,6 +69,54 @@ async function initializeTaskSchema(pool) {
       await pool.query(`ALTER TABLE ${table} ADD INDEX ${name} (${columns})`);
   }
   const now = Date.now();
+  const [legacyTasks] =
+    await pool.execute(`SELECT t.id,t.resource_id FROM hr_tasks t JOIN incident_reports i ON i.id=t.resource_id
+    WHERE t.resource_type='INCIDENT' AND i.workflow_version=1 AND t.state NOT IN ('COMPLETED','ARCHIVED')`);
+  for (const candidate of legacyTasks) {
+    const db = await pool.getConnection();
+    try {
+      await db.beginTransaction();
+      await db.execute(
+        'SELECT id FROM incident_reports WHERE id=? FOR UPDATE',
+        [candidate.resource_id]
+      );
+      const [[task]] = await db.execute(
+        'SELECT * FROM hr_tasks WHERE id=? FOR UPDATE',
+        [candidate.id]
+      );
+      if (task && !['COMPLETED', 'ARCHIVED'].includes(task.state)) {
+        const earned =
+          task.run_started_ms == null
+            ? 0
+            : WorkTime.milliseconds(Number(task.run_started_ms), now);
+        await db.execute(
+          "UPDATE hr_tasks SET state='ARCHIVED',active_ms=active_ms+?,run_started_ms=NULL,updated_ms=? WHERE id=?",
+          [earned, now, task.id]
+        );
+        await db.execute(
+          `INSERT INTO hr_task_events (task_id,action,actor_email,previous_owner,owner_email,credit_owner,active_ms,event_ms,remarks)
+          VALUES (?,'ARCHIVED','SYSTEM',?,?,?,?,?,'Legacy incident made read-only; recorded time retained.')`,
+          [
+            task.id,
+            task.owner_email,
+            task.owner_email,
+            earned ? task.owner_email : null,
+            earned,
+            now
+          ]
+        );
+        await db.execute(
+          'UPDATE hr_task_revision SET revision=revision+1 WHERE id=1'
+        );
+      }
+      await db.commit();
+    } catch (error) {
+      await db.rollback();
+      throw error;
+    } finally {
+      db.release();
+    }
+  }
   await pool.execute(
     `INSERT IGNORE INTO hr_tasks
     (resource_type, resource_id, phase, stage, updated_ms)
@@ -80,13 +129,14 @@ async function initializeTaskSchema(pool) {
     `INSERT IGNORE INTO hr_tasks
     (resource_type, resource_id, stage, state, waiting_reason, updated_ms)
     SELECT 'INCIDENT', i.id, i.status,
-      IF(i.status IN ('PENDING SIGNATURE', 'NTE ISSUED') OR EXISTS (
+      IF(w.hearing_status = 'SCHEDULED' OR w.phase = 'MANAGEMENT' OR EXISTS (
         SELECT 1 FROM incident_information_requests r WHERE r.incident_id = i.id AND r.status = 'PENDING'), 'WAITING', 'READY'),
-      CASE WHEN i.status = 'PENDING SIGNATURE' THEN 'Awaiting employee / assigned reviewer signatures'
-        WHEN i.status = 'NTE ISSUED' THEN 'Awaiting employee explanation'
+      CASE WHEN w.hearing_status = 'SCHEDULED' THEN 'Awaiting hearing completion'
+        WHEN w.phase = 'MANAGEMENT' THEN 'Awaiting Management approval'
         WHEN EXISTS (SELECT 1 FROM incident_information_requests r WHERE r.incident_id = i.id AND r.status = 'PENDING')
           THEN 'Awaiting requested information' ELSE '' END, ?
-    FROM incident_reports i WHERE i.status <> 'CLOSED'`,
+    FROM incident_reports i JOIN incident_workflows w ON w.incident_id = i.id
+    WHERE i.workflow_version = 2 AND w.explanation_submitted_at IS NOT NULL AND i.status <> 'CLOSED'`,
     [now]
   );
 }

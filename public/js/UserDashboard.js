@@ -1571,13 +1571,15 @@ async function loadPendingAnnouncementsPopup() {
     const message = document.createElement('p');
     message.className = 'announcement-message';
     const days = Number(reminder.daysRemaining);
-    message.textContent = reminder.overdueAt
+    message.textContent = !reminder.deadlineDate
+      ? `${reminder.caseNumber}: acknowledge receipt of your Notice To Explain to begin the five-calendar-day response period.`
+      : reminder.overdueAt
       ? `${reminder.caseNumber}: your explanation is overdue. Please respond as soon as possible.`
       : days > 0
-        ? `${reminder.caseNumber}: ${days} working day${days === 1 ? '' : 's'} remaining. Deadline: ${DateUtils.formatDate(reminder.deadlineDate)}.`
+        ? `${reminder.caseNumber}: ${days} calendar day${days === 1 ? '' : 's'} remaining. Deadline: ${DateUtils.formatDate(reminder.deadlineDate)}.`
         : reminder.dueToday
           ? `${reminder.caseNumber}: your explanation is due today (${DateUtils.formatDate(reminder.deadlineDate)}).`
-          : `${reminder.caseNumber}: 0 working days remaining. Deadline: ${DateUtils.formatDate(reminder.deadlineDate)}.`;
+          : `${reminder.caseNumber}: 0 calendar days remaining. Deadline: ${DateUtils.formatDate(reminder.deadlineDate)}.`;
     const open = document.createElement('button');
     open.type = 'button';
     open.textContent = 'Open case in Track';

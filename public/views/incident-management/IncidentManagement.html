@@ -1,87 +1,115 @@
 <section id="view-incident-file" class="view" hidden>
-  <form id="incident-file-form" class="panel incident-form">
-    <h2>Incident Report</h2>
-    <fieldset>
-      <legend>Report Details</legend>
-      <div class="fgrid">
-        <label>Reported By<input id="ir-reporter-name" readonly /></label>
-        <label>Department<input id="ir-reporter-department" readonly /></label>
-        <label>Position<input id="ir-reporter-position" readonly /></label>
-        <label
-          >Date Of Report<input id="ir-date-reported" type="date" readonly
-        /></label>
-        <div class="incident-search-field">
-          <label for="ir-reported-employee">Employee Being Reported</label>
-          <input
-            id="ir-reported-employee"
-            type="search"
-            autocomplete="off"
-            required
-          />
-          <input id="ir-reported-employee-id" type="hidden" />
-          <div
-            id="ir-reported-employee-options"
-            class="incident-suggestions"
-            role="listbox"
-            hidden
-          ></div>
+  <div id="ir-workflow-file"></div>
+  <template id="incident-report-template">
+    <section
+      class="incident-case-section incident-detail-panel"
+      data-report-card
+    >
+      <h3 data-report-heading></h3>
+      <section class="incident-case-section incident-detail-panel incident-report-core-section">
+        <h3>I. Employee Information</h3>
+        <div class="fgrid">
+          <div class="incident-search-field">
+            <label
+              >Employee Being Reported<input
+                data-field="employeeSearch"
+                type="search"
+                autocomplete="off"
+                required
+            /></label>
+            <div
+              data-field="employeeSuggestions"
+              class="incident-suggestions"
+              role="listbox"
+              hidden
+            ></div>
+          </div>
+          <label>Position<input data-field="position" readonly /></label>
+          <label>Department<input data-field="department" readonly /></label>
+          <label
+            >Immediate Supervisor<input data-field="supervisor" readonly
+          /></label>
         </div>
-      </div>
-    </fieldset>
-
-    <fieldset>
-      <legend>Incident Information</legend>
-      <div class="fgrid">
-        <label>Subject<input id="ir-subject" maxlength="191" required /></label>
+        <div class="fgrid">
+          <div class="incident-search-field">
+            <label
+              >Employee Concerned<input
+                data-field="concernedSearch"
+                type="search"
+                autocomplete="off"
+                required
+            /></label>
+            <div
+              data-field="concernedSuggestions"
+              class="incident-suggestions"
+              role="listbox"
+              hidden
+            ></div>
+          </div>
+          <label>Position<input data-field="concernedPosition" readonly /></label>
+          <label>Department<input data-field="concernedDepartment" readonly /></label>
+          <label>Immediate Supervisor<input data-field="concernedSupervisor" readonly /></label>
+        </div>
+      </section>
+      <section class="incident-case-section incident-detail-panel incident-report-core-section">
+        <h3>II. Details Of The Alleged Incident</h3>
+        <div class="incident-when-grid">
+          <label>Date<input data-field="date" type="date" required /></label>
+          <label>Time<input data-field="time" type="time" required /></label>
+          <label class="incident-filing-location">
+            Location<input
+              data-field="where"
+              maxlength="191"
+              placeholder="Specify the branch, department, work area, customer site, or other location."
+              required
+            />
+          </label>
+        </div>
         <label
-          >Date Of Incident<input id="ir-incident-date" type="date" required
-        /></label>
+          >What Allegedly Happened?<textarea
+            data-field="what"
+            rows="4"
+            maxlength="12000"
+            placeholder="Describe the specific act, omission, misconduct, or failure to perform a required duty."
+            required
+          ></textarea>
+        </label>
+        <div class="incident-person-picker-row">
+          <h4>Others Involved</h4>
+          <div class="incident-person-selectors" data-involved-selectors></div>
+        </div>
+        <div class="incident-person-picker-row">
+          <h4>Witnesses</h4>
+          <div class="incident-person-selectors" data-witness-selectors></div>
+        </div>
         <label
-          >Location<input id="ir-location" maxlength="191" required
-        /></label>
-        <label>Time<input id="ir-time" type="time" required /></label>
-      </div>
-      <label for="ir-description">Incident Description</label>
-      <textarea
-        id="ir-description"
-        rows="7"
-        maxlength="12000"
-        required
-      ></textarea>
-
-      <h3>Names of Persons Involved</h3>
-      <div id="ir-persons-involved" class="incident-participant-list"></div>
-
-      <h3>Names of Witnesses</h3>
-      <div id="ir-witnesses" class="incident-participant-list"></div>
-
-      <label for="ir-comments">Comment</label>
-      <textarea id="ir-comments" rows="4" maxlength="3000"></textarea>
-    </fieldset>
-
-    <fieldset>
-      <legend>Supporting Evidence</legend>
-      <label for="ir-evidence"
-        >Attach Documents, Images, Audio, Or Video (Up To 10 Files, 8 MB Each;
-        18 MB total)</label
-      >
-      <input
-        id="ir-evidence"
-        type="file"
-        accept=".pdf,.doc,.docx,.rtf,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp,.txt,.csv,.mp3,.wav,.mp4,.mov"
-        multiple
-      />
-      <div id="ir-evidence-list" class="note" aria-live="polite"></div>
-    </fieldset>
-
-    <p class="note">
-      The reported employee’s and assigned reviewer’s signatures acknowledge
-      receipt of this report; they do not indicate admission of wrongdoing.
-    </p>
-    <div class="actions">
-      <button id="ir-submit" type="submit">Submit Incident Report</button>
-    </div>
-  </form>
+          >Why Is This Being Reported?<textarea
+            data-field="why"
+            rows="4"
+            maxlength="12000"
+            placeholder="State the relevant responsibility, instruction, or circumstances supporting the report. Do not assume motive."
+            required
+          ></textarea>
+        </label>
+        <label
+          >How Did It Happen?<textarea
+            data-field="how"
+            rows="4"
+            maxlength="12000"
+            placeholder="Describe the sequence of events and the basis of the report, including how the information was obtained."
+            required
+          ></textarea>
+        </label>
+      </section>
+      <label
+        >Supporting Documents / Evidence<input
+          data-field="files"
+          type="file"
+          multiple
+      /></label>
+      <div data-report-actions class="actions"></div>
+    </section>
+  </template>
 </section>
 
 <section id="view-incident-track" class="view" hidden>
@@ -199,92 +227,19 @@
         Refresh
       </button>
     </div>
-    <div class="incident-review-counters" aria-label="Case summary">
-      <article>
-        <span>Total Cases</span><strong id="ir-review-total">0</strong>
-      </article>
-      <article>
-        <span>Ongoing</span><strong id="ir-review-ongoing">0</strong>
-      </article>
-      <article>
-        <span>Waiting</span><strong id="ir-review-waiting">0</strong>
-      </article>
-      <article title="NTE Issued, Explanation Sent, and Evaluation">
-        <span>NTE</span><strong id="ir-review-nte">0</strong>
-      </article>
-      <article>
-        <span>Closed</span><strong id="ir-review-closed">0</strong>
-      </article>
+    <div id="ir-review-summary" class="incident-review-counters"></div>
+    <div class="incident-review-toolbar">
+      <div id="ir-review-categories" class="actions incident-review-tabs"></div>
+      <label class="incident-review-search"
+        >Search:<input
+        id="ir-review-search"
+        type="search"
+        placeholder="IR Number or Employee"
+        maxlength="191"
+      /></label>
     </div>
-    <div class="incident-review-filters">
-      <details id="ir-review-filter-control" open>
-        <summary>FILTER</summary>
-        <div class="fgrid">
-          <label
-            >Search Cases<input
-              id="ir-review-search"
-              type="search"
-              maxlength="191"
-              placeholder="IR number, employee, title, or reporter"
-          /></label>
-          <label
-            >Workflow Stage<select id="ir-review-stage">
-              <option value="ALL">All stages</option>
-              <option value="PENDING SIGNATURE">Pending Signature</option>
-              <option value="SIGNED">Signed</option>
-              <option value="UNDER_REVIEW">Under Review</option>
-              <option value="UNDER INVESTIGATION">Under Investigation</option>
-              <option value="NTE ISSUED">NTE Issued</option>
-              <option value="EXPLANATION SENT">Explanation Sent</option>
-              <option value="EVALUATION">Evaluation</option>
-              <option value="DECISION ISSUED">Decision Issued</option>
-              <option value="CLOSED">Closed</option>
-            </select></label
-          >
-        </div>
-      </details>
-      <div
-        class="incident-review-categories"
-        role="group"
-        aria-label="Case grouping"
-      >
-        <button type="button" data-review-category="ALL" aria-pressed="false">
-          All
-        </button>
-        <button
-          type="button"
-          data-review-category="ONGOING"
-          aria-pressed="true"
-        >
-          Ongoing
-        </button>
-        <button
-          type="button"
-          data-review-category="WAITING"
-          aria-pressed="false"
-        >
-          Waiting
-        </button>
-        <button
-          type="button"
-          data-review-category="CLOSED"
-          aria-pressed="false"
-        >
-          Closed
-        </button>
-      </div>
-    </div>
-    <p id="ir-review-results" class="note" role="status" aria-live="polite"></p>
-    <p id="ir-review-empty" class="note" hidden>
-      No matching Incident Reports.
-    </p>
-    <div
-      id="ir-review-list"
-      class="incident-review-list"
-      role="list"
-      aria-label="Incident Reports"
-      tabindex="0"
-    ></div>
+    <div id="ir-review-list" class="incident-review-list"></div>
+    <p id="ir-review-empty" class="note" hidden>No Matching Cases.</p>
   </section>
 </section>
 

@@ -251,6 +251,7 @@ input[type='file'] {
 .filters label,
 .toolbar label,
 .fgrid label,
+.fgrid .incident-head-reviewer-field,
 .login-card label,
 .password-form label,
 .hr-leave-balances label,
@@ -692,7 +693,7 @@ button.ghost {
 .report-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 12px; margin: 0; }
 .report-detail-grid textarea { resize: vertical; }
 .report-detail-rows { margin-top: 12px; }
-.incident-review-list { max-height: min(calc(68vh + 80px), 800px); overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.incident-review-list { max-height: min(calc(68vh + 80px), 800px); overflow: auto; overscroll-behavior: contain; scrollbar-gutter: auto; }
 .required-indicator { color: #a1253d; font-weight: 700; margin-left: 0.2em; }
 @media (max-width: 640px) {
   .tablewrap.report-table-scroll > table.report-table-master tr > :nth-child(3):not(:only-child),
@@ -2220,6 +2221,28 @@ legend {
   color: var(--muted);
   font-size: 13px;
 }
+.incident-when-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.incident-when-grid > label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.incident-when-grid .incident-filing-location { grid-column: span 2; }
+.incident-report-core-section > .fgrid { column-gap: 14px; }
+.incident-report-core-section > .fgrid + .fgrid { margin-top: 4px; }
+.incident-person-picker-row { margin-block: 14px; min-width: 0; }
+.incident-person-picker-row h4 { margin: 0 0 8px; font-weight: 400; }
+.incident-person-selectors {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+.incident-person-selectors .incident-search-field,
+.incident-person-selectors input { min-width: 0; width: 100%; box-sizing: border-box; }
 .incident-suggestions {
   position: absolute;
   z-index: var(--layer-menu);
@@ -2355,23 +2378,40 @@ legend {
 .incident-review-filters select {
   width: 100%;
 }
+.incident-review-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin: 16px 0;
+}
+.incident-review-search {
+  display: flex;
+  flex: 0 1 390px;
+  align-items: center;
+  gap: 10px;
+  min-width: min(100%, 290px);
+  color: var(--muted);
+  font-size: 13px;
+}
+.incident-review-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .incident-review-categories {
   display: flex;
-  gap: 18px;
-  margin-top: 16px;
-  border-bottom: 1px solid var(--rule);
+  flex: 1 1 400px;
+  gap: 8px;
+  margin: 0;
+  border-bottom: 0;
 }
 .incident-review-categories button {
-  padding: 10px 8px;
-  border: 0;
-  border-bottom: 3px solid transparent;
-  border-radius: 0;
-  background: transparent;
-  color: var(--muted);
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 8px 14px;
 }
 .incident-review-categories button[aria-pressed='true'] {
-  color: var(--brand, #722f43);
-  border-bottom-color: var(--brand, #722f43);
   font-weight: 700;
 }
 .incident-review-list {
@@ -2417,8 +2457,8 @@ legend {
 }
 .incident-review-case-meta {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 18px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 20px;
   margin: 8px 0 0;
 }
 .incident-review-case-meta dt {
@@ -2454,6 +2494,21 @@ legend {
   }
   .incident-review-case-meta {
     grid-template-columns: 1fr;
+  }
+  .incident-review-toolbar {
+    align-items: stretch;
+  }
+  .incident-review-categories {
+    flex-basis: 100%;
+    overflow-x: auto;
+  }
+  .incident-review-search {
+    flex-basis: 100%;
+  }
+}
+@container incident-review-list (min-width: 621px) and (max-width: 850px) {
+  .incident-review-case-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 #view-incident-track [hidden] {
@@ -3029,6 +3084,50 @@ legend {
 .performance-tasks-table { width: 1780px; }
 .performance-tasks-table th:last-child, .performance-tasks-table td:last-child { width: 280px; min-width: 280px; }
 .performance-assignments-table { width: 100%; min-width: 1020px; }
+.workflow-form { display: grid; gap: 16px; min-width: 0; }
+.workflow-form > label, .workflow-form .workflow-action-body > label { display: grid; gap: 6px; min-width: 0; }
+.workflow-form .incident-detail-panel > label { display: grid; gap: 6px; margin-block: 14px; min-width: 0; }
+.workflow-form label.workflow-checkbox { display: flex; align-items: flex-start; gap: 8px; color: var(--ink); }
+.workflow-form [hidden] { display: none !important; }
+.workflow-form input:not([type="checkbox"]), .workflow-form select, .workflow-form textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+.workflow-form textarea { min-height: 100px; resize: vertical; }
+.workflow-form .incident-detail-panel { margin-block: 12px; }
+.workflow-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 24px; margin: 12px 0; }
+.workflow-details > div { min-width: 0; }
+.workflow-details > .workflow-field-wide { grid-column: 1 / -1; }
+.workflow-details dt { font-size: .85rem; color: var(--muted); margin-bottom: 4px; }
+.workflow-details dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+.workflow-action { margin-block: 12px; }
+.workflow-action > button { width: 100%; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.workflow-related-reports .actions { flex-wrap: wrap; }
+.workflow-related-reports button, .workflow-form button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.workflow-action-body { border: 1px solid var(--rule); border-radius: 8px; padding: 16px; margin-top: 8px; }
+.workflow-signature { display: grid; gap: 8px; min-width: 0; }
+.workflow-signature canvas { width: 100%; max-width: 560px; touch-action: none; }
+.workflow-signature > button { justify-self: start; }
+.workflow-signed { display: grid; gap: 6px; max-width: 280px; margin-block: 16px; }
+.workflow-signed img { width: 240px; max-width: 100%; height: 70px; object-fit: contain; object-position: center bottom; }
+.workflow-request-person, .workflow-witness { padding: 12px; border: 1px solid var(--rule); border-radius: 8px; margin-block: 8px; }
+.workflow-request-person > label:first-child { display: flex; align-items: center; gap: 8px; }
+.workflow-attachments { display: grid; gap: 8px; padding-left: 20px; overflow-wrap: anywhere; }
+#incident-assignment-settings { grid-column: 1 / -1; }
+#incident-department-assignments { margin-block: 16px; }
+#incident-assignment-settings > label { display: grid; gap: 6px; max-width: 520px; }
+.incident-head-reviewers { display: grid; gap: var(--field-gap); }
+.incident-head-reviewers select { width: 100%; }
+@media (max-width: 640px) {
+  .incident-when-grid { grid-template-columns: minmax(0, 1fr); }
+  .incident-when-grid .incident-filing-location { grid-column: auto; }
+  .incident-person-selectors { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .workflow-details { grid-template-columns: minmax(0, 1fr); }
+  .workflow-action-body { padding: 12px; }
+  .workflow-form .actions > button { flex: 1 1 100%; }
+}
+@media (min-width: 641px) and (max-width: 1100px) {
+  .incident-when-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .incident-when-grid .incident-filing-location { grid-column: 1 / -1; }
+  .incident-person-selectors { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 @media (max-width: 1100px) {
   .performance-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .performance-charts { grid-template-columns: minmax(0, 1fr); }

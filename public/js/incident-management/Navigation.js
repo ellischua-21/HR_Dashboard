@@ -9,7 +9,7 @@
     HEAD: [
       ['incident-file', 'File'],
       ['incident-track', 'Track'],
-      ['incident-history', 'History'],
+      ['incident-review', 'Review'],
       ['incident-code-of-conduct', 'Code of Conduct']
     ],
     SUPERVISOR: [
@@ -25,6 +25,7 @@
       ['incident-code-of-conduct', 'Code of Conduct']
     ],
     ADMIN: [
+      ['incident-file', 'File'],
       ['incident-track', 'Track'],
       ['incident-review', 'Review'],
       ['incident-code-of-conduct', 'Code of Conduct']
@@ -32,8 +33,13 @@
   };
 
   global.INCIDENT_MANAGEMENT_NAVIGATION = {
-    forRole(role) {
-      return (NAVIGATION_BY_ROLE[role] || []).map((item) => [...item]);
+    forRole(role, isHrHead = false) {
+      const items = NAVIGATION_BY_ROLE[role] || [];
+      return items
+        .filter(
+          (item) => !(role === 'HR' && !isHrHead && item[0] === 'incident-file')
+        )
+        .map((item) => [...item]);
     }
   };
 })(window);

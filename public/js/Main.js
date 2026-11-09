@@ -182,7 +182,9 @@ async function init() {
         )
       : session.role === 'ADMIN'
         ? NAV.filter((item) => item[0] !== 'dashboard').map((item) =>
-            item[0] === 'hr-performance' ? [item[0], 'Dashboard', item[2]] : item
+            item[0] === 'hr-performance'
+              ? [item[0], 'Dashboard', item[2]]
+              : item
           )
         : NAV;
     const createNavLink = (n) => {
@@ -257,7 +259,9 @@ async function init() {
       group.appendChild(children);
       $('nav').appendChild(group);
     };
-    const canViewForms = session.perms.some((permission) => ['forms.review', 'forms.view'].includes(permission));
+    const canViewForms = session.perms.some((permission) =>
+      ['forms.review', 'forms.view'].includes(permission)
+    );
     const formItems = FORM_NAV.filter((n) =>
       n[0] === 'leave-requests' ? canViewForms : session.perms.includes(n[2])
     ).map((item) =>
@@ -270,7 +274,8 @@ async function init() {
     );
     const isHrAdmin = ['HR', 'ADMIN'].includes(session.role);
     if (isHrAdmin) {
-      const landingId = session.role === 'ADMIN' ? 'hr-performance' : 'dashboard';
+      const landingId =
+        session.role === 'ADMIN' ? 'hr-performance' : 'dashboard';
       visibleNavItems.filter((n) => n[0] === landingId).forEach(addNavLink);
       addNavGroup('Forms', formItems, true);
 
@@ -299,7 +304,10 @@ async function init() {
       );
       addNavGroup(
         'Incident Management',
-        window.INCIDENT_MANAGEMENT_NAVIGATION.forRole(session.role)
+        window.INCIDENT_MANAGEMENT_NAVIGATION.forRole(
+          session.role,
+          session.is_hr_head
+        )
       );
       visibleNavItems.filter((n) => n[0] === 'inbox').forEach(addNavLink);
       if (session.role === 'ADMIN') {
@@ -321,7 +329,10 @@ async function init() {
       addNavGroup('Forms', formItems, true);
       addNavGroup(
         'Incident Management',
-        window.INCIDENT_MANAGEMENT_NAVIGATION.forRole(session.role)
+        window.INCIDENT_MANAGEMENT_NAVIGATION.forRole(
+          session.role,
+          session.is_hr_head
+        )
       );
       visibleNavItems
         .filter((n) => n[0] !== 'employee-dashboard')
@@ -412,7 +423,11 @@ async function init() {
       await loadOptions();
       go(NAV[0]);
     }
-    if (session.perms.some((permission) => ['forms.review', 'forms.view'].includes(permission))) {
+    if (
+      session.perms.some((permission) =>
+        ['forms.review', 'forms.view'].includes(permission)
+      )
+    ) {
       const reviewBadgeScope = 'ALL';
       window
         .refreshSubmittedFormsBadge(reviewBadgeScope)
@@ -528,7 +543,10 @@ function addLoginInput(form, labelText, name, type, autocomplete, required) {
 }
 
 function go(n) {
-  if (session.role === 'ADMIN' && ['dashboard', 'hr-performance'].includes(n[0])) {
+  if (
+    session.role === 'ADMIN' &&
+    ['dashboard', 'hr-performance'].includes(n[0])
+  ) {
     n = ['hr-performance', 'Dashboard', 'admin.manage'];
   }
   if (n[0] === 'executive' && !can('exec.view')) return;
@@ -538,15 +556,12 @@ function go(n) {
   document
     .querySelectorAll('#nav a')
     .forEach((a) => a.classList.toggle('on', a.dataset.id === n[0]));
-  let activeGroup = null;
   document.querySelectorAll('#nav .nav-group').forEach((group) => {
     const containsActiveLink = Boolean(
       group.querySelector(`a[data-id="${n[0]}"]`)
     );
     group.classList.toggle('has-active', containsActiveLink);
-    if (containsActiveLink) activeGroup = group;
   });
-  window.AppOutsideDismiss.openNavigationGroup(activeGroup);
   $('title').textContent = n[0] === 'accounts' ? 'Manage Accounts' : n[1];
   document.querySelectorAll('.view').forEach((v) => (v.hidden = true));
   if (n[0] === 'dashboard') {
@@ -571,7 +586,10 @@ function setSubmittedFormsCount(count, scope = 'HR') {
   badge.hidden = pending === 0;
   updateFormsNotificationDot();
   const link = badge.parentElement;
-  link.setAttribute('aria-label', `${session.role === 'ADMIN' ? 'View Forms' : 'Review Requests'}, ${pending} pending`);
+  link.setAttribute(
+    'aria-label',
+    `${session.role === 'ADMIN' ? 'View Forms' : 'Review Requests'}, ${pending} pending`
+  );
   link.title = `${pending} pending form${pending === 1 ? '' : 's'}`;
 }
 

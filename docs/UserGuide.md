@@ -51,9 +51,9 @@ their existing dashboard and attendance list.
 | ------- | ------------- |
 | STAFF   | Fill out forms, check personal submissions, track incidents involving you, view case history and the Code of Conduct, read the Inbox, and change your password. |
 | SUPERVISOR | STAFF features, plus review assigned STAFF form requests and file Incident Reports. |
-| HEAD    | STAFF features, plus review assigned SUPERVISOR form requests and file Incident Reports. |
+| HEAD    | Personal dashboard and forms, assigned SUPERVISOR form reviews, Incident Report filing and assigned department incident reviews. Closed incidents are in Review. |
 | HR      | Dashboard, employee records, attendance, reports, announcements, personal forms, form reviews, and incident filing and review. |
-| ADMIN   | Dashboard, employee records, attendance, reports, announcements, view-only forms and incident access, HR task assignment and performance monitoring, account approvals, and account assignments. ADMIN does not have personal form submission pages. |
+| ADMIN   | HR Performance Dashboard, employee records, attendance, reports, announcements, View Forms, account management, and assigned incident access. ADMINs acting as department HEADs can file/review IRs; designated Management approvers approve recommendations. ADMIN has no personal form submission pages. |
 
 **Head HR is an HR account with an extra assignment.** It keeps the normal HR
 features and can also review forms submitted by other HR accounts.
@@ -76,7 +76,7 @@ analytics Dashboard and **Reports → HR Reports**, without Executive Summary ac
 | File an incident                                   | **Incident Management → File**; available to SUPERVISOR, HEAD, and HR  |
 | Open a case and its available actions              | **Incident Management → Track** |
 | Find incidents awaiting HR attention               | **Incident Management → Review**; HR and ADMIN |
-| Find completed personal cases                      | **Incident Management → History**; STAFF, SUPERVISOR and HEAD |
+| Find completed personal cases                      | **Incident Management → History**; STAFF and SUPERVISOR; HEAD uses **Review → Closed** |
 | View the disciplinary matrix and violation history | **Incident Management → Code of Conduct** |
 | Create an announcement                             | **Reports → Create Announcement**; HR and ADMIN |
 | Approve account requests                           | **Manage Accounts → Account Requests**; ADMIN |
@@ -150,7 +150,7 @@ serial number or details.
 
 ### Review a form request
 
-1. Open **Forms → Review Requests**, or **Manage Forms** for ADMIN.
+1. Open **Forms → Review Requests**, or **View Forms** for ADMIN.
 2. Use status, form type, search, and submission-date filters to find the request.
 3. Select **View form** and read the request.
    HR must select **Take Task** before processing it. ADMIN can view requests and assign or reassign them, but cannot process them. If another
@@ -220,157 +220,178 @@ or contact HR. Scanner-account connections are managed by the system administrat
 
 ## 7. Use Incident Management
 
+### Pages by role
+
+| Role | Pages |
+| --- | --- |
+| STAFF | Track, History, Code of Conduct |
+| SUPERVISOR | File, Track, History, Code of Conduct |
+| HEAD | File, Track, Review, Code of Conduct |
+| HR | Track, Review, Code of Conduct; the designated Head HR also sees File |
+| ADMIN | File, Track, Review, Code of Conduct; filing and HEAD review require a department assignment |
+
+All accounts use the same circle tracker: **IR Filed > NTE Issued > Closed**.
+Other actions keep the current stage. A case can contain several Incident Reports,
+with a separate IR number and outcome for each reported employee. Use **Related
+Incident Reports** in Track to switch between the reports you may access. The
+case reaches Closed only after every report in that case has been closed.
+
+### ADMIN: set up reviewers
+
+1. Open **Manage Accounts > Accounts**.
+2. Under **Incident Reviewer Assignments**, choose a HEAD or ADMIN for each
+   department. One reviewer may cover several departments. The **Heads** department
+   has two ADMIN reviewer slots.
+3. Select any active ADMIN as the **Management Approver**.
+4. Select the existing **Save Changes** button. Leaving the page without saving
+   discards your edits.
+
+Department assignments route reports filed by supervisors in those departments.
+The initial mapping is Paso Warehouse—HEAD 1; Dalisay/E-commerce—HEAD 2;
+Marketing and Procurement—ADMIN 1; Accounting and HR—ADMIN 2 (including employee
+records labeled Human Resources); Printing—HEAD 3;
+Sales—HEAD 4; Stores—HEAD 5. ADMIN 1 and ADMIN 2 are both assigned to **Heads**.
+The startup applies a mapping only when it finds a matching active reviewer account;
+it does not create accounts. Assign any departments left Unassigned after the
+corresponding HEAD account is available.
+
+Reports against HEAD accounts enter a shared queue for the two ADMIN reviewers
+assigned to **Heads**. The same applies when a HEAD files against STAFF in their own
+department. The filer, reported employee, and witnesses cannot take that review.
+An eligible ADMIN selects **Take HEAD Review Task**; once one takes it, the other
+ADMIN can still view the case but cannot take it. An assigned ADMIN may review
+incidents and use the HR Performance Dashboard. An ADMIN without a HEAD assignment
+cannot file or take HEAD review tasks, but may approve a case if selected as its
+Management Approver.
+
+Only the designated **Head HR** can file an IR as HR. That report goes to the
+reviewer assigned to the HR department for the initial IR/NTE decision. After the
+reported employee submits an explanation, an uninvolved HR account can take the
+evaluation task.
+
 ### File an Incident Report
 
-1. Open **Incident Management → File**.
-2. Check your automatically filled reporter details.
-3. Search for the **Employee Being Reported** and select the correct suggestion.
-4. Enter the subject, incident date, time, location, and description.
-5. Add people involved, witnesses, and comments where applicable. Select people from the suggestions.
-6. Attach supporting files if needed, then select **Submit Incident Report**.
-7. Use the assigned IR number to find the case in **Track**.
+1. Open **Incident Management > File**.
+2. Search for the reported employee and select the correct suggestion. Section I
+   fills their name, position, immediate supervisor, and department automatically.
+3. Complete Section II: incident title, What, When, Where, Who, Why, and How.
+   Describe facts and circumstances without assuming motive.
+4. Use **Add Witness** for witnesses. Witnesses are listed within the IR;
+   they are not automatically treated as reported employees.
+5. Attach supporting files where needed.
+6. For another reported employee in the same case, select **File Another**.
+   Shared incident details are copied for you to review and edit. Each employee
+   receives a separate IR number and can receive a different outcome.
+7. Select **File Reports** and confirm.
 
-Evidence uploads allow up to **10 files**, **8 MB per file**, and **18 MB total**.
-Supported choices include documents, images, audio, and video shown by the file
-selector.
+The involved employees and reviewing HEAD are notified. The former employee,
+Supervisor/Head, and HR signatures on the initial IR are no longer required.
 
-### Track a case and sign when requested
+### HEAD: review an IR
 
-1. Open **Incident Management → Track**, or use the link in an Inbox notification.
-2. Search for and select the case.
-3. Read the Incident Report, available documents, signatures, and activity timeline.
-   Reporter details and reported-employee details are shown separately.
-4. If your signature is requested, draw it in your signature box and select **Sign**.
-5. Use **Refresh status** to reload the selected case.
+Open **Incident Management > Review** and select **View** to open Track.
+HEAD filters are **All**, **For Review**, **NTE Issued**, and **Closed**.
+ADMIN filters are **All**, **IR Filed**, **NTE Issued**, and **Closed**.
+HEAD and ADMIN see their assigned review cases, plus eligible shared-queue items.
 
-Employee and assigned reviewer signatures acknowledge receipt of the report; they are not an
-admission of wrongdoing. After the required acknowledgments, HR signs to begin its
-review. You only see information and actions allowed for your involvement in the
-case.
+For each IR, the assigned HEAD can:
 
-### Understand the stages
+- **Request More Evidence** from the filing supervisor, with a written request.
+  The supervisor receives a notification and a response form with attachments.
+  HEAD must wait for the response before another request, NTE issuance, or closure.
+- **Prepare Notice To Explain**, completing Sections III, IV, and VI. The notice
+  retains Sections I and II from the IR and includes Section V's explanation
+  directive. Save a draft or draw the issuing HEAD signature and **Issue NTE**.
+- **Close For Documentation**, recording the closure reason. This does not add a
+  confirmed violation. Other reports in the same case remain independent.
 
-| Stage               | What it means |
-| ------------------- | ------------- |
-| Pending Signature   | Required employee or assigned reviewer acknowledgments are incomplete. |
-| Signed              | Required acknowledgments are complete; HR has not yet started its signed review. |
-| Under Review        | HR has signed and is reviewing the report. |
-| Under Investigation | HR is collecting or assessing additional information. |
-| NTE Issued          | A Notice to Explain has been issued to the reported employee. |
-| Explanation Sent    | The employee has submitted their explanation. |
-| Evaluation          | HR is evaluating the case and preparing the decision. |
-| Decision Issued     | The approved final decision has been issued. |
-| Closed              | The case has been completed or closed at an earlier stage. |
+### Employee: acknowledge and explain
 
-Not every case goes through every stage. A case closed early shows its actual
-closure point and reason.
+1. Open the case from **Inbox** or **Incident Management > Track**.
+2. Read the issued NTE and permitted evidence. **View Document** provides a
+   formatted copy and the browser's **Print / Save As PDF** option.
+3. Sign the receipt acknowledgment in Section VI. It confirms receipt, not
+   admission of the allegation.
+4. The response deadline is **five calendar days after receipt**, including
+   weekends and holidays. Track shows the countdown. An outstanding notice has
+   a reminder at most once per day.
+5. Complete Section VII, attach supporting documents, and draw your explanation
+   signature. You may **Save Draft** before submitting.
+6. Select **Submit Explanation** and confirm. The submitted statement and
+   signature are preserved and cannot be overwritten.
 
-### HR: find and review cases
+An employee can **Request An Extension** while an explanation is outstanding.
+HR can approve the requested days, choose a different number of additional
+calendar days, or reject the request. The employee can also request an
+administrative hearing when submitting the explanation.
 
-Open **Incident Management → Review** to see the case totals and list.
+An overdue response is marked overdue and HR is notified. Overdue status does
+not establish a violation or automatically impose a sanction.
 
-- **All:** all accessible cases.
-- **Waiting:** cases awaiting required signatures, including HR's signature.
-- **Ongoing:** HR has signed and the case is not closed.
-- **Closed:** completed or closed cases.
+### HR: evaluate, obtain approval, and close
 
-Search by IR number, employee, title, or reporter, and use the workflow-stage
-filter where needed. Select **View** to open the case in **Track**. Review is the
-case list; Track contains the case details and available actions.
+HR sees cases from NTE issuance onward. Review filters are **All**, **NTE Issued**,
+**For Review**, and **Closed**. A submitted explanation moves the item into HR's
+For Review filter; the circle stage remains NTE Issued.
 
-Before signing for HR or processing a case, select **Take Task** in Track.
-The task stays with that reviewer through investigation, explanation, evaluation,
-and closure. Other HR accounts can view it; ADMIN can reassign it when needed.
-Tasks awaiting employee or assigned-reviewer signatures become available to take
-after those signatures are complete.
+1. Open the case and select **Take Task** after the employee has submitted the
+   explanation. Another HR may view it, but only its owner may process it.
+2. Read the IR, NTE, employee explanation, and supporting records.
+3. If necessary, **Request Information From Employees**. Select the involved
+   employees and write a separate request for each. HR must wait for all responses.
+   Each recipient can submit one response per request and must then wait for
+   further instructions.
+4. For an external hearing, choose **Schedule Hearing** and enter its details.
+   Involved people are notified. Mark it completed only after the hearing has
+   actually finished; processing remains paused until then.
+5. Open **Review NTE And Recommend Action** for Section VIII. Record findings,
+   review indicators, whether a violation was established, and optional remarks.
+   For an established violation, select the severity. The system counts previous
+   finalized violations of that severity and fills the corrective action from
+   the configured matrix. A finding of no violation has no disciplinary action.
+6. Choose an uninvolved Management approver and **Send For Management Approval**.
+   The designated ADMIN can approve or return the recommendation with remarks.
+7. After approval, HR selects **Issue Approved Final Decision**. The reported
+   employee receives the decision and a popup notification. Finalized established
+   violations now appear in the employee's violation history.
+8. Select **Close Case**, enter the closure reason, and confirm.
+   Involved people are notified. The shared case tracker reaches Closed when
+   every IR in that case is closed.
 
-### HR: review or investigate
+If an approved recommendation needs revision, use **Revise Evaluation** before
+issuing it. New Management approval is required afterward.
 
-During **Under Review**, HR can require further investigation, prepare an NTE, or
-close the case for documentation. Selecting further investigation moves the case
-to **Under Investigation**; no transition note is required.
+HR time starts only when the HR task is taken. Earlier HEAD review and employee
+explanation time are excluded from HR backlog and timing. The timer counts only
+Monday-Friday, 8:00 AM-6:30 PM, Philippine time, and pauses for requested employee
+responses, scheduled hearings, and Management approval.
 
-During investigation:
+### Documents and confidentiality
 
-1. Record investigation findings and add supporting evidence where needed.
-2. Under **Request information from employees**, select the recipients and write
-   the information needed from each person. Requests can contain different
-   instructions for different recipients.
-3. Send the requests and wait for the responses.
+- Reported employees may see Sections I-VII and their issued final decision.
+- Other involved employees and the filing supervisor may see Sections I-IV.
+- Assigned HEADs may see Sections I-VII and the permitted final decision.
+- Authorized HR and assigned ADMIN reviewers may see Sections I-VIII.
+- Information requests and their attachments are available to the selected
+  recipient and authorized reviewers. Internal HR activity is kept separate from
+  the public timeline.
 
-While responses are pending, HR cannot issue an NTE, close the case, or send another
-request. A recipient opens the case in Track, enters their response, attaches any
-requested evidence, and submits it. After submission, that response cannot be
-followed by another submission unless HR makes a new request.
-
-**Notice to Explain** and **Close for documentation** reveal their fields only
-when selected. Closing for documentation requires a reason and does not record a
-disciplinary violation.
-
-### HR: issue a Notice to Explain
-
-1. In an eligible case, select the Notice to Explain action.
-2. Check the reported employee shown as the recipient.
-3. Enter the allegation, issuance date, documented receipt date, response period,
-   and explanation deadline. Attach supporting evidence where needed.
-4. Review the deadline. The working-day calculation skips weekends; HR can adjust
-   the deadline to match the approved company procedure.
-5. Use **Save draft** if the notice is not ready. Use **Preview NTE** to check it.
-6. Draw the authorized HR signature and select **Issue NTE**. Confirm issuance.
-
-The case changes to **NTE Issued**, and the reported employee is notified.
-
-### Employee: respond to a Notice to Explain
-
-1. Open the notice from the notification or select the case in **Track**.
-2. Read the NTE, permitted attachments, and deadline.
-3. Write your explanation and attach supporting evidence.
-4. Select **Save draft** to return to it later, or **Submit explanation to HR**
-   when it is ready. Confirm submission.
-5. Check the saved explanation and its submission date and time in the case.
-
-A draft has not been submitted. A submitted explanation cannot be overwritten.
-If an additional-statement option is available, it records a separate statement
-instead of replacing the original.
-
-Outstanding NTEs show a countdown and a daily reminder. Reminders stop once the
-explanation is submitted or the notice is resolved. An overdue deadline is flagged
-for HR; it does not automatically establish a violation.
-
-### HR: evaluate, issue a decision, and close
-
-1. Open the case with an **Explanation Sent** status. Select **Start Evaluation**
-   when ready to evaluate the explanation.
-2. Review the report, evidence, explanation, investigation records, and relevant
-   finalized violation history.
-3. Choose whether the allegation is substantiated. Enter the evaluation findings.
-4. For a substantiated finding, select the severity. The corrective action is
-   filled from the saved COC matrix and the employee's previous finalized offenses
-   at that severity. A not-substantiated finding receives no disciplinary action.
-5. Add remarks if needed and draw the authorized HR signature.
-6. Select **Process Evaluation**, review the confirmation, and issue the decision.
-
-The case moves to **Decision Issued**. The reported employee receives the decision;
-other involved users receive updates according to their access. An established
-violation is added to the employee's violation history.
-
-After delivery and administrative completion, enter the completion notes and
-select **Complete delivery and close case**. Confirm to close the case.
+Existing cases from the former workflow are labeled **Read-Only Legacy Record**.
+Their original documents, signatures, statuses, and history remain available
+within case permissions. They cannot be processed through the replacement
+workflow or counted as current HR backlog.
 
 ### Code of Conduct and violation history
 
-Open **Incident Management → Code of Conduct**.
+Open **Incident Management > Code of Conduct**. The left panel contains the
+corrective-action matrix; the right panel contains finalized violations.
+Pending allegations and unsubstantiated findings are not confirmed violations.
+STAFF, SUPERVISOR, and HEAD see their own history. HR and ADMIN can search an
+employee, select a suggestion, and choose **View Records**.
 
-- The left side shows the matrix: **severity**, **occurrence number**, and
-  **corrective action**.
-- The right side shows finalized violation history. Pending allegations and
-  unsubstantiated findings are not confirmed violations.
-- HR can search for an employee, select the name suggestion, and select
-  **View records**. Other accounts see their ow
-**HR: edit the matrix** in the configuration section. Change existing rows,
-use **Add matrix row** to add one, or **Remove** to remove one. Each severity and
-occurrence combination must be unique. Keep corrective-action text within **191
-characters**, then select **Save changes**.
+HR can edit matrix rows, use **Add Matrix Row**, and select **Save Changes**.
+The matrix used for a recommendation is preserved with that case, so later
+matrix changes do not rewrite previously approved findings.
 
 ## 8. Manage accounts
 
@@ -411,7 +432,7 @@ prevents removing the assignment without an eligible replacement.
 
 **Available to:** ADMIN, on **Dashboard**.
 
-Only HR accounts are included in the performance figures. ADMIN can view records and assign or reassign tasks, but cannot take tasks, sign forms, issue notices, make decisions, or change the COC matrix.
+Only HR accounts are included in the performance figures. ADMIN can view performance and assign or reassign permitted tasks, but cannot take HR tasks, process form reviews, or edit the COC matrix. Department HEAD duties and Management approvals performed by ADMIN are separate from HR performance.
 
 1. Choose a date range, reviewer, and request type, then select **Apply Filters**.
 2. Use the overview cards and charts to compare completed form reviews, reviewed
@@ -453,8 +474,8 @@ signatures before an HR takes it.
   **Monday–Friday, 8:00 AM–6:30 PM, Philippine time**. There is no separate lunch
   deduction or automatic public-holiday exclusion.
 - HR sees their own task timer in each form review row and in the incident Track view.
-- Time pauses while an incident awaits requested employee information or an NTE
-  explanation. It resumes when HR can act, and stops when the task is completed.
+- Time pauses while an incident awaits requested employee information, a hearing,
+  or Management approval. It resumes when HR can act, and stops when the task is completed.
 - The timer continues correctly when the page is closed or the server restarts.
 - **Total HR Time** includes HR reviewers' recorded time; ADMIN activity is excluded. **Current Owner Time**
   includes only the current reviewer's share. Time is a measure of workflow

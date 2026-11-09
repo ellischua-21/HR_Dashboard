@@ -104,7 +104,6 @@
         !menuButton.contains(target)
       )
         setSidebarOpen(false);
-      if (!navigation.contains(target)) openNavigationGroup();
       const feedback = document.querySelector('.feedback-popup:not([hidden])');
       if (feedback && !feedback.contains(target)) window.AppFeedback?.clear();
     },

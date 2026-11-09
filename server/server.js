@@ -15,7 +15,7 @@ const announcements = require('./services/AnnouncementService');
 const inbox = require('./services/InboxService');
 const accounts = require('./services/AccountService');
 const userForms = require('./services/FormService');
-const incidents = require('./services/IncidentService');
+const incidents = require('./services/IncidentWorkflowService');
 const tasks = require('./services/TaskService');
 const performance = require('./services/PerformanceService');
 const incidentArchive = require('./services/incident-management/Archive');
@@ -189,6 +189,11 @@ const methods = {
   reviewUserForm: (req, formId, decision, notes, signature, hrFields) =>
     userForms.reviewUserForm(req, formId, decision, notes, signature, hrFields),
   getIncidentFileContext: (req) => incidents.getIncidentFileContext(req),
+  getIncidentWorkflowConfiguration: (req) => incidents.getIncidentWorkflowConfiguration(req),
+  saveIncidentWorkflowConfiguration: (req, data) => incidents.saveIncidentWorkflowConfiguration(req, data),
+  submitIncidentGroup: (req, data) => incidents.submitIncidentGroup(req, data),
+  incidentWorkflowAction: (req, id, action, data) => incidents.incidentWorkflowAction(req, id, action, data),
+  getIncidentCorrectiveAction: (req, id, severity) => incidents.getIncidentCorrectiveAction(req, id, severity),
   searchIncidentEmployees: (req, query, purpose) =>
     incidents.searchIncidentEmployees(req, query, purpose),
   submitIncidentReport: (req, input) =>

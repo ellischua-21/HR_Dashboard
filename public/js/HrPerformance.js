@@ -221,7 +221,9 @@
         task.title,
         task.employeeName,
         task.ownerName || 'Unassigned',
-        FormStatus.titleCase(task.stage),
+        task.type === 'INCIDENT'
+          ? window.IncidentProgress.label(task.stage)
+          : FormStatus.titleCase(task.stage),
         task.waitingReason ||
           (task.state === 'COMPLETED'
             ? 'Completed'
@@ -264,7 +266,8 @@
       );
       // The task table already displays owner and time in their own columns.
       ownership.querySelector('.task-ownership-details')?.remove();
-      actions.append(view, log, ownership);
+      if (task.canViewCase !== false) actions.appendChild(view);
+      actions.append(log, ownership);
       body.appendChild(row);
     });
     if (!body.children.length) AppUI.emptyRow(body, 10, 'No matching tasks.');
@@ -291,7 +294,8 @@
       view.type = 'button';
       view.onclick = () =>
         window.openIncidentRoute(entry.incidentId, 'incident-track');
-      cell(row, '').appendChild(view);
+      const action = cell(row, '');
+      if (entry.canViewCase !== false) action.appendChild(view);
       body.appendChild(row);
     });
     if (!body.children.length)

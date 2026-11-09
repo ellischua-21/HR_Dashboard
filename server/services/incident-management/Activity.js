@@ -27,22 +27,6 @@ const PUBLIC_ACTIONS = {
   INVESTIGATION_CLOSED: 'Case closed after investigation',
   DECISION_CASE_CLOSED: 'Case closed'
 };
-const TARGET_STATUS = {
-  IR_CREATED: 'PENDING SIGNATURE',
-  IR_SUBMITTED: 'PENDING SIGNATURE',
-  SIGNATURES_COMPLETED: 'SIGNED',
-  HR_REVIEW_STARTED: 'UNDER_REVIEW',
-  INVESTIGATION_STARTED: 'UNDER INVESTIGATION',
-  NTE_ISSUED: 'NTE ISSUED',
-  EXPLANATION_SENT: 'EXPLANATION SENT',
-  EXPLANATION_RECEIVED_EXTERNALLY: 'EXPLANATION SENT',
-  EVALUATION_STARTED: 'EVALUATION',
-  DECISION_ISSUED: 'DECISION ISSUED',
-  CLOSED_FOR_DOCUMENTATION: 'CLOSED',
-  INVESTIGATION_CLOSED: 'CLOSED',
-  DECISION_CASE_CLOSED: 'CLOSED'
-};
-
 function publicTimeline(incident, activity, signatures) {
   const signatureFor = (role) =>
     signatures.find((signature) => signature.role === role);
@@ -103,4 +87,4 @@ function publicTimeline(incident, activity, signatures) {
   }
   return timeline.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 }
-module.exports = { PUBLIC_ACTIONS, TARGET_STATUS, publicTimeline };
+module.exports = { PUBLIC_ACTIONS, publicTimeline };
