@@ -14,8 +14,19 @@ for (const [id, path] of [
 }
 
 (async function loadDashboard() {
-  const finishLoading = AppLoading.begin();
+  let finishLoading = () => {};
+  let resource = 'the dashboard';
   try {
+    resource = 'Feedback.js';
+    if (
+      typeof window.AppFeedback?.show !== 'function' ||
+      typeof window.AppErrors?.show !== 'function'
+    )
+      throw new Error('Startup feedback is unavailable.');
+    resource = 'Loading.js';
+    if (typeof window.AppLoading?.begin !== 'function')
+      throw new Error('Startup loading indicator is unavailable.');
+    finishLoading = AppLoading.begin();
     const fragments = [
       ['dashboard-fragment', 'views/Dashboard.html'],
       ['employees-fragment', 'views/Employees.html'],
@@ -32,6 +43,7 @@ for (const [id, path] of [
       ]
     ];
     for (const [target, path] of fragments) {
+      resource = path.split('/').pop();
       const url = new URL(
         `${path}?v=${encodeURIComponent(assetVersion)}`,
         appBaseUrl
@@ -81,21 +93,46 @@ for (const [id, path] of [
       'js/incident-management/History.js',
       'js/incident-management/CodeOfConduct.js'
     ]) {
+      resource = path.split('/').pop();
       await new Promise((resolve, reject) => {
         const script = document.createElement('script');
         script.src = new URL(
           `${path}?v=${encodeURIComponent(assetVersion)}`,
           appBaseUrl
         );
-        script.onload = resolve;
-        script.onerror = () => reject(new Error(`Could not load ${path}.`));
+        // A downloaded script may still fail while being evaluated.
+        const executionError = (event) => {
+          if (event.filename === script.src) {
+            window.removeEventListener('error', executionError);
+            reject(new Error(`Could not initialize ${path}.`));
+          }
+        };
+        window.addEventListener('error', executionError);
+        script.onload = () => {
+          window.removeEventListener('error', executionError);
+          resolve();
+        };
+        script.onerror = () => {
+          window.removeEventListener('error', executionError);
+          reject(new Error(`Could not load ${path}.`));
+        };
         document.body.appendChild(script);
       });
     }
+    resource = 'the dashboard';
     await window.initializeDashboard();
+  } catch (error) {
+    console.error('Dashboard startup failed:', resource, error);
+    const app = document.getElementById('app');
+    app.hidden = true;
+    app.inert = true;
+    document.getElementById('bootstrap-screen')?.remove();
+    document.getElementById('login-screen')?.remove();
+    document.getElementById('startup-error-message').textContent =
+      `Could not load ${resource}. Reload the page to try again.`;
+    document.getElementById('startup-error').hidden = false;
+    document.getElementById('startup-reload').focus();
   } finally {
     finishLoading();
   }
-})().catch((error) => {
-  AppErrors.show(error.message || String(error));
-});
+})();

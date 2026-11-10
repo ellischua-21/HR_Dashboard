@@ -1715,6 +1715,12 @@ legend {
   place-items: center;
   padding: 20px;
 }
+#startup-error[hidden] {
+  display: none;
+}
+#startup-error-message {
+  overflow-wrap: anywhere;
+}
 .login-card {
   width: min(100%, 400px);
   display: grid;

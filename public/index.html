@@ -19,6 +19,27 @@
         <p id="bootstrap-status" class="note" role="status"></p>
       </div>
     </main>
+    <main
+      id="startup-error"
+      class="login"
+      aria-labelledby="startup-error-title"
+      hidden
+    >
+      <div class="login-card">
+        <h1 id="startup-error-title">Unable to Start</h1>
+        <p id="startup-error-message" role="alert">
+          The startup file (ui-loader.js) could not be loaded. Reload the page
+          to try again.
+        </p>
+        <button
+          id="startup-reload"
+          type="button"
+          onclick="window.location.reload()"
+        >
+          Reload Page
+        </button>
+      </div>
+    </main>
     <div id="app" hidden>
       <aside id="side" aria-label="Main navigation">
         <div class="brand">
@@ -79,6 +100,9 @@
     <section id="leave-print-root" aria-hidden="true"></section>
     <script src="js/Feedback.js?v=20261102-50"></script>
     <script src="js/Loading.js?v=20261106-83"></script>
-    <script src="js/ui-loader.js?v=20261109-111"></script>
+    <script
+      src="js/ui-loader.js?v=20261110-112"
+      onerror="document.getElementById('bootstrap-screen')?.remove(); document.getElementById('startup-error').hidden = false; document.getElementById('startup-reload').focus()"
+    ></script>
   </body>
 </html>
