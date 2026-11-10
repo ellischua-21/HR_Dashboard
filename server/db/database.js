@@ -77,6 +77,7 @@ async function initializeDatabase() {
     email VARCHAR(191) NOT NULL,
     full_name VARCHAR(191) NOT NULL DEFAULT '',
     role VARCHAR(40) NOT NULL,
+    is_setup_admin TINYINT(1) NOT NULL DEFAULT 0,
     active TINYINT(1) NOT NULL DEFAULT 1,
     extra_perms TEXT NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
@@ -90,6 +91,14 @@ async function initializeDatabase() {
   if (!userColumns.length) {
     await pool.query(
       "ALTER TABLE user_roles ADD COLUMN full_name VARCHAR(191) NOT NULL DEFAULT '' AFTER email"
+    );
+  }
+  const [setupAdminColumns] = await pool.query(
+    "SHOW COLUMNS FROM user_roles LIKE 'is_setup_admin'"
+  );
+  if (!setupAdminColumns.length) {
+    await pool.query(
+      'ALTER TABLE user_roles ADD COLUMN is_setup_admin TINYINT(1) NOT NULL DEFAULT 0 AFTER role'
     );
   }
   const [headColumns] = await pool.query(

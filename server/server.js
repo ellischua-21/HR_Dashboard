@@ -21,7 +21,7 @@ const performance = require('./services/PerformanceService');
 const incidentArchive = require('./services/incident-management/Archive');
 const incidentConduct = require('./services/incident-management/Conduct');
 const { verifyPassword } = require('./utils/Password');
-const { getAccountEmployee } = require('./utils/EmployeeIdentity');
+const { getAccountEmployee, isSetupAdministrator } = require('./utils/EmployeeIdentity');
 const { sendAttachment } = require('./utils/AttachmentResponse');
 
 const app = express();
@@ -75,7 +75,7 @@ app.post('/api/login', async (req, res, next) => {
       .toLowerCase();
     const password = req.body.password;
     const [rows] = await pool.execute(
-      'SELECT email, role, active, password_hash FROM user_roles WHERE email = ? LIMIT 1',
+      'SELECT email, role, active, password_hash, is_setup_admin FROM user_roles WHERE email = ? LIMIT 1',
       [email]
     );
     const user = rows[0];
@@ -92,7 +92,7 @@ app.post('/api/login', async (req, res, next) => {
         .json({ error: 'This account has an unrecognized role.' });
     }
     const employee = await getAccountEmployee(user.email);
-    if (!employee) {
+    if (!employee && !isSetupAdministrator(user)) {
       return res.status(403).json({
         error: 'A unique employee record must be linked to this account. Contact HR.'
       });

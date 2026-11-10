@@ -2,7 +2,7 @@ const { httpError } = require('../utils/HttpError');
 const { ROLE_PERMS } = require('../config/Permissions');
 const { pool } = require('../db/database');
 const { logAudit } = require('../services/AuditService');
-const { getAccountEmployee } = require('../utils/EmployeeIdentity');
+const { getAccountEmployee, isSetupAdministrator } = require('../utils/EmployeeIdentity');
 
 async function getCurrentUser(req) {
   const email = String(req.session.userEmail || '')
@@ -10,13 +10,13 @@ async function getCurrentUser(req) {
     .toLowerCase();
   if (!email) return null;
   const [rows] = await pool.execute(
-    'SELECT email, full_name, role, active, extra_perms, is_hr_head FROM user_roles WHERE email = ? LIMIT 1',
+    'SELECT email, full_name, role, active, extra_perms, is_hr_head, is_setup_admin FROM user_roles WHERE email = ? LIMIT 1',
     [email]
   );
   const row = rows[0];
   if (!row || !row.active) return null;
   const employee = await getAccountEmployee(row.email);
-  if (!employee) return null;
+  if (!employee && !isSetupAdministrator(row)) return null;
   const extra = String(row.extra_perms || '')
     .split(',')
     .map((value) => value.trim())
@@ -35,8 +35,8 @@ async function getCurrentUser(req) {
   const perms = [...basePermissions, ...extra];
   return {
     email: row.email,
-    full_name: employee.name,
-    employee_id: employee.record_id,
+    full_name: employee?.name || row.full_name || row.email,
+    employee_id: employee?.record_id || null,
     role: row.role,
     is_hr_head: Boolean(row.is_hr_head),
     perms

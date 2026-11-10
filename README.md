@@ -47,9 +47,9 @@ Keep page components inside the isolated `#main` stacking context and use the sh
 
 ## First-time setup
 
-Login requires exactly one non-archived record in the central `employees` table whose Personal Email matches the account email. This applies to every role, including ADMIN and HR, and is checked again for existing sessions. Credentials and permissions stay in `user_roles`; Master List, HR Reports, form autofill and leave eligibility use the central employee records.
+Login requires exactly one non-archived record in the central `employees` table whose Personal Email matches the account email. The sole exception is the first setup ADMIN created by `create-user` when the accounts table is empty. That account can sign in without an employee record to import the master list and set up the system. The exception is stored on that specific account and applies only while its role is ADMIN; creating other accounts never grants it. Login and existing sessions both enforce these rules.
 
-Before activating this rule on an existing installation, use Employee Master List import to add genuine employee records for any existing accounts that lack them, including at least one administrator. Importing a profile does not replace its account password or role. The `create-user` command also requires an existing employee profile; on a new installation, provision the first genuine employee record in MySQL before creating its administrator login.
+Credentials and permissions stay in `user_roles`; Master List, HR Reports, form autofill and leave eligibility use the central employee records. Setup does not create a placeholder employee. If a matching employee record is imported later, the setup ADMIN uses that employee's details automatically. All subsequent accounts, including additional ADMIN and HR accounts, need a genuine employee record first. Importing a profile does not replace its account password or role.
 
 1. Start **Apache** and **MySQL** in the XAMPP Control Panel.
 2. The current workspace already has an empty `hr_dashboard` database and its tables. On a different XAMPP installation, create a database named `hr_dashboard` using `utf8mb4`; the Node setup command creates the tables and default lookup values.
@@ -85,7 +85,7 @@ Before activating this rule on an existing installation, use Employee Master Lis
    npm.cmd run create-user -- hr-admin@example.com ADMIN
    ```
 
-   Other supported roles are `STAFF`, `SUPERVISOR`, `HEAD`, and `HR`. Run this command again to reset a user's password or role.
+   On an empty accounts table, this creates the first setup ADMIN without requiring an employee record. Sign in with it to import employees. Other supported roles are `STAFF`, `SUPERVISOR`, `HEAD`, and `HR`; subsequent accounts require a matching employee record. Run this command again to reset a user's password or role. The original setup ADMIN can also have its password reset without an employee record while keeping its ADMIN role.
 
 8. Start the API in a PowerShell window and leave it running:
 
