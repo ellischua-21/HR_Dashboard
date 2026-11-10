@@ -12,6 +12,8 @@ Options -Indexes
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
+  # Include Windows directory aliases with trailing dots or spaces.
+  RewriteRule "(^|/)\.git[. ]*(/|$)" - [F,L,NC]
   RewriteBase /HR_Dashboard/
   RewriteRule ^$ public/ [R=302,L]
   RewriteRule ^(?:node_modules|server|scripts|tests)(?:/|$) - [F,L,NC]
