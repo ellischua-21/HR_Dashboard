@@ -112,6 +112,9 @@ function createBrowser() {
       this.append(child);
       return child;
     }
+    prepend(child) {
+      this.insertBefore(child, this.children[0]);
+    }
     insertBefore(child, reference) {
       const index = this.children.indexOf(reference);
       if (index < 0) this.appendChild(child);

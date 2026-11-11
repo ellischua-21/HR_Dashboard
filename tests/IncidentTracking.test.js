@@ -59,7 +59,7 @@ test('case access recognizes response and database field names, and rejects unre
   for (const role of ['HR', 'ADMIN'])
     assert.equal(
       canViewIncident({ role, email: 'reviewer@example.com' }, report),
-      true
+      role === 'HR'
     );
 });
 
@@ -68,8 +68,14 @@ test('selector and badge scope includes case participants and denies unsupported
   const scope = incidentAccessScope(user);
   assert.match(scope.sql, /incident_participants/);
   assert.match(scope.sql, /reported_employee_email/);
-  assert.deepEqual(scope.values, Array(4).fill(user.email));
-  assert.equal(incidentAccessScope({ ...user, role: 'HR' }).sql, '1 = 1');
+  assert.deepEqual(scope.values, Array(10).fill(user.email));
+  assert.match(scope.sql, /workflow_version/);
+  for (const role of ['STAFF', 'HEAD', 'HR', 'ADMIN']) {
+    const scoped = incidentAccessScope({ ...user, role });
+    assert.equal((scoped.sql.match(/\?/g) || []).length, scoped.values.length);
+    assert.ok(scoped.values.every((email) => email === user.email));
+    if (role === 'HR') assert.match(scoped.sql, /nte_issued_at IS NOT NULL/);
+  }
   assert.equal(incidentAccessScope({ ...user, role: 'UNKNOWN' }).sql, '1 = 0');
 });
 
@@ -230,65 +236,56 @@ test('final closure keeps Decision Issued as the final milestone without exposin
   assert.equal(result.closureReason.includes('Private'), false);
 });
 
-test('badge counts use unresolved involvement, persist independently of reading, and belong in Review for HR', async (t) => {
+test('current badges use unresolved case scope independently of notification reading', async (t) => {
   const { pool } = require('../server/db/database');
-  const incidents = require('../server/services/IncidentService');
+  const incidents = require('../server/services/IncidentWorkflowService');
+  const { accountIdentityMock } = require('./helpers/AccountFixtures');
   let role = 'STAFF';
-  t.mock.method(pool, 'getConnection', async () => ({
-    beginTransaction: async () => {},
-    commit: async () => {},
-    rollback: async () => {},
-    release: () => {},
-    execute: async () => [[]]
+  const identity = accountIdentityMock(() => ({
+    email: 'employee@example.com',
+    role,
+    active: 1
   }));
-  t.mock.method(pool, 'execute', async (sql) => {
-    if (sql.includes('FROM user_roles WHERE email'))
-      return [[{ email: 'employee@example.com', role, active: 1 }]];
-    if (sql.includes("status <> 'CLOSED'")) {
+  t.mock.method(pool, 'execute', async (sql, values) => {
+    if (sql.includes('SELECT COALESCE(SUM(CASE')) {
       assert.doesNotMatch(
         sql,
         /viewed_at|incident_notifications|signatory_role/
       );
-      if (['STAFF', 'HEAD'].includes(role)) {
-        assert.match(sql, /incident_participants/);
-        return [[{ count: 2 }]];
-      }
-      return [[{ count: 4 }]];
+      assert.match(sql, /r.status<>'CLOSED'/);
+      assert.match(sql, /r.workflow_version=2/);
+      assert.match(sql, /incident_participants/);
+      assert.equal((sql.match(/\?/g) || []).length, values.length);
+      return [
+        [{ track: role === 'STAFF' ? 2 : 0, review: role === 'HR' ? 4 : 0 }]
+      ];
     }
-    if (sql.includes('SELECT COUNT(*) AS count FROM incident_reports'))
-      return [[{ count: 4 }]];
-    throw new Error(`Unexpected query: ${sql}`);
+    return identity(sql, values);
   });
   const req = { session: { userEmail: 'employee@example.com' } };
-  assert.deepEqual(await incidents.getIncidentBadgeCounts(req), {
-    track: 2,
-    review: 0
-  });
-  assert.deepEqual(await incidents.getIncidentBadgeCounts(req), {
-    track: 2,
-    review: 0
-  });
-  role = 'HEAD';
-  assert.deepEqual(await incidents.getIncidentBadgeCounts(req), {
-    track: 2,
-    review: 0
-  });
-  for (role of ['HR', 'ADMIN'])
+  for (let i = 0; i < 2; i++)
     assert.deepEqual(await incidents.getIncidentBadgeCounts(req), {
-      track: 0,
-      review: 4
+      track: 2,
+      review: 0
     });
+  role = 'HR';
+  assert.deepEqual(await incidents.getIncidentBadgeCounts(req), {
+    track: 0,
+    review: 4
+  });
 });
 
 test('knowing a case ID cannot bypass the tracking endpoint or case-document permissions', async (t) => {
   const { pool } = require('../server/db/database');
   const incidents = require('../server/services/IncidentService');
   t.mock.method(pool, 'execute', async (sql, values) => {
+    if (sql.includes('LOWER(TRIM(personal_email))'))
+      return [[{ record_id: 'SYNTHETIC', name: 'Synthetic Employee' }]];
     if (sql.includes('FROM user_roles WHERE email'))
       return [[{ email: 'outsider@example.com', role: 'STAFF', active: 1 }]];
     if (sql.includes('AS version')) {
-      assert.match(sql, /AND \(LOWER\(reporter_email\)/);
-      assert.deepEqual(values, [12, ...Array(4).fill('outsider@example.com')]);
+      assert.match(sql, /workflow_version/);
+      assert.deepEqual(values, [12, ...Array(10).fill('outsider@example.com')]);
       return [[]];
     }
     if (sql.includes('FROM incident_reports WHERE id')) return [[report]];
@@ -308,6 +305,8 @@ test('tracking versions use the signature table timestamp key', async (t) => {
   const { pool } = require('../server/db/database');
   const incidents = require('../server/services/IncidentService');
   t.mock.method(pool, 'execute', async (sql) => {
+    if (sql.includes('LOWER(TRIM(personal_email))'))
+      return [[{ record_id: 'SYNTHETIC', name: 'Synthetic Employee' }]];
     if (sql.includes('FROM user_roles WHERE email'))
       return [[{ email: 'head@example.com', role: 'HEAD', active: 1 }]];
     if (sql.includes('AS version')) {
@@ -322,132 +321,176 @@ test('tracking versions use the signature table timestamp key', async (t) => {
   assert.equal(result.version, 'PENDING SIGNATURE:2026-10-01:0:');
 });
 
-test('reported employee receives a decision-issued popup notification', async (t) => {
+test('current decision popups are scoped to their recipient and reported employee', async (t) => {
   const { pool } = require('../server/db/database');
-  const incidents = require('../server/services/IncidentService');
+  const incidents = require('../server/services/IncidentWorkflowService');
+  const { accountIdentityMock } = require('./helpers/AccountFixtures');
+  const email = 'employee@example.com';
+  const identity = accountIdentityMock(() => ({
+    email,
+    role: 'STAFF',
+    active: 1
+  }));
   t.mock.method(pool, 'execute', async (sql, values) => {
-    if (sql.includes('FROM user_roles WHERE email'))
-      return [[{ email: 'employee@example.com', role: 'STAFF', active: 1 }]];
-    assert.match(sql, /n\.notification_type = 'DECISION_ISSUED'/);
-    assert.match(sql, /LOWER\(i\.reported_employee_email\) = LOWER\(\?\)/);
-    assert.deepEqual(values, Array(10).fill('employee@example.com'));
-    return [
-      [
-        {
-          id: 33,
-          type: 'DECISION_ISSUED',
-          incidentId: 5,
-          caseNumber: 'IR-5',
-          subject: 'Test incident',
-          status: 'DECISION ISSUED'
-        }
-      ]
-    ];
+    if (!sql.includes('FROM incident_notifications n'))
+      return identity(sql, values);
+    assert.match(sql, /n.notification_type='DECISION_ISSUED'/);
+    assert.match(sql, /LOWER\(r.reported_employee_email\)=LOWER\(\?\)/);
+    assert.match(sql, /n.viewed_at IS NULL/);
+    assert.ok(values.every((value) => value === email));
+    assert.equal((sql.match(/\?/g) || []).length, values.length);
+    return [[{ id: 33, type: 'DECISION_ISSUED', incidentId: 5 }]];
   });
   const notifications = await incidents.listPendingIncidentNotifications({
-    session: { userEmail: 'employee@example.com' }
+    session: { userEmail: email }
   });
-  assert.equal(notifications.length, 1);
   assert.equal(notifications[0].title, 'Incident decision issued');
   assert.equal(notifications[0].target, 'incident-track');
 });
 
-test('Track actions reject an unrelated signer, employee explanation, or information-request response', async (t) => {
-  const { pool } = require('../server/db/database');
-  const incidents = require('../server/services/IncidentService');
-  let status = 'PENDING SIGNATURE';
-  t.mock.method(pool, 'execute', async () => [
-    [
-      {
-        email: 'outsider@example.com',
-        role: 'STAFF',
-        active: 1
-      }
-    ]
-  ]);
-  t.mock.method(pool, 'getConnection', async () => ({
-    beginTransaction: async () => {},
-    rollback: async () => {},
-    release: () => {},
-    execute: async (sql) => {
-      if (sql.includes('FROM incident_reports'))
-        return [
-          [
-            {
-              id: 12,
-              status,
-              case_number: 'IR-12',
-              reported_employee_email: 'employee@example.com',
-              assigned_head_email: 'head@example.com'
-            }
-          ]
-        ];
-      if (sql.includes('FROM incident_information_requests')) return [[]];
-      throw new Error('An unrelated account must not reach a write query.');
-    }
-  }));
-  const req = { session: { userEmail: 'outsider@example.com' } };
-  const signature = 'data:image/png;base64,aA==';
-  await assert.rejects(
-    incidents.signIncidentCase(req, 12, 'EMPLOYEE', signature),
-    { status: 403 }
-  );
-  await assert.rejects(incidents.signIncidentCase(req, 12, 'HR', signature), {
-    status: 403
-  });
-  status = 'NTE ISSUED';
-  await assert.rejects(
-    incidents.saveIncidentExplanationDraft(req, 12, 'Not my case'),
-    { status: 403 }
-  );
-  status = 'UNDER INVESTIGATION';
-  await assert.rejects(
-    incidents.respondToIncidentInformation(req, 12, 44, 'Not my request'),
-    { status: 403 }
-  );
+test('current actions deny an unrelated signer, explanation author and request respondent', async (t) => {
+  const { incidentFixture } = require('./helpers/IncidentWorkflow');
+  const incidents = require('../server/services/IncidentWorkflowService');
+  const f = incidentFixture(t);
+  const req = f.req('outsider@example.invalid', 'STAFF');
+  for (const action of ['ACKNOWLEDGE', 'SAVE_EXPLANATION', 'RESPOND'])
+    await assert.rejects(incidents.incidentWorkflowAction(req, 7, action, {}), {
+      status: 403
+    });
+  assert.equal(f.state().writes.length, 0);
+  assert.equal(f.counts().commits, 0);
 });
 
-test('HR cannot take investigation actions while any information request is pending', async (t) => {
-  const { pool } = require('../server/db/database');
-  const incidents = require('../server/services/IncidentService');
-  t.mock.method(pool, 'execute', async (sql) => {
-    if (sql.includes('FROM user_roles WHERE email'))
-      return [[{ email: 'hr@example.com', role: 'HR', active: 1 }]];
-    throw new Error(`Unexpected pool query: ${sql}`);
+test('pending information blocks HR processing and rolls back attempted task changes', async (t) => {
+  const { incidentFixture } = require('./helpers/IncidentWorkflow');
+  const incidents = require('../server/services/IncidentWorkflowService');
+  const f = incidentFixture(t);
+  f.state().requests.push({
+    id: 1,
+    recipient_email: 'employee@example.invalid',
+    status: 'PENDING'
   });
-  let wrote = false;
-  const connection = {
-    beginTransaction: async () => {},
-    commit: async () => {},
-    rollback: async () => {},
-    release: () => {},
-    execute: async (sql) => {
-      if (sql.includes('FROM incident_reports'))
-        return [
-          [{ id: 12, status: 'UNDER INVESTIGATION', case_number: 'IR-12' }]
-        ];
-      if (sql.includes("status = 'PENDING'")) return [[{ pending: 1 }]];
-      wrote = true;
-      throw new Error(`Action should have been blocked: ${sql}`);
-    }
+  const req = f.req();
+  const before = structuredClone(f.state());
+  for (const action of [
+    'SAVE_REVIEW',
+    'SEND_APPROVAL',
+    'REQUEST_INFORMATION',
+    'HEARING'
+  ]) {
+    await assert.rejects(
+      incidents.incidentWorkflowAction(req, 7, action, {}),
+      /Awaiting requested information/
+    );
+    assert.deepEqual(f.state(), before);
+  }
+  assert.equal(f.counts().commits, 0);
+});
+
+test('hearing scheduling pauses HR time and only its owner can complete and resume it', async (t) => {
+  const { incidentFixture } = require('./helpers/IncidentWorkflow');
+  const incidents = require('../server/services/IncidentWorkflowService');
+  const f = incidentFixture(t);
+  let now = Date.parse('2026-11-09T10:00:00+08:00');
+  t.mock.method(Date, 'now', () => now);
+  f.state().task.run_started_ms = now - 3600000;
+  await incidents.incidentWorkflowAction(f.req(), 7, 'HEARING', {
+    details: 'Synthetic external hearing.'
+  });
+  assert.equal(f.state().task.state, 'WAITING');
+  assert.equal(f.state().task.run_started_ms, null);
+  assert.equal(f.state().task.active_ms, 3600000);
+  assert.ok(
+    f
+      .state()
+      .taskEvents.some(
+        (event) =>
+          event.action === 'PAUSED' &&
+          event.activeMs === 3600000 &&
+          event.creditOwner === 'hr@example.invalid'
+      )
+  );
+  now += 3 * 3600000;
+  await assert.rejects(
+    incidents.incidentWorkflowAction(
+      f.req('other@example.invalid'),
+      7,
+      'HEARING',
+      { completed: true, details: 'Synthetic completion.' }
+    ),
+    /assigned HR/
+  );
+  await incidents.incidentWorkflowAction(f.req(), 7, 'HEARING', {
+    completed: true,
+    details: 'Synthetic completion.'
+  });
+  assert.equal(f.state().row.hearing_status, 'COMPLETED');
+  assert.equal(f.state().task.state, 'READY');
+  assert.equal(f.state().task.run_started_ms, now);
+  assert.equal(f.state().task.active_ms, 3600000);
+});
+
+test('information responses pause HR until every recipient responds and cannot be overwritten', async (t) => {
+  const {
+    incidentFixture,
+    HEAD,
+    EMPLOYEE,
+    HR
+  } = require('./helpers/IncidentWorkflow');
+  const incidents = require('../server/services/IncidentWorkflowService');
+  const f = incidentFixture(t);
+  await incidents.incidentWorkflowAction(f.req(), 7, 'REQUEST_INFORMATION', {
+    requests: [
+      { email: EMPLOYEE, text: 'Synthetic question for the employee.' },
+      { email: HEAD, text: 'Synthetic question for the assigned Head.' }
+    ]
+  });
+  assert.equal(f.state().task.state, 'WAITING');
+  assert.equal(f.state().task.run_started_ms, null);
+  const [first, second] = f.state().requests;
+  const response = {
+    requestId: first.id,
+    statement: 'Synthetic employee response with relevant facts.'
   };
-  t.mock.method(pool, 'getConnection', async () => connection);
-  const req = { session: { userEmail: 'hr@example.com' } };
-  const blocked = { status: 409, message: /Wait for all|Wait for all current/ };
   await assert.rejects(
-    incidents.transitionIncident(req, 12, 'CLOSE_INVESTIGATION', 'Close'),
-    blocked
+    incidents.incidentWorkflowAction(
+      f.req(HEAD, 'HEAD'),
+      7,
+      'RESPOND',
+      response
+    ),
+    /unavailable or already answered/
   );
+  await incidents.incidentWorkflowAction(
+    f.req(EMPLOYEE, 'STAFF'),
+    7,
+    'RESPOND',
+    response
+  );
+  assert.equal(f.state().task.state, 'WAITING');
   await assert.rejects(
-    incidents.requestIncidentInformationBatch(req, 12, [
-      { recipientEmail: 'employee@example.com', requestText: 'More details' }
-    ]),
-    blocked
+    incidents.incidentWorkflowAction(
+      f.req(EMPLOYEE, 'STAFF'),
+      7,
+      'RESPOND',
+      response
+    ),
+    /already answered/
   );
-  await assert.rejects(
-    incidents.addIncidentInvestigationNote(req, 12, 'Finding'),
-    blocked
+  await incidents.incidentWorkflowAction(f.req(HEAD, 'HEAD'), 7, 'RESPOND', {
+    ...response,
+    requestId: second.id
+  });
+  assert.equal(f.state().task.state, 'READY');
+  assert.ok(f.state().task.run_started_ms > 0);
+  assert.ok(
+    f.state().requests.every((request) => request.status === 'RESPONDED')
   );
-  await assert.rejects(incidents.saveIncidentNteDraft(req, 12, {}), blocked);
-  assert.equal(wrote, false);
+  assert.ok(
+    f
+      .state()
+      .notifications.some(
+        (item) => item.recipient === HR && item.type === `INFO_DONE_${first.id}`
+      )
+  );
 });

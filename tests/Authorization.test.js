@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { pool } = require('../server/db/database');
+const { pool, initializeDatabase } = require('../server/db/database');
 const {
   getCurrentUser,
   getSession,
@@ -216,4 +216,78 @@ test('authorization follows current account role, not client-supplied roles or p
   await assert.rejects(requirePerm({ session: {} }, 'admin.manage'), {
     status: 401
   });
+});
+
+test('startup preserves the approved legacy role mapping and is safe to rerun', async (t) => {
+  const expected = {
+    USER: 'STAFF',
+    MANAGER: 'STAFF',
+    EXECUTIVE: 'STAFF',
+    HR_STAFF: 'HR',
+    HR_ADMIN: 'ADMIN',
+    SYSTEM_ADMIN: 'ADMIN',
+    STAFF: 'STAFF',
+    SUPERVISOR: 'SUPERVISOR',
+    HEAD: 'HEAD',
+    HR: 'HR',
+    ADMIN: 'ADMIN',
+    UNKNOWN: 'UNKNOWN'
+  };
+  const rows = Object.keys(expected).map((role, index) => ({
+    email: `legacy-${index}@example.invalid`,
+    role,
+    active: index % 2,
+    is_setup_admin: role === 'ADMIN' ? 1 : 0,
+    password_hash: 'synthetic-hash'
+  }));
+  const before = structuredClone(rows);
+  const stop = new Error('Stop after the account role migration');
+  let changed = 0;
+  // Exercise the actual startup statements with synthetic rows, stopping before
+  // unrelated schema work. No query or connection reaches the application DB.
+  t.mock.method(pool, 'query', async (sql) => {
+    if (sql.startsWith('CREATE TABLE IF NOT EXISTS account_requests'))
+      throw stop;
+    const update =
+      /^UPDATE user_roles SET role = '([^']+)' WHERE role (?:= '([^']+)'|IN \(([^)]+)\))$/.exec(
+        sql
+      );
+    if (update) {
+      const oldRoles = update[2]
+        ? [update[2]]
+        : [...update[3].matchAll(/'([^']+)'/g)].map((match) => match[1]);
+      for (const row of rows)
+        if (oldRoles.includes(row.role)) {
+          row.role = update[1];
+          changed++;
+        }
+      return [{ affectedRows: changed }];
+    }
+    if (sql.startsWith('SHOW COLUMNS'))
+      return [
+        sql.includes("LIKE 'corp_email'") || sql.includes("LIKE 'email'")
+          ? []
+          : [{ Field: 'exists' }]
+      ];
+    assert.match(sql, /^CREATE TABLE IF NOT EXISTS (employees|user_roles) \(/);
+    return [{ affectedRows: 0 }];
+  });
+  t.mock.method(pool, 'execute', async () =>
+    assert.fail('Unexpected database execution')
+  );
+  t.mock.method(pool, 'getConnection', async () =>
+    assert.fail('Unexpected database connection')
+  );
+
+  await assert.rejects(initializeDatabase(), (error) => error === stop);
+  assert.deepEqual(
+    rows,
+    before.map((row) => ({ ...row, role: expected[row.role] }))
+  );
+  assert.equal(changed, 6);
+  const migrated = structuredClone(rows);
+  changed = 0;
+  await assert.rejects(initializeDatabase(), (error) => error === stop);
+  assert.deepEqual(rows, migrated);
+  assert.equal(changed, 0);
 });

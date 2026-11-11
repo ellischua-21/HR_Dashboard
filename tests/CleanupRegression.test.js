@@ -13,14 +13,15 @@ const { getSession } = require('../server/middleware/Auth');
 const { importEmployees } = require('../server/services/ImportService');
 const { assignAccountHead } = require('../server/services/AccountService');
 const {
-  listIncidentViolations,
-  listIncidentsForHistory
+  listIncidentViolations
 } = require('../server/services/incident-management/Archive');
 const { listFormsForReview } = require('../server/services/FormService');
 const {
-  saveIncidentEvaluation,
+  listIncidentsForHistory,
+  incidentWorkflowAction,
   searchIncidentEmployees
-} = require('../server/services/IncidentService');
+} = require('../server/services/IncidentWorkflowService');
+const { incidentFixture } = require('./helpers/IncidentWorkflow');
 const {
   getIncidentCodeGuide,
   saveIncidentMatrix,
@@ -30,6 +31,8 @@ const {
 test('employee reports return all sorted rows when requested and keep role checks and ordinary paging', async (t) => {
   let role = 'HR';
   t.mock.method(pool, 'execute', async (sql) => {
+    if (sql.includes('LOWER(TRIM(personal_email))'))
+      return [[{ record_id: 'SYNTHETIC-ACTOR', name: 'Synthetic Actor' }]];
     if (sql.includes('FROM user_roles'))
       return [[{ email: 'reviewer@example.com', role, active: 1 }]];
     if (sql.includes('INSERT INTO audit_logs')) return [{ affectedRows: 1 }];
@@ -70,6 +73,8 @@ test('employee reports return all sorted rows when requested and keep role check
 test('employee list keeps filtered access while allowing all rows for scrolling', async (t) => {
   const calls = [];
   t.mock.method(pool, 'execute', async (sql, values) => {
+    if (sql.includes('LOWER(TRIM(personal_email))'))
+      return [[{ record_id: 'SYNTHETIC-ACTOR', name: 'Synthetic Actor' }]];
     calls.push({ sql, values });
     if (sql.includes('FROM user_roles'))
       return [[{ email: 'hr@example.com', role: 'HR', active: 1 }]];
@@ -90,6 +95,8 @@ test('employee list keeps filtered access while allowing all rows for scrolling'
 test('scrolling incident histories keeps case and employee access restrictions', async (t) => {
   const calls = [];
   t.mock.method(pool, 'execute', async (sql, values) => {
+    if (sql.includes('LOWER(TRIM(personal_email))'))
+      return [[{ record_id: 'SYNTHETIC-ACTOR', name: 'Synthetic Actor' }]];
     calls.push({ sql, values });
     if (sql.includes('FROM user_roles'))
       return [[{ email: 'staff@example.com', role: 'STAFF', active: 1 }]];
@@ -103,11 +110,12 @@ test('scrolling incident histories keeps case and employee access restrictions',
     call.sql.includes('date_reported AS dateFiled')
   );
   assert.doesNotMatch(cases.sql, /LIMIT 25 OFFSET/);
-  assert.match(cases.sql, /LOWER\(reported_employee_email\) = LOWER\(\?\)/);
+  assert.match(cases.sql, /LOWER\(r.reported_employee_email\) = LOWER\(\?\)/);
   assert.equal(
     cases.values.filter((value) => value === 'staff@example.com').length,
-    5
+    13
   );
+  assert.equal((cases.sql.match(/\?/g) || []).length, cases.values.length);
   assert.equal(history.pages, 1);
   await listIncidentViolations(req, { allRows: true });
   const violations = calls.find((call) =>
@@ -127,6 +135,8 @@ test('scrolling incident histories keeps case and employee access restrictions',
 test('HR and ADMIN can search another employee violation history while STAFF and HEAD cannot', async (t) => {
   let role = 'ADMIN';
   t.mock.method(pool, 'execute', async (sql) => {
+    if (sql.includes('LOWER(TRIM(personal_email))'))
+      return [[{ record_id: 'SYNTHETIC-ACTOR', name: 'Synthetic Actor' }]];
     if (sql.includes('FROM user_roles'))
       return [
         [
@@ -181,7 +191,7 @@ test('HR and ADMIN share full employee fields, records and updates without a sen
     position: 'Staff',
     department: 'IT',
     rank: 'Rank and File',
-    status: 'Active',
+    status: 'Regular',
     date_employed: '2026-01-01',
     fte: 1,
     birthday: '2000-01-01',
@@ -191,6 +201,8 @@ test('HR and ADMIN share full employee fields, records and updates without a sen
     emergency_name: 'Emergency Contact'
   };
   t.mock.method(pool, 'execute', async (sql) => {
+    if (sql.includes('LOWER(TRIM(personal_email))'))
+      return [[{ record_id: 'SYNTHETIC-ACTOR', name: 'Synthetic Actor' }]];
     if (sql.includes('FROM user_roles'))
       return [
         [
@@ -218,6 +230,8 @@ test('HR and ADMIN share full employee fields, records and updates without a sen
     rollback: async () => {},
     release() {},
     execute: async (sql, values) => {
+      if (sql.includes('GET_LOCK(')) return [[{ acquired: 1 }]];
+      if (sql.includes('RELEASE_LOCK(')) return [[{ released: 1 }]];
       if (sql.startsWith('SELECT record_id')) return [[]];
       if (sql.startsWith('SELECT * FROM employees')) return [[record]];
       if (sql.startsWith('UPDATE employees')) {
@@ -278,6 +292,8 @@ test('form review date filters preserve the authorized queue and badge totals wi
   const calls = [];
   let role = 'HR';
   t.mock.method(pool, 'execute', async (sql, values) => {
+    if (sql.includes('LOWER(TRIM(personal_email))'))
+      return [[{ record_id: 'SYNTHETIC-ACTOR', name: 'Synthetic Actor' }]];
     calls.push({ sql, values });
     if (/^SELECT email, full_name, role/.test(sql))
       return [[{ email: 'hr@example.com', role, active: 1 }]];
@@ -329,6 +345,8 @@ test('saving the COC matrix immediately changes the guide for all roles', async 
   let role = 'HR';
   let matrix = [];
   t.mock.method(pool, 'execute', async (sql, values) => {
+    if (sql.includes('LOWER(TRIM(personal_email))'))
+      return [[{ record_id: 'SYNTHETIC-ACTOR', name: 'Synthetic Actor' }]];
     if (sql.includes('FROM user_roles'))
       return [[{ email: 'user@example.com', role, active: 1 }]];
     if (sql.startsWith('UPDATE incident_code_policy_draft')) {
@@ -347,7 +365,7 @@ test('saving the COC matrix immediately changes the guide for all roles', async 
   for (role of ['STAFF', 'HEAD', 'HR', 'ADMIN']) {
     const guide = await getIncidentCodeGuide(req);
     assert.deepEqual(guide.matrix, rows);
-    assert.equal(guide.canManage, ['HR', 'ADMIN'].includes(role));
+    assert.equal(guide.canManage, role === 'HR');
   }
 });
 
@@ -355,6 +373,8 @@ test('COC matrix saves still reject invalid rows and unauthorized users', async 
   let role = 'HR';
   let writes = 0;
   t.mock.method(pool, 'execute', async (sql) => {
+    if (sql.includes('LOWER(TRIM(personal_email))'))
+      return [[{ record_id: 'SYNTHETIC-ACTOR', name: 'Synthetic Actor' }]];
     if (sql.includes('FROM user_roles'))
       return [[{ email: 'user@example.com', role, active: 1 }]];
     if (sql.startsWith('UPDATE incident_code_policy_draft')) ++writes;
@@ -385,9 +405,12 @@ test('COC matrix saves still reject invalid rows and unauthorized users', async 
 });
 
 test('HR imports validate the same complete employee fields as ADMIN', async (t) => {
-  t.mock.method(pool, 'execute', async () => [
-    [{ email: 'hr@example.com', role: 'HR', active: 1 }]
-  ]);
+  t.mock.method(pool, 'execute', async (sql) => {
+    if (sql.includes('LOWER(TRIM(personal_email))'))
+      return [[{ record_id: 'SYNTHETIC-ACTOR' }]];
+    assert.match(sql, /FROM user_roles/);
+    return [[{ email: 'hr@example.com', role: 'HR', active: 1 }]];
+  });
   t.mock.method(pool, 'query', async () => [
     Object.entries(LISTS).flatMap(([list_name, values]) =>
       values.map((value) => ({ list_name, value }))
@@ -399,7 +422,9 @@ test('HR imports validate the same complete employee fields as ADMIN', async (t)
     rollback: async () => {},
     release() {},
     execute: async (sql) => {
-      assert.match(sql, /SELECT emp_no FROM employees/);
+      if (sql.includes('GET_LOCK(')) return [[{ acquired: 1 }]];
+      if (sql.includes('RELEASE_LOCK(')) return [[{ released: 1 }]];
+      assert.match(sql, /SELECT (emp_no|personal_email) FROM employees/);
       return [[]];
     }
   }));
@@ -415,7 +440,7 @@ test('HR imports validate the same complete employee fields as ADMIN', async (t)
         department: 'IT',
         location: 'Head Office',
         rank: 'Rank and File',
-        status: 'Active',
+        status: 'Regular',
         date_employed: '2026-01-01',
         birthday: '2000-01-01',
         fte: 1
@@ -432,9 +457,12 @@ test('HR imports validate the same complete employee fields as ADMIN', async (t)
 
 test('single Head assignments reuse bulk assignment validation and preserve HR designation', async (t) => {
   const calls = [];
-  t.mock.method(pool, 'execute', async () => [
-    [{ email: 'admin@example.com', role: 'ADMIN', active: 1 }]
-  ]);
+  t.mock.method(pool, 'execute', async (sql) => {
+    if (sql.includes('LOWER(TRIM(personal_email))'))
+      return [[{ record_id: 'SYNTHETIC-ACTOR' }]];
+    assert.match(sql, /FROM user_roles/);
+    return [[{ email: 'admin@example.com', role: 'ADMIN', active: 1 }]];
+  });
   t.mock.method(pool, 'getConnection', async () => ({
     beginTransaction: async () => {},
     commit: async () => {},
@@ -448,6 +476,7 @@ test('single Head assignments reuse bulk assignment validation and preserve HR d
     ],
     execute: async (sql, values) => {
       calls.push({ sql, values });
+      if (sql.includes('FROM hr_tasks t JOIN user_forms')) return [[]];
       return [{ affectedRows: 1 }];
     }
   }));
@@ -465,79 +494,19 @@ test('single Head assignments reuse bulk assignment validation and preserve HR d
   assert.ok(calls.every((call) => !/SET is_hr_head/.test(call.sql)));
 });
 
-test('an evaluation saves without removed violation, reference, or justification fields', async (t) => {
-  const calls = [];
-  let committed = false;
-  t.mock.method(pool, 'execute', async () => [
-    [{ email: 'hr@example.com', role: 'HR', active: 1 }]
-  ]);
-  t.mock.method(pool, 'getConnection', async () => ({
-    beginTransaction: async () => {},
-    commit: async () => {
-      committed = true;
-    },
-    rollback: async () => {},
-    release() {},
-    execute: async (sql, values) => {
-      calls.push({ sql, values });
-      if (sql.includes('FROM incident_reports WHERE id'))
-        return [
-          [
-            {
-              id: 7,
-              case_number: 'IR-7',
-              subject: 'Test incident',
-              status: 'EVALUATION',
-              reported_employee_email: 'staff@example.com'
-            }
-          ]
-        ];
-      if (sql.includes('FROM incident_decisions')) return [[]];
-      if (sql.includes('COUNT(*)')) return [[{ total: 1 }]];
-      if (sql.includes('SELECT matrix FROM incident_code_policy_draft'))
-        return [
-          [
-            {
-              matrix: JSON.stringify([
-                {
-                  severity: 'Light',
-                  occurrence: 1,
-                  correctiveAction: 'Written Warning'
-                },
-                {
-                  severity: 'Light',
-                  occurrence: 2,
-                  correctiveAction: '4 days Suspension'
-                }
-              ])
-            }
-          ]
-        ];
-      if (sql.includes('FROM incident_case_subjects')) return [[{ id: 4 }]];
-      if (sql.includes('SELECT id FROM incident_evaluations'))
-        return [[{ id: 8 }]];
-      if (/^(INSERT|DELETE)/.test(sql.trim()))
-        return [{ insertId: 8, affectedRows: 1 }];
-      throw new Error(`Unexpected query: ${sql}`);
-    }
-  }));
-  const result = await saveIncidentEvaluation(
-    { session: { userEmail: 'hr@example.com' } },
-    7,
-    {
-      finding: 'SUBSTANTIATED',
-      findings: 'Findings reviewed.',
-      severity: 'Light',
-      recommendedAction: 'Wrong client suggestion'
-    }
-  );
-  assert.equal(committed, true);
-  assert.equal(result.recommendedAction, '4 days Suspension');
-  const saved = calls.find((call) =>
-    call.sql.includes('INSERT INTO incident_evaluations')
-  );
-  assert.equal(saved.values[11], '');
-  assert.equal(saved.values[5], 'Test incident');
-  assert.equal(saved.values[9], '4 days Suspension');
-  assert.equal(saved.values[10], '4 days Suspension');
+test('current HR assessment computes the action without retired evaluation fields', async (t) => {
+  const f = incidentFixture(t);
+  await incidentWorkflowAction(f.req(), 7, 'SAVE_REVIEW', {
+    finding: 'SUBSTANTIATED',
+    findings: 'Synthetic findings reviewed.',
+    severity: 'Light',
+    recommendedAction: 'Wrong client suggestion'
+  });
+  const saved = JSON.parse(f.state().row.hr_review);
+  assert.equal(f.counts().commits, 1);
+  assert.equal(saved.correctiveAction, '4 days Suspension');
+  assert.equal(saved.previousOffenses, 1);
+  for (const retired of ['violations', 'reference', 'justification'])
+    assert.ok(!(retired in saved));
+  assert.equal(saved.findings, 'Synthetic findings reviewed.');
 });

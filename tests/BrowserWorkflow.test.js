@@ -307,7 +307,9 @@ test('form previews and incident documents share date/time formatting while inpu
   });
   assert.ok(report.includes('10/28/2026'));
   assert.ok(report.includes('12:00 AM'));
-  const input = browser.document.getElementById('ir-incident-date');
+  const input = browser.document
+    .getElementById('incident-report-template')
+    .querySelector('[data-field="date"]');
   input.value = '2026-10-28';
   assert.equal(input.value, '2026-10-28');
 });
@@ -482,13 +484,33 @@ test('NTE reminder buttons direct every role to Track with the matching label', 
   }
 });
 
-test('Supervisor and Head have the same incident navigation', () => {
+test('Supervisor has History while Head has Review and ordinary HR cannot file', () => {
   const browser = createBrowser();
   browser.loadDashboard();
   const navigation = browser.context.INCIDENT_MANAGEMENT_NAVIGATION;
   assert.deepEqual(
-    Array.from(navigation.forRole('SUPERVISOR'), (item) => Array.from(item)),
-    Array.from(navigation.forRole('HEAD'), (item) => Array.from(item))
+    Array.from(navigation.forRole('SUPERVISOR'), (item) => item[0]),
+    [
+      'incident-file',
+      'incident-track',
+      'incident-history',
+      'incident-code-of-conduct'
+    ]
+  );
+  assert.deepEqual(
+    Array.from(navigation.forRole('HEAD'), (item) => item[0]),
+    [
+      'incident-file',
+      'incident-track',
+      'incident-review',
+      'incident-code-of-conduct'
+    ]
+  );
+  assert.ok(
+    !navigation.forRole('HR').some((item) => item[0] === 'incident-file')
+  );
+  assert.ok(
+    navigation.forRole('HR', true).some((item) => item[0] === 'incident-file')
   );
 });
 
@@ -561,324 +583,266 @@ test('app confirmations resolve through Confirm, Cancel, and Escape', async () =
   assert.equal(await replacement, true);
 });
 
-test('case closure validates visibly and reloads its calling view', async () => {
+function workflowIncident(overrides = {}) {
+  return {
+    id: 9,
+    workflowVersion: 2,
+    caseNumber: 'IR-9',
+    subject: 'Synthetic incident',
+    status: 'NTE ISSUED',
+    phase: 'HR',
+    reporterEmail: 'reporter@example.invalid',
+    reporterName: 'Synthetic Reporter',
+    reportedEmployeeEmail: 'employee@example.invalid',
+    reportedEmployeeName: 'Synthetic Employee',
+    assignedHeadEmail: 'head@example.invalid',
+    siblings: [],
+    files: [],
+    informationRequests: [],
+    extensions: [],
+    internalActivity: [],
+    hearingStatus: 'NONE',
+    submittedAt: '2026-11-02 10:00:00',
+    report: {
+      employee: {
+        name: 'Synthetic Employee',
+        position: 'Staff',
+        department: 'IT',
+        supervisor: 'Synthetic Head'
+      },
+      what: 'Synthetic report',
+      date: '2026-11-01',
+      time: '09:00',
+      involved: [],
+      witnesses: []
+    },
+    rights: { hr: true, maxSection: 8 },
+    task: { isMine: true, state: 'READY', owner: 'hr@example.invalid' },
+    managers: [],
+    defaultManager: '',
+    nte: null,
+    ...overrides
+  };
+}
+function workflowBrowser() {
   const browser = createBrowser();
   browser.loadDashboard();
-  const { context, document } = browser;
-  browser.evaluate("session = { role: 'HR', email: 'hr@example.com' }");
+  browser.evaluate("session = { role: 'HR', email: 'hr@example.invalid' }");
+  browser.context.IncidentTimeline.render = () => {};
+  const parent = browser.document.createElement('section');
+  browser.document.body.appendChild(parent);
+  return { ...browser, parent };
+}
+const actionButton = (parent, title) =>
+  parent
+    .querySelectorAll('button')
+    .find((button) => button.textContent === title);
+const labeledControl = (parent, title) =>
+  parent
+    .querySelectorAll('label')
+    .find((label) => label.textContent.startsWith(title))?.children[0];
+
+test('current case closure validates visibly and reloads its calling view', async () => {
+  const { context, document, parent } = workflowBrowser();
   const calls = [];
   context.fetch = async (url, options) => {
-    const method = url.split('/').pop();
-    calls.push({ method, args: JSON.parse(options.body).args });
-    return {
-      ok: true,
-      json: async () =>
-        method === 'getIncidentBadgeCounts'
-          ? { track: 0, review: 0 }
-          : { ok: true, status: 'CLOSED' }
-    };
+    calls.push({
+      method: url.split('/').pop(),
+      args: JSON.parse(options.body).args
+    });
+    return { ok: true, json: async () => ({ ok: true }) };
   };
+  context.refreshIncidentBadges = context.refreshInboxBadge = async () => {};
   context.appConfirm = async () => true;
-  const parent = document.createElement('section');
-  document.body.appendChild(parent);
-  let reloaded = null;
-  context.IncidentCaseUI.renderDecision(
+  let reloads = 0;
+  context.IncidentWorkflow.render(
     parent,
-    {
-      id: 9,
-      caseNumber: 'IR-9',
-      canReview: true,
-      status: 'DECISION ISSUED',
-      decision: {
-        outcome: 'NO_VIOLATION',
-        issuedAt: '2026-10-28',
-        deliveredAt: '2026-10-28'
-      }
-    },
-    {
-      reload: async (id) => {
-        reloaded = id;
-      }
-    }
+    workflowIncident({ phase: 'FINALIZED' }),
+    async () => ++reloads
   );
-  const close = parent
-    .querySelectorAll('button')
-    .find((button) => button.textContent.includes('close case'));
-  const notes = parent.querySelector('textarea');
-  await close.click();
+  await actionButton(parent, 'Close Case').click();
+  const form = parent.querySelector('form'),
+    reason = form.querySelector('textarea');
+  assert.equal(reason.required, true);
+  reason.willValidate = true;
+  reason.validity = { valid: false, valueMissing: true };
+  await form.trigger('submit');
   assert.equal(calls.length, 0);
+  assert.equal(reloads, 0);
   assert.match(
     document.querySelector('.feedback-popup').textContent,
-    /Enter the completion notes/
+    /required fields/
   );
-  notes.value = 'Delivery and administrative completion confirmed.';
-  await close.click();
-  assert.equal(calls[0].method, 'closeIncidentDecision');
-  assert.equal(calls[0].args[0], 9);
-  assert.equal(reloaded, 9);
-  assert.equal(document.getElementById('ir-case-dialog').open, false);
-  assert.equal(close.disabled, false);
+  reason.value = 'Administrative completion confirmed.';
+  reason.validity = { valid: true };
+  await form.trigger('submit');
+  assert.deepEqual(calls, [
+    {
+      method: 'incidentWorkflowAction',
+      args: [9, 'CLOSE', { reason: reason.value }]
+    }
+  ]);
+  assert.equal(reloads, 1);
+  assert.equal(form.querySelector('button').disabled, false);
 });
 
-test('investigation actions are shared and available only to reviewers on active cases', async () => {
-  const browser = createBrowser();
-  browser.loadDashboard();
-  const { context, document } = browser;
-  context.fetch = async () => ({ ok: true, json: async () => [] });
-  const incident = {
-    id: 1,
-    status: 'UNDER INVESTIGATION',
-    canReview: true,
-    informationRequests: [],
-    activity: []
-  };
-  const parent = document.createElement('section');
-  context.IncidentInvestigation.render(parent, incident, {
-    reload: async () => {}
-  });
-  await Promise.resolve();
-  assert.ok(
-    parent
-      .querySelectorAll('button')
-      .some((b) => b.textContent === 'Save investigation note')
+test('current HR actions require ownership, an active case and completed information requests', () => {
+  for (const [overrides, canEdit] of [
+    [{}, true],
+    [{ task: { isMine: false } }, false],
+    [{ status: 'CLOSED' }, false],
+    [
+      {
+        informationRequests: [
+          { status: 'PENDING', recipientEmail: 'other@example.invalid' }
+        ]
+      },
+      false
+    ]
+  ]) {
+    const { context, parent } = workflowBrowser();
+    context.IncidentWorkflow.render(
+      parent,
+      workflowIncident(overrides),
+      async () => {}
+    );
+    for (const title of [
+      'Schedule Hearing',
+      'Request Information From Employees',
+      'Review NTE And Recommend Action'
+    ])
+      assert.equal(Boolean(actionButton(parent, title)), canEdit, title);
+  }
+});
+
+test('current review and NTE editors initialize only when opened and preserve their fields on reopening', async () => {
+  for (const [overrides, title, pads] of [
+    [{}, 'Review NTE And Recommend Action', 0],
+    [
+      { phase: 'HEAD', rights: { head: true, maxSection: 2 } },
+      'Prepare Notice To Explain',
+      1
+    ]
+  ]) {
+    const { context, parent } = workflowBrowser();
+    let initialized = 0;
+    context.createSignaturePad = () => {
+      ++initialized;
+      return { toDataURL: () => '' };
+    };
+    context.IncidentWorkflow.render(
+      parent,
+      workflowIncident(overrides),
+      async () => {}
+    );
+    const toggle = actionButton(parent, title);
+    assert.ok(toggle);
+    assert.equal(parent.querySelector('form'), null);
+    assert.equal(initialized, 0);
+    await toggle.click();
+    const field = parent.querySelector('textarea');
+    assert.ok(field);
+    field.value = 'Preserve this draft';
+    assert.equal(initialized, pads);
+    assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+    await toggle.click();
+    assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+    await toggle.click();
+    assert.equal(parent.querySelector('textarea'), field);
+    assert.equal(field.value, 'Preserve this draft');
+    assert.equal(initialized, pads);
+  }
+});
+
+test('current issued NTE identifies the recipient and excludes internal HR actions for its employee', () => {
+  const { context, parent } = workflowBrowser();
+  context.IncidentWorkflow.render(
+    parent,
+    workflowIncident({
+      nte: {
+        policy: 'Synthetic policy',
+        dateIssued: '2026-11-01',
+        issuerName: 'Synthetic Head',
+        evidenceTypes: []
+      },
+      rights: { reported: true, maxSection: 7 },
+      phase: 'EMPLOYEE',
+      receivedAt: '2026-11-01',
+      explanation: { statement: 'Synthetic explanation' },
+      status: 'CLOSED'
+    }),
+    async () => {}
   );
+  assert.match(parent.textContent, /Employee Being ReportedSynthetic Employee/);
+  assert.match(parent.textContent, /Synthetic policy/);
+  assert.match(parent.textContent, /Directive To Submit Written Explanation/);
+  assert.doesNotMatch(parent.textContent, /HR Administrative Review/);
   assert.equal(
-    parent
-      .querySelectorAll('button')
-      .some((button) => button.textContent === 'Close for documentation'),
-    false
+    actionButton(parent, 'Review NTE And Recommend Action'),
+    undefined
   );
-  const closure = context.IncidentCaseUI.renderClosureAction(incident, {});
-  parent.appendChild(closure);
-  const closeToggle = closure
-    .querySelectorAll('button')
-    .find((button) => button.textContent === 'Close for documentation');
-  await closeToggle.click();
-  assert.equal(closeToggle.textContent, 'Hide closure form');
-  const employeeView = document.createElement('section');
-  context.IncidentInvestigation.render(
-    employeeView,
-    { ...incident, canReview: false },
-    {}
-  );
-  assert.equal(employeeView.querySelectorAll('button').length, 0);
-  const archived = document.createElement('section');
-  context.IncidentInvestigation.render(
-    archived,
-    { ...incident, status: 'CLOSED' },
-    {}
-  );
-  assert.equal(archived.querySelectorAll('button').length, 0);
+  assert.equal(parent.querySelector('form'), null);
 });
 
-test('review and NTE forms appear only after their action is selected', async () => {
-  const browser = createBrowser();
-  browser.loadDashboard();
-  const { context, document } = browser;
-  const root = document.createElement('section');
-  let transitionArgs;
+test('current review displays server-calculated action and prior finalized violations', async () => {
+  const { context, parent } = workflowBrowser();
+  const calls = [];
   context.fetch = async (url, options) => {
-    const method = url.split('/').pop();
-    if (method === 'transitionIncident')
-      transitionArgs = JSON.parse(options.body).args;
+    calls.push({
+      method: url.split('/').pop(),
+      args: JSON.parse(options.body).args
+    });
     return {
       ok: true,
-      json: async () =>
-        method === 'transitionIncident'
-          ? { status: 'UNDER INVESTIGATION' }
-          : { track: 0, review: 0 }
+      json: async () => ({
+        correctiveAction: '4 days Suspension',
+        previousOffenses: 1
+      })
     };
   };
-  context.refreshInboxBadge = async () => {};
-  context.refreshIncidentBadges = async () => {};
-  let signaturePadInitializations = 0;
-  context.createSignaturePad = () => {
-    signaturePadInitializations += 1;
-    return { toDataURL: () => 'data:image/png;base64,aA==' };
-  };
-  const incident = {
-    id: 19,
-    status: 'UNDER_REVIEW',
-    canReview: true
-  };
-  const review = context.IncidentCaseUI.renderReviewActions(incident, {
-    reload: async () => {}
-  });
-  root.appendChild(review);
-  const closure = context.IncidentCaseUI.renderClosureAction(incident, {
-    reload: async () => {}
-  });
-  root.appendChild(closure);
-  const closeToggle = closure
-    .querySelectorAll('button')
-    .find((button) => button.textContent === 'Close for documentation');
-  const closePanel = closure.querySelectorAll('div').at(-1);
-  assert.equal(closePanel.hidden, true);
-  await closeToggle.click();
-  assert.equal(closePanel.hidden, false);
-  const investigate = review
-    .querySelectorAll('button')
-    .find((button) => button.textContent === 'Require further investigation');
-  await investigate.click();
-  assert.deepEqual(transitionArgs, [19, 'START_INVESTIGATION', '']);
-
-  const nteRoot = document.createElement('section');
-  context.IncidentCaseUI.renderNte(
-    nteRoot,
-    {
-      ...incident,
-      reportedEmployeeEmail: 'employee@example.com',
-      currentUserEmail: 'hr@example.com',
-      nte: null,
-      explanations: [],
-      explanationAddenda: []
-    },
-    [],
-    {}
-  );
-  const nteToggle = nteRoot
-    .querySelectorAll('button')
-    .find((button) => button.textContent === 'Prepare NTE');
-  const nteEditor = nteRoot.querySelectorAll('.incident-nte-editor')[0];
-  assert.equal(nteEditor.hidden, true);
-  assert.equal(signaturePadInitializations, 0);
-  await nteToggle.click();
-  assert.equal(nteEditor.hidden, false);
-  assert.equal(signaturePadInitializations, 1);
-});
-
-test('issued NTE identifies the recipient and omits HR response tracking', () => {
-  const browser = createBrowser();
-  browser.loadDashboard();
-  const { context, document } = browser;
-  const parent = document.createElement('section');
-  context.IncidentCaseUI.renderNte(
-    parent,
-    {
-      id: 2,
-      caseNumber: 'IR-2',
-      subject: 'Test incident',
-      status: 'NTE ISSUED',
-      canReview: true,
-      currentUserEmail: 'hr@example.com',
-      reportedEmployeeName: 'Reported Employee',
-      reportedEmployeeEmail: 'employee@example.com',
-      nte: {
-        status: 'ISSUED',
-        issuanceDate: '2026-10-28',
-        receiptDate: '2026-10-28',
-        deadlineDate: '2026-11-04',
-        daysRemaining: 5,
-        evidence: []
-      },
-      explanations: [],
-      explanationAddenda: []
-    },
-    [],
-    {}
-  );
-  assert.ok(
-    parent
-      .querySelectorAll('p')
-      .some((paragraph) =>
-        paragraph.textContent.includes(
-          'Directed To: Reported Employee (employee@example.com)'
-        )
-      )
-  );
-  assert.equal(parent.textContent.includes('HR response tracking'), false);
-  assert.equal(
-    parent
-      .querySelectorAll('button')
-      .some((button) => /Download|Start evaluation/.test(button.textContent)),
-    false
-  );
-});
-
-test('evaluation corrective action is filled from severity and prior finalized violations', async () => {
-  const browser = createBrowser();
-  browser.loadDashboard();
-  const { context, document } = browser;
-  context.fetch = async () => ({
-    ok: true,
-    json: async () => ({
-      matrix: [
-        {
-          severity: 'Light',
-          occurrence: 1,
-          correctiveAction: 'Written Warning'
-        },
-        {
-          severity: 'Light',
-          occurrence: 2,
-          correctiveAction: '4 days Suspension'
-        }
-      ]
-    })
-  });
-  const parent = document.createElement('section');
-  context.IncidentCaseUI.renderEvaluation(
-    parent,
-    {
-      id: 11,
-      status: 'EVALUATION',
-      canReview: true,
-      currentUserEmail: 'hr@example.com',
-      evaluation: null,
-      disciplinaryHistory: [{ severity: 'Light' }]
-    },
-    [],
-    {}
-  );
-  const [finding, severity] = parent.querySelectorAll('select');
-  const correctiveAction = parent.querySelectorAll('input')[0];
+  context.IncidentWorkflow.render(parent, workflowIncident(), async () => {});
+  await actionButton(parent, 'Review NTE And Recommend Action').click();
+  const finding = labeledControl(parent, 'Finding'),
+    severity = labeledControl(parent, 'Violation Severity');
   finding.value = 'SUBSTANTIATED';
   await finding.trigger('change');
   severity.value = 'Light';
   await severity.trigger('change');
-  for (let index = 0; index < 5; index += 1) await Promise.resolve();
-  assert.equal(correctiveAction.value, '4 days Suspension');
-  assert.equal(correctiveAction.readOnly, true);
+  const action = labeledControl(parent, 'Recommended Corrective Action');
+  assert.equal(action.value, '4 days Suspension');
+  assert.equal(action.readOnly, true);
+  assert.equal(labeledControl(parent, 'Previous Relevant Offenses').value, 1);
+  assert.deepEqual(calls, [
+    { method: 'getIncidentCorrectiveAction', args: [9, 'Light'] }
+  ]);
+  finding.value = 'NOT_SUBSTANTIATED';
+  await finding.trigger('change');
+  assert.equal(action.value, 'No Further Action');
+  assert.equal(severity.disabled, true);
 });
 
-test('Track supplies its reload callback without inline feedback elements', async () => {
-  const browser = createBrowser();
-  browser.loadDashboard();
-  const { context, document } = browser;
-  browser.evaluate("session = { role: 'HR', email: 'hr@example.com' }");
-  const incident = {
-    id: 9,
-    caseNumber: 'IR-9',
-    subject: 'Test',
-    status: 'DECISION ISSUED',
-    canReview: true,
-    reportedEmployeeName: 'Employee',
-    signatures: [],
-    informationRequests: [],
-    decision: {},
-    tracking: {
-      currentStage: 'DECISION ISSUED',
-      closed: false,
-      stages: [{ key: 'DECISION ISSUED', label: 'Decision Issued' }]
-    }
-  };
+test('current Track reload callback refreshes the selected case without legacy inline controls', async () => {
+  const { context, document } = workflowBrowser();
+  let reads = 0,
+    reload;
   context.fetch = async (url) => ({
     ok: true,
-    json: async () =>
-      url.endsWith('getIncidentTrackingVersion') ? { version: '1' } : incident
+    json: async () => {
+      if (url.endsWith('getIncidentTrackingVersion')) return { version: '1' };
+      ++reads;
+      return workflowIncident();
+    }
   });
   context.IncidentProgress.render = () => {};
-  context.IncidentTimeline.render = () => {};
-  context.IncidentCaseUI.renderReport = context.IncidentCaseUI.renderSignature =
-    () => {};
-  let controls;
-  context.IncidentCaseUI.renderDecision = (_parent, _incident, view) => {
-    controls = view;
+  context.IncidentWorkflow.render = (_parent, _incident, callback) => {
+    reload = callback;
   };
   await context.IncidentTrack.select(9);
-  assert.equal(Object.hasOwn(controls, 'feedback'), false);
+  assert.equal(typeof reload, 'function');
+  assert.equal(reads, 1);
+  await reload();
+  assert.equal(reads, 2);
   assert.equal(document.getElementById('ir-track-action-feedback'), null);
-  assert.equal(controls.reload, context.IncidentTrack.select);
 });
 
 test('Head HR switches preview immediately, discard unsaved visits, and persist only on Save Changes', async () => {
@@ -902,6 +866,17 @@ test('Head HR switches preview immediately, discard unsaved visits, and persist 
       saved = true;
       return { ok: true, json: async () => ({ ok: true }) };
     }
+    if (url.endsWith('getIncidentWorkflowConfiguration'))
+      return {
+        ok: true,
+        json: async () => ({
+          departments: [],
+          assignments: [],
+          accounts: [],
+          approvers: [],
+          managementEmail: ''
+        })
+      };
     ++reads;
     return {
       ok: true,

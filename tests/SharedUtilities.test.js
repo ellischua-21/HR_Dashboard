@@ -12,6 +12,7 @@ const {
   parseInput
 } = require('../shared/DateUtils');
 const { normalizePagination } = require('../server/utils/Pagination');
+const WorkTime = require('../shared/WorkTime');
 const { sendAttachment } = require('../server/utils/AttachmentResponse');
 const { normalizeEmployeeFilters } = require('../server/utils/EmployeeFilters');
 const {
@@ -28,6 +29,65 @@ test('employee age changes on the calendar birthday and rejects invalid or futur
   assert.equal(ageOnDate('2026-11-05', '2026-11-04'), '');
   assert.equal(ageOnDate('2026-02-30', '2026-11-04'), '');
   assert.equal(ageOnDate('', '2026-11-04'), '');
+});
+
+test('HR working time clips Manila shift boundaries, skips weekends and retains full elapsed hours', () => {
+  const time = (value) => Date.parse(value + '+08:00');
+  assert.equal(
+    WorkTime.milliseconds(
+      time('2026-11-06T18:00:00'),
+      time('2026-11-09T08:30:00')
+    ),
+    3600000
+  );
+  assert.equal(
+    WorkTime.milliseconds(
+      time('2026-11-07T08:00:00'),
+      time('2026-11-08T18:30:00')
+    ),
+    0
+  );
+  assert.equal(
+    WorkTime.milliseconds(
+      time('2026-11-09T07:00:00'),
+      time('2026-11-09T20:00:00')
+    ),
+    10.5 * 3600000
+  );
+  assert.equal(WorkTime.milliseconds(NaN, time('2026-11-09T20:00:00')), 0);
+  assert.equal(WorkTime.milliseconds(2, 1), 0);
+  assert.equal(WorkTime.format(105 * 3600000 + 61000), '105:01:01');
+});
+
+test('working-time week optimization matches daily intersection across deterministic multi-year ranges', () => {
+  const day = 86400000,
+    hour = 3600000,
+    offset = 8 * hour;
+  function daily(from, to) {
+    let total = 0;
+    for (
+      let start = Math.floor((from + offset) / day) * day - offset;
+      start < to;
+      start += day
+    ) {
+      if ([0, 6].includes(new Date(start + offset).getUTCDay())) continue;
+      total += Math.max(
+        0,
+        Math.min(to, start + 18.5 * hour) - Math.max(from, start + 8 * hour)
+      );
+    }
+    return total;
+  }
+  const base = Date.parse('2025-12-01T00:00:00Z');
+  for (let i = 0; i < 200; i++) {
+    const from = base + i * 13 * hour + i * 731;
+    const to = from + ((i * 17) % 740) * day + ((i * 11) % 24) * hour;
+    assert.equal(
+      WorkTime.milliseconds(from, to),
+      daily(from, to),
+      `range ${i}`
+    );
+  }
 });
 
 test('shared deadline calendar handles weekends, year boundaries, and invalid input', () => {

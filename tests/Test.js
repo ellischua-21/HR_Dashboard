@@ -191,12 +191,14 @@ test('requested account roles map to the intended permission profiles', () => {
   assert.equal(requestAccount, undefined);
   assert.equal(ACCOUNT_ROLE_MAP.STAFF, 'STAFF');
   assert.deepEqual(ROLE_PERMS.STAFF, [
+    'employee.self',
     'forms.self',
     'announcements.read',
     'inbox.read',
     'account.password'
   ]);
   assert.deepEqual(ROLE_PERMS.HEAD, [
+    'employee.self',
     'forms.self',
     'forms.review',
     'announcements.read',

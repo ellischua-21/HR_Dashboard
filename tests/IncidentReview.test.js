@@ -1,361 +1,371 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { pool } = require('../server/db/database');
+const incidents = require('../server/services/IncidentWorkflowService');
 const {
-  buildReviewFilter,
-  ACTIVE_CASE_SQL,
-  NTE_CASE_SQL
+  categoriesForRole,
+  categoryForIncident
 } = require('../server/services/incident-management/Review');
 const {
   incidentNotificationTarget
 } = require('../server/services/incident-management/Tracking');
+const { accountIdentityMock } = require('./helpers/AccountFixtures');
+const {
+  incidentFixture,
+  HR,
+  HEAD,
+  EMPLOYEE,
+  MANAGER
+} = require('./helpers/IncidentWorkflow');
 
-test('Review groups use the HR signature for waiting and processing, and formal closure for archives', () => {
-  const waiting = buildReviewFilter({ category: 'WAITING' });
-  const ongoing = buildReviewFilter({ category: 'ONGOING' });
-  const all = buildReviewFilter({ category: 'ALL' });
-  assert.match(waiting.sql, /NOT EXISTS/);
-  assert.match(waiting.sql, /signatory_role = 'HR'/);
-  assert.match(ongoing.sql, /AND EXISTS/);
-  assert.match(waiting.sql, /status <> 'CLOSED'/);
-  assert.match(ongoing.sql, /status <> 'CLOSED'/);
-  assert.equal(
-    buildReviewFilter({ category: 'CLOSED' }).sql,
-    "incident_reports.status = 'CLOSED'"
-  );
-  assert.equal(all.sql, '1 = 1');
-  assert.equal(ACTIVE_CASE_SQL, "incident_reports.status <> 'CLOSED'");
-  assert.match(NTE_CASE_SQL, /'NTE ISSUED', 'EXPLANATION SENT', 'EVALUATION'/);
-});
+const review = {
+  finding: 'SUBSTANTIATED',
+  findings: 'Synthetic findings supported by evidence.',
+  severity: 'Light',
+  recommendedAction: 'Client override'
+};
 
-test('Review search binds literal wildcard characters and validates filters and page sizes', () => {
-  const filter = buildReviewFilter({
-    category: 'WAITING',
-    stage: 'SIGNED',
-    search: '  20%_!  ',
-    page: 2
-  });
-  assert.deepEqual(filter.values, ['SIGNED', ...Array(4).fill('%20!%!_!!%')]);
-  assert.match(filter.sql, /reporter_name LIKE/);
-  assert.equal(filter.filters.pageSize, 25);
-  for (const input of [
-    null,
-    [],
-    { category: 'ANY' },
-    { stage: "CLOSED' OR 1=1" },
-    { page: 0 },
-    { page: 1.2 },
-    { pageSize: 51 },
-    { search: 'x'.repeat(192) }
-  ])
-    assert.throws(() => buildReviewFilter(input), { status: 400 });
-});
-
-test('Review counters and paginated results are read from one database snapshot', async (t) => {
-  const { pool } = require('../server/db/database');
-  const incidents = require('../server/services/IncidentService');
-  t.mock.method(pool, 'execute', async () => [
-    [{ email: 'hr@example.com', role: 'HR', active: 1 }]
+test('current Review categories follow role and phase; legacy records stay closed', () => {
+  assert.deepEqual(categoriesForRole('HR'), [
+    'ALL',
+    'NTE_ISSUED',
+    'FOR_REVIEW',
+    'CLOSED'
   ]);
-  let commits = 0;
-  let releases = 0;
-  t.mock.method(pool, 'getConnection', async () => ({
-    beginTransaction: async () => {},
-    rollback: async () => {},
-    commit: async () => {
-      ++commits;
-    },
-    release: () => {
-      ++releases;
-    },
-    execute: async (sql, values) => {
-      if (sql.includes('FROM system_settings')) return [[]];
-      if (sql.includes('FROM incident_ntes n')) return [[]]; // overdue sweep
-      if (sql.includes('AS totalCases')) {
-        assert.match(sql, /AS ongoing/);
-        assert.match(sql, /AS waiting/);
-        assert.match(sql, /AS filteredCount/);
-        assert.deepEqual(values, Array(4).fill('%Employee%'));
-        return [
-          [
-            {
-              totalCases: '52',
-              ongoing: '18',
-              waiting: '12',
-              nte: '12',
-              closed: '16',
-              filteredCount: '26'
-            }
-          ]
-        ];
-      }
-      assert.match(sql, /LIMIT 25 OFFSET 25/);
-      assert.match(sql, /MAX\(a.created_at\)/);
-      assert.match(sql, /MAX\(s.signed_at\)/);
-      assert.match(sql, /reporter_name AS reporterName/);
-      assert.deepEqual(values, Array(4).fill('%Employee%'));
-      return [
-        [
-          {
-            id: 9,
-            caseNumber: 'IR-9',
-            status: 'UNDER_REVIEW',
-            reporterName: 'Head'
-          }
-        ]
-      ];
-    }
+  assert.equal(
+    categoryForIncident({ phase: 'EMPLOYEE' }, { role: 'HR' }),
+    'NTE_ISSUED'
+  );
+  assert.equal(
+    categoryForIncident({ phase: 'HR' }, { role: 'HR' }),
+    'FOR_REVIEW'
+  );
+  assert.equal(
+    categoryForIncident({ status: 'IR FILED' }, { role: 'HEAD' }),
+    'FOR_REVIEW'
+  );
+  assert.equal(categoryForIncident({ legacy: true }, { role: 'HR' }), 'CLOSED');
+});
+
+test('Review filters and counters retain only uninvolved HR cases after NTE issuance', async (t) => {
+  const identity = accountIdentityMock(() => ({
+    email: HR,
+    role: 'HR',
+    active: 1
   }));
-  const result = await incidents.getIncidentReviewDashboard(
-    { session: { userEmail: 'hr@example.com' } },
-    { category: 'ONGOING', search: 'Employee', page: 100 }
+  const rows = [
+    {
+      id: 1,
+      workflowVersion: 2,
+      caseNumber: 'IR-1',
+      subject: 'Literal %_ evidence',
+      phase: 'HR',
+      nteIssuedAt: '2026-11-01',
+      userInvolved: 0
+    },
+    {
+      id: 2,
+      workflowVersion: 2,
+      caseNumber: 'IR-2',
+      subject: 'Other',
+      phase: 'EMPLOYEE',
+      nteIssuedAt: '2026-11-01',
+      userInvolved: 0
+    },
+    {
+      id: 3,
+      workflowVersion: 2,
+      caseNumber: 'IR-3',
+      phase: 'HEAD',
+      nteIssuedAt: null,
+      userInvolved: 0
+    },
+    {
+      id: 4,
+      workflowVersion: 2,
+      caseNumber: 'IR-4',
+      phase: 'HR',
+      nteIssuedAt: '2026-11-01',
+      userInvolved: 1
+    }
+  ];
+  t.mock.method(pool, 'execute', async (sql, values) => {
+    if (sql.includes('FROM incident_reports r LEFT JOIN')) {
+      assert.match(sql, /incident_participants/);
+      assert.match(sql, /WHERE .*workflow_version/s);
+      assert.ok(values.every((value) => value === HR));
+      return [rows];
+    }
+    return identity(sql, values);
+  });
+  const req = { session: { userEmail: HR } };
+  const result = await incidents.getIncidentReviewDashboard(req, {
+    category: 'FOR_REVIEW',
+    search: '%_'
+  });
+  assert.deepEqual(
+    result.cases.map((row) => row.id),
+    [1]
   );
   assert.deepEqual(result.summary, {
-    totalCases: 52,
-    ongoing: 18,
-    waiting: 12,
-    nte: 12,
-    closed: 16
+    ALL: 2,
+    NTE_ISSUED: 1,
+    FOR_REVIEW: 1,
+    CLOSED: 0
   });
-  assert.equal(result.total, 26);
-  assert.equal(result.page, 2);
-  assert.equal(result.pages, 2);
-  assert.equal(result.cases[0].caseNumber, 'IR-9');
-  assert.equal(commits, 2);
-  assert.equal(releases, 2);
+  await assert.rejects(
+    incidents.getIncidentReviewDashboard(req, { category: 'ONGOING' }),
+    { status: 409 }
+  );
+  await assert.rejects(
+    incidents.getIncidentReviewDashboard(req, { search: 'x'.repeat(192) }),
+    { status: 409 }
+  );
 });
 
-test('STAFF and HEAD cannot retrieve the Review dashboard even with inbox access', async (t) => {
-  const { pool } = require('../server/db/database');
-  const incidents = require('../server/services/IncidentService');
+test('STAFF and SUPERVISOR cannot use Review; assigned HEAD retains Review access', async (t) => {
   let role = 'STAFF';
-  t.mock.method(pool, 'execute', async () => [
-    [{ email: 'employee@example.com', role, active: 1 }]
-  ]);
-  t.mock.method(pool, 'getConnection', async () => {
-    throw new Error('Review database queries must not run.');
-  });
-  for (role of ['STAFF', 'HEAD'])
+  const identity = accountIdentityMock(() => ({
+    email: HEAD,
+    role,
+    active: 1
+  }));
+  t.mock.method(pool, 'execute', async (sql, values) =>
+    sql.includes('FROM incident_reports r LEFT JOIN')
+      ? [[]]
+      : identity(sql, values)
+  );
+  const req = { session: { userEmail: HEAD } };
+  for (role of ['STAFF', 'SUPERVISOR'])
     await assert.rejects(
-      incidents.getIncidentReviewDashboard({
-        session: { userEmail: 'employee@example.com' }
-      }),
-      { status: 403 }
+      incidents.getIncidentReviewDashboard(req),
+      /cannot access Review/
     );
+  role = 'HEAD';
+  assert.equal((await incidents.getIncidentReviewDashboard(req)).total, 0);
 });
 
-test('HR cannot issue a decision before evaluation or mutate an archived case', async (t) => {
-  const { pool } = require('../server/db/database');
-  const incidents = require('../server/services/IncidentService');
-  let status = 'UNDER_REVIEW';
-  let rollbacks = 0;
-  t.mock.method(pool, 'execute', async () => [
-    [{ email: 'hr@example.com', role: 'HR', active: 1 }]
-  ]);
-  t.mock.method(pool, 'getConnection', async () => ({
-    beginTransaction: async () => {},
-    release: () => {},
-    rollback: async () => {
-      ++rollbacks;
-    },
-    execute: async (sql) => {
-      if (sql.includes('FROM incident_reports'))
-        return [[{ id: 1, case_number: 'IR-1', status }]];
-      if (sql.includes('FROM incident_evaluations')) return [[]];
-      throw new Error(
-        'No decision or case mutation is allowed without the required workflow state.'
-      );
-    }
-  }));
-  const req = { session: { userEmail: 'hr@example.com' } };
-  const input = {
-    signature: 'data:image/png;base64,aA==',
-    outcome: 'NO_VIOLATION',
-    decisionReason: 'Evaluation required.'
-  };
-  await assert.rejects(incidents.issueIncidentDecision(req, 1, input), {
-    status: 409
-  });
-  status = 'EVALUATION';
-  await assert.rejects(incidents.issueIncidentDecision(req, 1, input), {
-    status: 409
-  });
-  status = 'CLOSED';
-  await assert.rejects(
-    incidents.transitionIncident(req, 1, 'CLOSE_DOCUMENTATION', 'Archived'),
-    { status: 409 }
-  );
-  await assert.rejects(
-    incidents.saveIncidentEvaluation(req, 1, {
-      finding: 'NOT_SUBSTANTIATED',
-      findings: 'Archived'
-    }),
-    { status: 409 }
-  );
-  assert.equal(rollbacks, 4);
-});
-
-test('final decision cannot override the matrix action recorded in evaluation', async (t) => {
-  const { pool } = require('../server/db/database');
-  const incidents = require('../server/services/IncidentService');
-  t.mock.method(pool, 'execute', async () => [
-    [{ email: 'hr@example.com', role: 'HR', active: 1 }]
-  ]);
-  t.mock.method(pool, 'getConnection', async () => ({
-    beginTransaction: async () => {},
-    rollback: async () => {},
-    release() {},
-    execute: async (sql) => {
-      if (sql.includes('FROM incident_reports'))
-        return [[{ id: 3, case_number: 'IR-3', status: 'EVALUATION' }]];
-      if (sql.includes('FROM incident_evaluations'))
-        return [
-          [
-            {
-              id: 8,
-              finding: 'SUBSTANTIATED',
-              rule_id: null,
-              recommended_action: '4 days Suspension'
-            }
-          ]
-        ];
-      if (sql.includes('FROM incident_decisions')) return [[]];
-      if (sql.includes('FROM incident_case_subjects')) return [[{ id: 9 }]];
-      throw new Error(`Unexpected query: ${sql}`);
-    }
-  }));
-  await assert.rejects(
-    incidents.issueIncidentDecision(
-      { session: { userEmail: 'hr@example.com' } },
-      3,
-      {
-        signature: 'data:image/png;base64,aA==',
-        outcome: 'WRITTEN_WARNING',
-        finalAction: 'Written Warning',
-        decisionReason: 'Final decision.'
-      }
-    ),
-    { status: 409, message: /corrective action recorded in the evaluation/ }
-  );
-});
-
-test('event links open Track for all roles, including closed cases', () => {
-  for (const role of ['HR', 'ADMIN'])
-    for (const status of [
-      'PENDING SIGNATURE',
-      'NTE ISSUED',
-      'EXPLANATION SENT',
-      'CLOSED'
-    ])
-      assert.equal(incidentNotificationTarget(role, status), 'incident-track');
-  for (const role of ['STAFF', 'HEAD']) {
-    assert.equal(incidentNotificationTarget(role, 'CLOSED'), 'incident-track');
-    assert.equal(
-      incidentNotificationTarget(role, 'NTE ISSUED'),
-      'incident-track'
+test('HR cannot issue an unapproved decision, mutate a closed case, or write a legacy record', async (t) => {
+  const f = incidentFixture(t);
+  const req = f.req();
+  for (const phase of ['HR', 'MANAGEMENT', 'FINAL_ACTION']) {
+    f.state().row.phase = phase;
+    await assert.rejects(
+      incidents.incidentWorkflowAction(req, 7, 'ISSUE_DECISION'),
+      /Management approval is required/
     );
   }
+  f.state().row.status = 'CLOSED';
+  await assert.rejects(
+    incidents.incidentWorkflowAction(req, 7, 'SAVE_REVIEW', review),
+    /closed and read-only/
+  );
+  f.state().row.workflow_version = 1;
+  await assert.rejects(
+    incidents.incidentWorkflowAction(req, 7, 'SAVE_REVIEW', review),
+    { status: 404 }
+  );
+  assert.equal(f.counts().commits, 0);
+  assert.equal(f.counts().rollbacks, 5);
+  assert.equal(f.state().writes.length, 0);
+  for (const method of [
+    'submitIncidentReport',
+    'signIncidentCase',
+    'saveIncidentEvaluation',
+    'issueIncidentDecision'
+  ])
+    await assert.rejects(incidents[method](req, 7, {}), { status: 409 });
 });
 
-test('reported employees see one combined filing and acknowledgment notification', async (t) => {
-  const { pool } = require('../server/db/database');
-  const { getInbox } = require('../server/services/InboxService');
-  t.mock.method(pool, 'execute', async (sql) => {
-    if (sql.includes('FROM user_roles WHERE email'))
-      return [[{ email: 'employee@example.com', role: 'STAFF', active: 1 }]];
-    if (sql.includes('FROM hr_announcements')) return [[]];
-    if (sql.includes('FROM incident_notifications n'))
-      return [
-        [
-          {
-            notificationId: 12,
-            notificationType: 'IR_SUBMITTED',
-            createdAt: '2026-10-28T08:00:00Z',
-            viewedAt: null,
-            incidentId: 4,
-            caseNumber: 'IR-4',
-            subject: 'Test incident',
-            reportedEmployeeName: 'Employee',
-            reportedEmployeeEmail: 'employee@example.com',
-            status: 'PENDING SIGNATURE',
-            requiresAction: 0
-          },
-          {
-            notificationId: 13,
-            notificationType: 'EMPLOYEE_SIGNATURE',
-            createdAt: '2026-10-28T08:00:00Z',
-            viewedAt: null,
-            incidentId: 4,
-            caseNumber: 'IR-4',
-            subject: 'Test incident',
-            reportedEmployeeName: 'Employee',
-            reportedEmployeeEmail: 'employee@example.com',
-            status: 'PENDING SIGNATURE',
-            requiresAction: 1
-          }
-        ]
-      ];
-    throw new Error(`Unexpected query: ${sql}`);
-  });
-  const items = await getInbox({
-    session: { userEmail: 'employee@example.com' }
-  });
-  const incidentItems = items.filter((item) => item.type === 'INCIDENT');
-  assert.equal(incidentItems.length, 1);
-  assert.equal(
-    incidentItems[0].title,
-    'Incident Report filed. Requires your acknowledgment and signature'
+test('assessment uses the configured occurrence action and requires recorded Management approval', async (t) => {
+  const f = incidentFixture(t);
+  await incidents.incidentWorkflowAction(f.req(), 7, 'SEND_APPROVAL', review);
+  let saved = JSON.parse(f.state().row.hr_review);
+  assert.equal(saved.correctiveAction, '4 days Suspension');
+  assert.equal(saved.previousOffenses, 1);
+  assert.equal(f.state().row.phase, 'MANAGEMENT');
+  assert.equal(f.state().task.state, 'WAITING');
+  assert.equal(f.state().documents[0].type, 'HR_RECOMMENDATION');
+  await assert.rejects(
+    incidents.incidentWorkflowAction(f.req(HEAD, 'HEAD'), 7, 'MANAGEMENT', {
+      approve: true
+    }),
+    /designated/
   );
-  assert.equal(incidentItems[0].status, 'ACTION_REQUIRED');
-  assert.equal(incidentItems[0].unseen, true);
+  await incidents.incidentWorkflowAction(
+    f.req(MANAGER, 'ADMIN'),
+    7,
+    'MANAGEMENT',
+    { approve: true }
+  );
+  assert.equal(f.state().row.phase, 'FINAL_ACTION');
+  assert.equal(f.state().task.state, 'READY');
+  await incidents.incidentWorkflowAction(f.req(), 7, 'ISSUE_DECISION', {
+    finalAction: 'Client override'
+  });
+  saved = JSON.parse(f.state().row.decision);
+  assert.equal(saved.correctiveAction, '4 days Suspension');
+  assert.equal(saved.outcome, 'SUSPENSION');
+  assert.equal(f.state().row.phase, 'FINALIZED');
+  await incidents.incidentWorkflowAction(f.req(), 7, 'CLOSE', {
+    reason: 'Synthetic completion documented.'
+  });
+  assert.equal(f.state().row.status, 'CLOSED');
+  assert.equal(f.state().task.state, 'COMPLETED');
+  assert.ok(
+    f
+      .state()
+      .notifications.some(
+        (item) => item.recipient === EMPLOYEE && item.type === 'DECISION_ISSUED'
+      )
+  );
+  assert.ok(
+    !f
+      .state()
+      .notifications.some(
+        (item) => item.recipient === HR && item.type === 'DECISION_ISSUED'
+      )
+  );
 });
 
-test('assigned Heads receive one combined filing and signature notification', async (t) => {
-  const { pool } = require('../server/db/database');
-  const { getInbox } = require('../server/services/InboxService');
-  t.mock.method(pool, 'execute', async (sql) => {
-    if (sql.includes('FROM user_roles WHERE email'))
-      return [[{ email: 'head@example.com', role: 'HEAD', active: 1 }]];
-    if (sql.includes('FROM hr_announcements')) return [[]];
-    if (sql.includes('FROM user_forms f')) return [[]];
-    if (sql.includes('FROM incident_notifications n'))
-      return [
-        [
-          {
-            notificationId: 22,
-            notificationType: 'IR_SUBMITTED',
-            createdAt: '2026-10-28T08:00:00Z',
-            viewedAt: null,
-            incidentId: 5,
-            caseNumber: 'IR-5',
-            subject: 'Test incident',
-            reportedEmployeeName: 'Employee',
-            reportedEmployeeEmail: 'employee@example.com',
-            status: 'PENDING SIGNATURE',
-            requiresAction: 0
-          },
-          {
-            notificationId: 23,
-            notificationType: 'HEAD_SIGNATURE',
-            createdAt: '2026-10-28T08:00:00Z',
-            viewedAt: null,
-            incidentId: 5,
-            caseNumber: 'IR-5',
-            subject: 'Test incident',
-            reportedEmployeeName: 'Employee',
-            reportedEmployeeEmail: 'employee@example.com',
-            status: 'PENDING SIGNATURE',
-            requiresAction: 1
-          }
-        ]
-      ];
-    throw new Error(`Unexpected query: ${sql}`);
+test('changed finalized offense count and stale approval versions block finalization', async (t) => {
+  const f = incidentFixture(t, {
+    phase: 'FINAL_ACTION',
+    approved_at: '2026-11-01',
+    hr_review: {
+      ...review,
+      previousOffenses: 0,
+      correctiveAction: 'Written Warning',
+      version: 'v2'
+    },
+    management: { approved: true, reviewVersion: 'v1' }
   });
-  const items = await getInbox({ session: { userEmail: 'head@example.com' } });
-  const incidentItems = items.filter((item) => item.type === 'INCIDENT');
-  assert.equal(incidentItems.length, 1);
-  assert.equal(
-    incidentItems[0].title,
-    'Incident Report filed. Requires your review and signature'
+  await assert.rejects(
+    incidents.incidentWorkflowAction(f.req(), 7, 'ISSUE_DECISION'),
+    /new Management approval/
   );
-  assert.equal(incidentItems[0].status, 'ACTION_REQUIRED');
+  f.state().row.management.reviewVersion = 'v2';
+  await assert.rejects(
+    incidents.incidentWorkflowAction(f.req(), 7, 'ISSUE_DECISION'),
+    /violation count changed/
+  );
+  assert.equal(f.state().documents.length, 0);
+  assert.equal(f.counts().commits, 0);
+});
+
+test('failed notification rolls back recommendation, snapshots, task timing and revisions', async (t) => {
+  const f = incidentFixture(t);
+  const req = f.req();
+  const before = structuredClone(f.state());
+  f.fail((sql) => sql.includes('INSERT IGNORE INTO incident_notifications'));
+  await assert.rejects(
+    incidents.incidentWorkflowAction(req, 7, 'SEND_APPROVAL', review),
+    /Synthetic write failure/
+  );
+  assert.deepEqual(f.state(), before);
+  assert.deepEqual(f.counts(), { commits: 0, rollbacks: 1, released: 1 });
+});
+
+test('event links open Track for every role, including closed cases', () => {
+  for (const role of ['STAFF', 'SUPERVISOR', 'HEAD', 'HR', 'ADMIN'])
+    for (const status of ['IR FILED', 'NTE ISSUED', 'CLOSED'])
+      assert.equal(incidentNotificationTarget(role, status), 'incident-track');
+});
+
+test('Inbox preserves current action status, HR ownership suppression and read-only legacy notices', async (t) => {
+  const {
+    getInbox,
+    markInboxSeen
+  } = require('../server/services/InboxService');
+  const identity = accountIdentityMock(() => ({
+    email: HR,
+    role: 'HR',
+    active: 1
+  }));
+  const rows = [
+    {
+      notificationId: 1,
+      incidentId: 7,
+      notificationType: 'EXPLANATION_SENT',
+      requiresAction: 1,
+      taskOwner: 'other@example.invalid'
+    },
+    {
+      notificationId: 2,
+      incidentId: 8,
+      notificationType: 'NTE_ISSUED',
+      requiresAction: 1,
+      taskOwner: 'other@example.invalid',
+      reportedEmployeeEmail: HR
+    },
+    {
+      notificationId: 3,
+      incidentId: 9,
+      notificationType: 'INFO_REQ_4',
+      requiresAction: 1,
+      taskOwner: 'other@example.invalid'
+    },
+    {
+      notificationId: 4,
+      incidentId: 10,
+      notificationType: 'HEAD_SIGNATURE',
+      workflowVersion: 1,
+      requiresAction: 0
+    },
+    {
+      notificationId: 5,
+      incidentId: 7,
+      notificationType: 'DECISION_ISSUED',
+      requiresAction: 0,
+      taskOwner: HR,
+      viewedAt: '2026-11-02'
+    }
+  ].map((row) => ({
+    workflowVersion: 2,
+    status: 'NTE ISSUED',
+    caseNumber: 'IR-TEST',
+    subject: 'Synthetic subject',
+    reportedEmployeeName: 'Synthetic Employee',
+    reportedEmployeeEmail: EMPLOYEE,
+    createdAt: '2026-11-01',
+    ...row
+  }));
+  let seen;
+  t.mock.method(pool, 'execute', async (sql, values) => {
+    if (sql.includes('FROM incident_notifications n')) {
+      assert.match(sql, /WHERE n.recipient_email = \? AND/);
+      assert.match(sql, /CONCAT\('EVIDENCE_', actor_activity.id\)/);
+      assert.match(
+        sql,
+        /LOWER\(actor_activity.actor_email\) = LOWER\(n.recipient_email\)/
+      );
+      assert.equal((sql.match(/\?/g) || []).length, values.length);
+      assert.ok(values.every((value) => value === HR));
+      return [rows];
+    }
+    if (
+      sql.includes('FROM hr_announcements') ||
+      sql.includes('FROM user_forms f')
+    )
+      return [[]];
+    if (sql.startsWith('UPDATE incident_notifications')) {
+      assert.match(sql, /WHERE recipient_email = \? AND id IN/);
+      seen = values;
+      return [{ affectedRows: rows.length }];
+    }
+    return identity(sql, values);
+  });
+  const req = { session: { userEmail: HR } };
+  const items = await getInbox(req);
+  const byId = (id) => items.find((item) => item.notificationId === id);
+  assert.equal(byId(1).unseen, false);
+  assert.equal(byId(1).status, 'ACTION_REQUIRED');
+  assert.equal(byId(2).unseen, true);
+  assert.equal(byId(3).unseen, true);
+  assert.equal(byId(4).status, 'LEGACY');
+  assert.equal(byId(5).unseen, false);
+  assert.ok(items.every((item) => item.target === 'incident-track'));
+  assert.doesNotMatch(byId(2).message, /Synthetic subject|Synthetic Employee/);
+  assert.equal((await markInboxSeen(req)).count, rows.length);
+  assert.deepEqual(seen, [HR, 1, 2, 3, 4, 5]);
 });

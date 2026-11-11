@@ -122,7 +122,7 @@ Only an account with the `ADMIN` role sees **Manage Accounts** and can approve o
 - **HR**: dashboard, full employee registration and record read/write, and reports, plus **Manage Forms** for requests forwarded to HR. The designated Head HR can also review forms submitted by other HR accounts. HR and ADMIN have the same complete employee fields; no separate sensitive-data permission is required.
 - **ADMIN**: account management, full employee-record access, View Forms, and HR performance monitoring. Department-assigned ADMIN HEADs can file/review incidents; designated Management approvers approve recommendations. Other incident access is view-only and limited to available cases.
 
-The searchable Reports To field offers active or pending SUPERVISOR accounts for STAFF, and HEAD accounts for SUPERVISOR. Approve the assigned reviewer before approving their subordinate's account. ADMIN can change saved assignments in Manage Accounts. STAFF forms go to their Supervisor then HR; SUPERVISOR forms go to their Head then HR; HEAD forms go directly to HR. At API startup, legacy USER, MANAGER, and EXECUTIVE accounts are migrated to STAFF; HR_STAFF and HR_ADMIN migrate to HR; SYSTEM_ADMIN migrates to ADMIN. Bootstrap the initial administrator with the `create-user` command above. Grant **ADMIN** only to trusted administrators.
+The searchable Reports To field offers active or pending SUPERVISOR accounts for STAFF, and HEAD accounts for SUPERVISOR. Approve the assigned reviewer before approving their subordinate's account. ADMIN can change saved assignments in Manage Accounts. STAFF forms go to their Supervisor then HR; SUPERVISOR forms go to their Head then HR; HEAD forms go directly to HR. At API startup, legacy USER, MANAGER, and EXECUTIVE accounts are migrated to STAFF; HR_STAFF migrates to HR; HR_ADMIN and SYSTEM_ADMIN migrate to ADMIN. Bootstrap the initial administrator with the `create-user` command above. Grant **ADMIN** only to trusted administrators.
 
 ## User forms and leave requests
 
@@ -194,9 +194,13 @@ For manual account provisioning, bootstrap or recovery administrators can use `n
 
 ## Checks and sample records
 
-The existing incident tests describe the retired workflow. They have not been
-rewritten or run during this rework, following the request to avoid test work.
-Use the updated user guide for manual verification of the new workflow.
+Run `npm.cmd run check` for structural checks and `npm.cmd test` for regression
+tests. Incident tests exercise the current workflow facade and browser controller;
+legacy tracking and confidential-document tests remain covered. Leave approval
+tests cover balance deductions, duplicate approvals and transaction rollback.
+Service tests use synthetic SQL responses, and browser tests use a minimal DOM.
+See [Regression coverage](docs/RegressionCoverage.md) for the baseline, changed
+expectations and checks still requiring an isolated MySQL database or real browser.
 
 ### HR review ownership and performance
 
