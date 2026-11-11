@@ -101,6 +101,12 @@ There is no public account-request option on the sign-in screen. HR and ADMIN cr
 
 All users can change their own password by entering the current password and a new password (12–128 characters) in **Change Password**. ADMIN manages registration requests and accounts in **Manage Accounts**.
 
+Privileged capabilities follow the role grants in `server/config/Permissions.js`.
+Residual `extra_perms` cannot grant account management, audit, executive, analytics,
+employee management, reports, announcement management, form review/view, or COC
+management outside those role grants. Other extras retain their existing behavior;
+form assignments and incident case permissions are still enforced separately.
+
 Only an account with the `ADMIN` role sees **Manage Accounts** and can approve or reject requests. The role and assigned Head appear in each request and are fixed when approved:
 
 - **STAFF**: a personal dashboard for submitted-form history and status, plus form templates. STAFF cannot access employee records or the HR dashboard.

@@ -891,16 +891,24 @@ test('extra midday scans do not hide the last departure or change gross work hou
 
 test('only HR and ADMIN can access attendance, even when another role has emp.read', async (t) => {
   let role = 'HEAD';
-  t.mock.method(
-    pool,
-    'execute',
-    accountIdentityMock(() => ({
-      email: 'test@example.com',
-      role,
-      active: 1,
-      extra_perms: 'emp.read'
-    }))
-  );
+  const identity = accountIdentityMock(() => ({
+    email: 'test@example.com',
+    role,
+    active: 1,
+    extra_perms: 'emp.read'
+  }));
+  t.mock.method(pool, 'execute', async (sql, values) => {
+    if (sql.startsWith('INSERT INTO audit_logs')) {
+      assert.deepEqual(values, [
+        'test@example.com',
+        'ACCESS_DENIED',
+        '',
+        'emp.read'
+      ]);
+      return [{ affectedRows: 1 }];
+    }
+    return identity(sql, values);
+  });
   const req = { session: { userEmail: 'test@example.com' } };
   for (role of ['STAFF', 'HEAD'])
     await assert.rejects(getAttendanceContext(req), { status: 403 });

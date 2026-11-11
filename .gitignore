@@ -1,2 +1,7 @@
 node_modules/
 .env
+
+# Local AI agent configuration and generated code graphs
+/.codex/
+/.gemini/
+/graphify-out/

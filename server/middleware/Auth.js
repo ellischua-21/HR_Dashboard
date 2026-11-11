@@ -1,5 +1,5 @@
 const { httpError } = require('../utils/HttpError');
-const { ROLE_PERMS } = require('../config/Permissions');
+const { ROLE_PERMS, isRolePermissionAllowed } = require('../config/Permissions');
 const { pool } = require('../db/database');
 const { logAudit } = require('../services/AuditService');
 const { getAccountEmployee, isSetupAdministrator } = require('../utils/EmployeeIdentity');
@@ -22,9 +22,10 @@ async function getCurrentUser(req) {
     .map((value) => value.trim())
     .filter(
       (value) =>
-        value && !['forms.head-review', 'emp.sensitive'].includes(value) &&
-        !(row.role === 'ADMIN' && ['dash.view', 'forms.review', 'forms.self', 'incidents.coc.manage'].includes(value)) &&
-        !(row.role === 'HR' && value === 'exec.view')
+        value &&
+        !['forms.head-review', 'emp.sensitive'].includes(value) &&
+        !(row.role === 'ADMIN' && value === 'forms.self') &&
+        isRolePermissionAllowed(row.role, value)
     );
   const basePermissions = Object.prototype.hasOwnProperty.call(
     ROLE_PERMS,
@@ -48,7 +49,10 @@ async function requirePerm(req, permission) {
   if (!user) {
     throw httpError('Access denied: you are not an authorized user.', 401);
   }
-  if (!user.perms.includes(permission)) {
+  if (
+    !user.perms.includes(permission) ||
+    !isRolePermissionAllowed(user.role, permission)
+  ) {
     await logAudit(user.email, 'ACCESS_DENIED', '', permission);
     throw httpError('Access denied: insufficient permission.', 403);
   }

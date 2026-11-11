@@ -55,4 +55,29 @@ const ACCOUNT_ROLE_MAP = {
 
 ROLE_PERMS.SUPERVISOR = [...ROLE_PERMS.HEAD];
 
-module.exports = { ROLE_PERMS, ACCOUNT_ROLE_MAP };
+// These capabilities follow the documented role grants, never residual extras.
+const ROLE_ONLY_PERMISSIONS = new Set([
+  'admin.manage',
+  'audit.read',
+  'exec.view',
+  'dash.view',
+  'emp.read',
+  'emp.write',
+  'emp.export',
+  'emp.archive',
+  'report.run',
+  'announcements.manage',
+  'forms.review',
+  'forms.view',
+  'incidents.coc.manage'
+]);
+
+function isRolePermissionAllowed(role, permission) {
+  return (
+    !ROLE_ONLY_PERMISSIONS.has(permission) ||
+    (Object.prototype.hasOwnProperty.call(ROLE_PERMS, role) &&
+      ROLE_PERMS[role].includes(permission))
+  );
+}
+
+module.exports = { ROLE_PERMS, ACCOUNT_ROLE_MAP, isRolePermissionAllowed };
