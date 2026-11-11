@@ -85,3 +85,4 @@ task; do not treat older audit notes as the current workflow specification.
 - Report files added/modified/deleted, purpose, existing code reused, verification
   passed/failed/not run, remaining risks, and manual checks still required. Never
   claim untested workflows are verified.
+- Coding agents must not modify or delete existing tests solely to obtain a passing result. Any change to established test expectations must be justified against approved requirements and reported separately for review.
