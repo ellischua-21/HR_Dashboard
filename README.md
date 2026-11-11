@@ -155,6 +155,12 @@ For manual account provisioning, bootstrap or recovery administrators can use `n
 - `IncidentWorkflowSchema.js` adds versioned section records and case groups through
   the existing startup initializer. Existing incidents remain version 1 and read-only;
   `IncidentService.js` retains their document readers, without retired write logic.
+  For legacy records, only HR has internal review visibility. ADMIN participants
+  receive participant access, and assigned ADMIN HEADs receive assigned-HEAD access;
+  neither assignment nor ADMIN status grants draft NTEs, internal evaluations,
+  disciplinary context, or other recipients' confidential request attachments.
+  Reported employees retain issued documents and their own explanation attachments.
+  Current-workflow HEAD and Management assignments keep their existing rules.
 - Configure department HEAD/ADMIN reviewers and a Management approver in Manage
   Accounts using its existing Save Changes button. Startup seeds the supplied
   department defaults only when matching active accounts exist; missing HEAD accounts

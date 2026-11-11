@@ -13,7 +13,8 @@ const {
   manilaDate: currentManilaDate,
   workingDaysBetween
 } = require('../../shared/DateUtils');
-const VIEW_ROLES = new Set(['HR', 'ADMIN']);
+// Legacy ADMIN assignments grant HEAD visibility, not HR-internal visibility.
+const canViewInternal = (user) => user.role === 'HR';
 
 async function getIncidentTrackingVersion(req, incidentId) {
   const user = await requirePerm(req, 'inbox.read');
@@ -49,7 +50,7 @@ async function getIncidentNteEvidence(req, evidenceId) {
   const file = rows[0];
   if (!file) throw httpError('NTE attachment not found.', 404);
   if (
-    !VIEW_ROLES.has(user.role) &&
+    !canViewInternal(user) &&
     (file.nteStatus !== 'ISSUED' ||
       file.employeeEmail.toLowerCase() !== user.email.toLowerCase())
   )
@@ -79,7 +80,7 @@ async function getIncidentExplanationEvidence(req, evidenceId) {
   const file = rows[0];
   if (!file) throw httpError('Explanation attachment not found.', 404);
   if (
-    !VIEW_ROLES.has(user.role) &&
+    !canViewInternal(user) &&
     file.employeeEmail.toLowerCase() !== user.email.toLowerCase()
   )
     throw httpError(
@@ -113,7 +114,7 @@ async function getIncidentExplanationDraftEvidence(req, evidenceId) {
   const file = rows[0];
   if (!file) throw httpError('Draft attachment not found.', 404);
   if (
-    !VIEW_ROLES.has(user.role) &&
+    !canViewInternal(user) &&
     file.employeeEmail.toLowerCase() !== user.email.toLowerCase()
   )
     throw httpError('You do not have access to this draft attachment.', 403);
@@ -143,7 +144,7 @@ async function getIncidentExplanationAddendumEvidence(req, evidenceId) {
   const file = rows[0];
   if (!file) throw httpError('Additional statement attachment not found.', 404);
   if (
-    !VIEW_ROLES.has(user.role) &&
+    !canViewInternal(user) &&
     file.employeeEmail.toLowerCase() !== user.email.toLowerCase()
   )
     throw httpError('You do not have access to this attachment.', 403);
@@ -229,7 +230,7 @@ async function getIncidentCase(req, incidentId) {
              (LOWER(r.recipient_email) = LOWER(?) OR LOWER(r.requested_by) = LOWER(?))
          )
        ) ORDER BY id`,
-        [id, VIEW_ROLES.has(user.role) ? 1 : 0, user.email, user.email]
+        [id, canViewInternal(user) ? 1 : 0, user.email, user.email]
       ),
       pool.execute(
         `SELECT action, details, actor_email AS actorEmail, created_at AS createdAt,
@@ -246,7 +247,7 @@ async function getIncidentCase(req, incidentId) {
       )
     ]);
   const canViewNte =
-    VIEW_ROLES.has(user.role) ||
+    canViewInternal(user) ||
     incident.reportedEmployeeEmail.toLowerCase() === user.email.toLowerCase();
   let nte = null;
   let evaluation = null;
@@ -269,7 +270,7 @@ async function getIncidentCase(req, incidentId) {
                 signer_name AS signerName, signature_data AS signature, status,
                 issued_at AS issuedAt, overdue_at AS overdueAt
          FROM incident_ntes WHERE incident_id = ? AND (? = 1 OR status = 'ISSUED') LIMIT 1`,
-          [id, VIEW_ROLES.has(user.role) ? 1 : 0]
+          [id, canViewInternal(user) ? 1 : 0]
         ),
         pool.execute(
           `SELECT d.explanation, d.updated_at AS updatedAt
@@ -284,7 +285,7 @@ async function getIncidentCase(req, incidentId) {
          WHERE n.incident_id = ? ORDER BY submitted_at, e.id`,
           [id]
         ),
-        VIEW_ROLES.has(user.role)
+        canViewInternal(user)
           ? pool.execute(
               `SELECT previous_deadline AS previousDeadline,
                     extended_deadline AS extendedDeadline, reason,
@@ -312,7 +313,7 @@ async function getIncidentCase(req, incidentId) {
       [id]
     );
     addenda = addendumRows;
-    if (VIEW_ROLES.has(user.role)) {
+    if (canViewInternal(user)) {
       const [[evaluationRow]] = await pool.execute(
         `SELECT id, finding, findings, rule_id AS ruleId, violation_title AS violationTitle,
                 code_reference AS codeReference, severity, previous_offenses AS previousOffenses,
@@ -355,7 +356,7 @@ async function getIncidentCase(req, incidentId) {
       [id]
     );
     decision = decisionRows[0] || null;
-    if (decision && !VIEW_ROLES.has(user.role)) decision.closureReason = null;
+    if (decision && !canViewInternal(user)) decision.closureReason = null;
   }
   if (nte) {
     const [nteEvidence] = await pool.execute(
@@ -413,7 +414,7 @@ async function getIncidentCase(req, incidentId) {
     for (const reference of references) {
       if (
         reference.documentType === 'EVALUATION' &&
-        !VIEW_ROLES.has(user.role) &&
+        !canViewInternal(user) &&
         !decision
       )
         continue;
@@ -445,8 +446,8 @@ async function getIncidentCase(req, incidentId) {
     participants,
     signatures,
     evidence,
-    activity: VIEW_ROLES.has(user.role) ? activity : [],
-    informationRequests: VIEW_ROLES.has(user.role)
+    activity: canViewInternal(user) ? activity : [],
+    informationRequests: canViewInternal(user)
       ? requests
       : requests.filter(
           (request) =>
@@ -463,7 +464,7 @@ async function getIncidentCase(req, incidentId) {
     task,
     canManageTask:
       user.role === 'HR' && Boolean(task?.isMine && task.state === 'READY'),
-    canViewReview: VIEW_ROLES.has(user.role),
+    canViewReview: canViewInternal(user),
     canReview: false,
     currentUserName: user.full_name || user.email,
     currentUserEmail: user.email,
@@ -496,7 +497,7 @@ async function getIncidentEvidence(req, evidenceId) {
   const evidence = rows[0];
   if (!evidence) throw httpError('Evidence file not found.', 404);
   if (
-    !VIEW_ROLES.has(user.role) &&
+    !canViewInternal(user) &&
     (evidence.requestId
       ? ![evidence.requestRecipient, evidence.requestCreator].some(
           (email) => email && email.toLowerCase() === user.email.toLowerCase()
