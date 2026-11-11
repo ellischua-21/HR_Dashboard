@@ -149,6 +149,10 @@ For manual account provisioning, bootstrap or recovery administrators can use `n
 - The API listens on `127.0.0.1:3001` by default. If Apache uses a nonstandard host/port, add its origin (for example `http://localhost:8080`) to `CORS_ORIGINS`.
 - The Node API runs separately from Apache. XAMPP's MySQL stores employees, user roles, lookup values, audit events, and system settings.
 - ADMIN Audit Logs can be filtered by a start/end time and exact user email. Filter validation and SQL parameterization are enforced by the API.
+- Incident reviewer/Management configuration saves and HR corrective-action matrix
+  saves record audit events in the same transaction as their changes. An audit
+  failure rolls back the save. Event details contain assignment/row counts and
+  approver-selection status, without copying employee details or policy text.
 - Only HR and ADMIN can create accounts, using Employee Registration. Personal Email is the login email; HR/ADMIN select STAFF, SUPERVISOR, HEAD, or HR and set an initial password. New accounts remain pending until an ADMIN approves them. STAFF needs a Supervisor and SUPERVISOR needs a Head selected in Reports To; pending reviewers must be approved first.
 - HR and ADMIN can publish announcements from the Announcements tab. STAFF, SUPERVISOR and HEAD see unacknowledged announcements in a blurred modal after login; acknowledging records that announcement as seen for that account.
 - All roles have an Inbox. STAFF, SUPERVISOR and HEAD see new and previously acknowledged HR announcements. Supervisors and Heads see forms assigned to them; HR and ADMIN see forms at the HR review stage; the Head HR also sees forms submitted by other HR accounts. Reviewed form notifications remain in the Inbox. Inbox filters support item type and status, and form items open the shared Manage Forms tab.

@@ -344,6 +344,13 @@ test('form review date filters preserve the authorized queue and badge totals wi
 test('saving the COC matrix immediately changes the guide for all roles', async (t) => {
   let role = 'HR';
   let matrix = [];
+  t.mock.method(pool, 'getConnection', async () => ({
+    beginTransaction: async () => {},
+    commit: async () => {},
+    rollback: async () => {},
+    release() {},
+    execute: (...args) => pool.execute(...args)
+  }));
   t.mock.method(pool, 'execute', async (sql, values) => {
     if (sql.includes('LOWER(TRIM(personal_email))'))
       return [[{ record_id: 'SYNTHETIC-ACTOR', name: 'Synthetic Actor' }]];
@@ -355,6 +362,7 @@ test('saving the COC matrix immediately changes the guide for all roles', async 
     }
     if (sql.includes('SELECT matrix FROM incident_code_policy_draft'))
       return [[{ matrix: JSON.stringify(matrix) }]];
+    if (sql.startsWith('INSERT INTO audit_logs')) return [{ affectedRows: 1 }];
     throw new Error(`Unexpected query: ${sql}`);
   });
   const req = { session: { userEmail: 'user@example.com' } };
@@ -372,6 +380,13 @@ test('saving the COC matrix immediately changes the guide for all roles', async 
 test('COC matrix saves still reject invalid rows and unauthorized users', async (t) => {
   let role = 'HR';
   let writes = 0;
+  t.mock.method(pool, 'getConnection', async () => ({
+    beginTransaction: async () => {},
+    commit: async () => {},
+    rollback: async () => {},
+    release() {},
+    execute: (...args) => pool.execute(...args)
+  }));
   t.mock.method(pool, 'execute', async (sql) => {
     if (sql.includes('LOWER(TRIM(personal_email))'))
       return [[{ record_id: 'SYNTHETIC-ACTOR', name: 'Synthetic Actor' }]];

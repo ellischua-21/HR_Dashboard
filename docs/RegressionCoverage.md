@@ -1,6 +1,6 @@
-# Regression coverage — Phase 3
+# Regression coverage — Phases 3–4
 
-Verified November 11, 2026. This phase changes tests, fixtures, the test command
+Verified November 11, 2026. Phase 3 changes tests, fixtures, the test command
 and documentation. It does not change application behavior or database records.
 Current requirements come from `README.md` and `docs/UserGuide.md`; older audit
 notes describe earlier implementations.
@@ -52,6 +52,31 @@ reads, current aliases/bindings and the valid employment status `Regular`.
 The Head HR browser test distinguishes account reads from the additional workflow
 configuration request, preserving the assertion that switch clicks make no request.
 No tests are skipped and no production authorization is relaxed.
+
+## Phase 4: configuration audit integrity and sample validation
+
+The Phase 4 baseline was the passing 212-test suite above. New tests reproduced
+missing success audit events, saves that could not roll back on audit failure,
+and sample rows rejected with `Employment Status has an invalid value`.
+
+| File | Change |
+| --- | --- |
+| `server/services/incident-management/Conduct.js` | Validates first, then saves the COC matrix and `INCIDENT_MATRIX_UPDATED` audit event using one transaction connection. Audit failure rolls back the matrix. HR-only permission and `{ ok: true }` response remain unchanged. |
+| `server/services/incident-management/WorkflowConfiguration.js` | Adds `INCIDENT_WORKFLOW_CONFIG_UPDATED` through the existing `AuditService.logAudit` writer and supplied connection. Direct calls own their transaction; Manage Accounts retains ownership of its enclosing transaction, including earlier account assignments and their audit records. |
+| `scripts/SampleData.js` | Generates `Regular` instead of the unsupported `Active` employment status. Archive record status remains `Active`/`Archived`. |
+| `tests/ConfigurationIntegrity.test.js`, `package.json` | Adds and registers nine tests covering successful audit, audit-failure rollback, rejected roles/invalid input, configuration clearing, the enclosing account transaction, and sample validation. Successful business/audit writes through the pool instead of the transaction connection fail the fixture. |
+| `tests/CleanupRegression.test.js`, `README.md` | Updates two matrix fixtures for transaction connections and audit inserts; existing assertions remain unchanged. Documents atomic configuration auditing. |
+
+Audit details contain counts and Management approver selected/cleared status,
+without policy contents, employee details or selected reviewers' addresses.
+The existing actor email identifies who saved the change.
+
+Phase 4 verification: **221 passed, zero failed, zero skipped** using the same
+blocked-database/`fetch` preload; structural checks passed for 113 JavaScript files.
+Sample generation was evaluated in a VM with database initialization and import
+substituted; all 60 generated rows passed real employee cleaning and validation.
+No live generator/import, schema changes or application-server startup were run.
+No files were deleted and no established test expectations changed in Phase 4.
 
 ## Verification limits
 

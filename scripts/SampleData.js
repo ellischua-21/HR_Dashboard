@@ -1,5 +1,7 @@
 require('dotenv').config();
-const { acquireEmployeeIdentityLock } = require('../server/utils/EmployeeIdentityLock');
+const {
+  acquireEmployeeIdentityLock
+} = require('../server/utils/EmployeeIdentityLock');
 
 const { pool, initializeDatabase } = require('../server/db/database');
 const { LISTS } = require('../server/config/EmployeeSchema');
@@ -27,7 +29,7 @@ function makeSampleRows(count) {
     const number = String(index + 1).padStart(3, '0');
     const status =
       random() < 0.85
-        ? 'Active'
+        ? 'Regular'
         : pick(['Resigned', 'Terminated', 'Inactive', 'Probationary']);
     return {
       last_name: 'Sample',

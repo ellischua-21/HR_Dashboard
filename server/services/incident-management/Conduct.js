@@ -1,6 +1,7 @@
 const { pool } = require('../../db/database');
 const { requirePerm } = require('../../middleware/Auth');
 const { httpError } = require('../../utils/HttpError');
+const { logAudit } = require('../AuditService');
 
 function isPolicyManager(user) {
   return (
@@ -75,11 +76,29 @@ function normalizeMatrix(input) {
 }
 async function saveIncidentMatrix(req, matrix) {
   const user = await requirePolicyManager(req);
-  await pool.execute(
-    'UPDATE incident_code_policy_draft SET matrix = ?, updated_by = ? WHERE id = 1',
-    [JSON.stringify(normalizeMatrix(matrix)), user.email]
-  );
-  return { ok: true };
+  const rows = normalizeMatrix(matrix);
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    await connection.execute(
+      'UPDATE incident_code_policy_draft SET matrix = ?, updated_by = ? WHERE id = 1',
+      [JSON.stringify(rows), user.email]
+    );
+    await logAudit(
+      user.email,
+      'INCIDENT_MATRIX_UPDATED',
+      '1',
+      `Corrective action matrix updated: ${rows.length} rows.`,
+      connection
+    );
+    await connection.commit();
+    return { ok: true };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 module.exports = {
   readMatrix,

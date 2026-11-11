@@ -1,5 +1,6 @@
 const A = require('./WorkflowAccess');
 const { requirePerm } = require('../../middleware/Auth');
+const { logAudit } = require('../AuditService');
 const DEFAULT_DEPARTMENTS = [
   'Paso Warehouse',
   'Dalisay/E-commerce',
@@ -48,7 +49,9 @@ async function get(req) {
         ...assignments.map((row) => row.department)
       ])
     ]
-      .filter((department) => !HIDDEN_DEPARTMENTS.has(department.trim().toLowerCase()))
+      .filter(
+        (department) => !HIDDEN_DEPARTMENTS.has(department.trim().toLowerCase())
+      )
       .sort((first, second) => {
         const firstIsHeads = first.trim().toLowerCase() === 'heads';
         const secondIsHeads = second.trim().toLowerCase() === 'heads';
@@ -123,6 +126,13 @@ async function save(req, input = {}, executor = null) {
     );
     await db.execute(
       'UPDATE hr_task_revision SET revision = revision + 1 WHERE id = 1'
+    );
+    await logAudit(
+      user.email,
+      'INCIDENT_WORKFLOW_CONFIG_UPDATED',
+      '1',
+      `Incident review configuration updated: ${assignments.length} assignments; Management approver ${manager ? 'selected' : 'cleared'}.`,
+      db
     );
     if (!executor) await db.commit();
     return { ok: true };
