@@ -12,6 +12,7 @@ const {
   getAttendanceContext
 } = require('../server/services/AttendanceService');
 const { pool } = require('../server/db/database');
+const { accountIdentityMock } = require('./helpers/AccountFixtures');
 const { attendanceStatus } = require('../server/services/AttendanceRules');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -890,12 +891,16 @@ test('extra midday scans do not hide the last departure or change gross work hou
 
 test('only HR and ADMIN can access attendance, even when another role has emp.read', async (t) => {
   let role = 'HEAD';
-  t.mock.method(pool, 'execute', async (sql) => {
-    assert.ok(sql.includes('FROM user_roles'));
-    return [
-      [{ email: 'test@example.com', role, active: 1, extra_perms: 'emp.read' }]
-    ];
-  });
+  t.mock.method(
+    pool,
+    'execute',
+    accountIdentityMock(() => ({
+      email: 'test@example.com',
+      role,
+      active: 1,
+      extra_perms: 'emp.read'
+    }))
+  );
   const req = { session: { userEmail: 'test@example.com' } };
   for (role of ['STAFF', 'HEAD'])
     await assert.rejects(getAttendanceContext(req), { status: 403 });

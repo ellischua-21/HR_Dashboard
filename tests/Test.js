@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { accountIdentityMock } = require('./helpers/AccountFixtures');
 const {
   sanitize,
   validateEmployee,
@@ -305,40 +306,50 @@ test('form review enforces reviewer role and assigned account', async (t) => {
   let reviewerRole = 'SUPERVISOR';
   let submitterRole = 'STAFF';
   let assignedEmail = 'reviewer@example.com';
-  t.mock.method(pool, 'execute', async () => [
-    [
-      {
-        email: 'reviewer@example.com',
-        role: reviewerRole,
-        active: 1,
-        extra_perms: ''
+  t.mock.method(
+    pool,
+    'execute',
+    accountIdentityMock(() => ({
+      email: 'reviewer@example.com',
+      role: reviewerRole,
+      active: 1,
+      extra_perms: ''
+    }))
+  );
+  t.mock.method(pool, 'getConnection', async () => {
+    const form = {
+      id: 1,
+      control_no: 'TEST-1',
+      status: 'PENDING',
+      review_stage: 'HEAD',
+      head_reviewer_email: assignedEmail,
+      user_email: 'submitter@example.com',
+      submitter_role: submitterRole,
+      template_key: 'leave-2026',
+      form_data: '{}'
+    };
+    return {
+      beginTransaction: async () => {},
+      commit: async () => {},
+      rollback: async () => {},
+      release() {},
+      execute: async (sql, values) => {
+        // FormService locks this row; TaskService reads it again after review.
+        if (sql.includes('FROM user_forms f')) {
+          assert.deepEqual(values, [1]);
+          return [[{ ...form }]];
+        }
+        if (sql.includes('UPDATE user_forms SET status = ?')) {
+          assert.equal(values.at(-1), 1);
+          form.status = values[0];
+          return [{ affectedRows: 1 }];
+        }
+        if (sql.includes('INSERT INTO audit_logs'))
+          return [{ affectedRows: 1 }];
+        throw new Error('Unexpected form review query: ' + sql);
       }
-    ]
-  ]);
-  t.mock.method(pool, 'getConnection', async () => ({
-    beginTransaction: async () => {},
-    commit: async () => {},
-    rollback: async () => {},
-    release() {},
-    execute: async (sql) =>
-      sql.includes('SELECT f.id')
-        ? [
-            [
-              {
-                id: 1,
-                control_no: 'TEST-1',
-                status: 'PENDING',
-                review_stage: 'HEAD',
-                head_reviewer_email: assignedEmail,
-                user_email: 'submitter@example.com',
-                submitter_role: submitterRole,
-                template_key: 'leave-2026',
-                form_data: '{}'
-              }
-            ]
-          ]
-        : [{ affectedRows: 1 }]
-  }));
+    };
+  });
   const req = { session: { userEmail: 'reviewer@example.com' } };
   assert.equal(
     (await reviewUserForm(req, 1, 'REJECTED', 'Reason')).status,
@@ -569,7 +580,7 @@ test('user forms require a bounded PNG electronic signature', () => {
     employeeNo: 'E-1001',
     department: 'Operations',
     date: '2026-10-19',
-    particulars: 'Uniform',
+    particulars: 'Replacement uniform deduction',
     amount: '10',
     employeeAcknowledgment: true,
     signature: 'data:image/png;base64,iVBORw0KGgo='
