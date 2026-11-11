@@ -2,6 +2,8 @@ const { pool } = require('../db/database');
 const { httpError } = require('../utils/HttpError');
 const { ACCOUNT_ROLE_MAP } = require('../config/Permissions');
 const { requirePerm } = require('../middleware/Auth');
+const { acquireEmployeeIdentityLock } = require('../utils/EmployeeIdentityLock');
+const { hasDuplicateEmployeeEmail, DUPLICATE_EMAIL } = require('./EmployeeEmailService');
 const { logAudit } = require('./AuditService');
 const { hashPassword, verifyPassword } = require('../utils/Password');
 const { sanitize } = require('../utils/Validation');
@@ -410,7 +412,9 @@ async function saveAccountChanges(req, changes) {
 async function approveAccountRequest(req, requestId) {
   const admin = await requirePerm(req, 'admin.manage');
   const connection = await pool.getConnection();
+  let unlock;
   try {
+    unlock = await acquireEmployeeIdentityLock(connection);
     await connection.beginTransaction();
     const [requests] = await connection.execute(
       `SELECT id, full_name, email, assigned_role, assigned_head_email, password_hash
@@ -425,6 +429,8 @@ async function approveAccountRequest(req, requestId) {
     const employee = await getAccountEmployee(accountRequest.email, connection, true);
     if (!employee)
       throw httpError('A unique employee record must exist before this account can be approved.', 409);
+    if (await hasDuplicateEmployeeEmail(connection, employee.personal_email, employee.record_id))
+      throw httpError(DUPLICATE_EMAIL, 409);
     const role = Object.prototype.hasOwnProperty.call(
       ACCOUNT_ROLE_MAP,
       accountRequest.assigned_role
@@ -497,9 +503,10 @@ async function approveAccountRequest(req, requestId) {
     await connection.commit();
     return { ok: true, email: accountRequest.email, role };
   } catch (error) {
-    await connection.rollback();
+    if (unlock) await connection.rollback();
     throw error;
   } finally {
+    await unlock?.();
     connection.release();
   }
 }

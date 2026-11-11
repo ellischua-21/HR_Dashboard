@@ -14,6 +14,8 @@ const { withCalc, normalizeEmployee } = require('./DashboardService');
 const { createEmployeeAccountRequest } = require('./AccountService');
 const { cleanEmployee, dbValue } = require('../utils/EmployeeData');
 const { manilaDate } = require('../../shared/DateUtils');
+const { acquireEmployeeIdentityLock } = require('../utils/EmployeeIdentityLock');
+const { validateEmailChange } = require('./EmployeeEmailService');
 
 const LIGHT = [
   'record_id',
@@ -176,7 +178,9 @@ async function saveEmployee(req, data = {}) {
   }
 
   const connection = await pool.getConnection();
+  let unlock;
   try {
+    unlock = await acquireEmployeeIdentityLock(connection);
     await connection.beginTransaction();
     const [duplicates] = await connection.execute(
       'SELECT record_id FROM employees WHERE emp_no = ? AND record_id <> ? LIMIT 1',
@@ -198,6 +202,13 @@ async function saveEmployee(req, data = {}) {
         return { ok: false, errors: ['Record not found'] };
       }
       const old = normalizeEmployee(found[0]);
+      if (Object.prototype.hasOwnProperty.call(data, 'personal_email')) {
+        const emailError = await validateEmailChange(connection, clean, old);
+        if (emailError) {
+          await connection.rollback();
+          return { ok: false, errors: [emailError] };
+        }
+      }
       const changed = [];
       const next = { ...old };
       EMP_FIELDS.forEach((field) => {
@@ -245,6 +256,11 @@ async function saveEmployee(req, data = {}) {
       return { ok: true, record_id: old.record_id };
     }
 
+    const emailError = await validateEmailChange(connection, clean);
+    if (emailError) {
+      await connection.rollback();
+      return { ok: false, errors: [emailError] };
+    }
     const sequence = await nextSequence(connection);
     const recordId = 'EMP-' + String(sequence).padStart(6, '0').slice(-6);
     const now = new Date();
@@ -288,11 +304,12 @@ async function saveEmployee(req, data = {}) {
       accountEmail: clean.personal_email
     };
   } catch (error) {
-    await connection.rollback();
+    if (unlock) await connection.rollback();
     if (error.code === 'ER_DUP_ENTRY')
       return { ok: false, errors: ['Employee Number already exists'] };
     throw error;
   } finally {
+    await unlock?.();
     connection.release();
   }
 }
@@ -300,7 +317,9 @@ async function saveEmployee(req, data = {}) {
 async function archiveEmployee(req, recordId) {
   const user = await requireEmployeeAccess(req, 'emp.archive');
   const connection = await pool.getConnection();
+  let unlock;
   try {
+    unlock = await acquireEmployeeIdentityLock(connection);
     await connection.beginTransaction();
     const [rows] = await connection.execute(
       'SELECT record_id FROM employees WHERE record_id = ? FOR UPDATE',
@@ -321,9 +340,10 @@ async function archiveEmployee(req, recordId) {
     await connection.commit();
     return { ok: true };
   } catch (error) {
-    await connection.rollback();
+    if (unlock) await connection.rollback();
     throw error;
   } finally {
+    await unlock?.();
     connection.release();
   }
 }

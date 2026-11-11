@@ -5,6 +5,8 @@ const { pool, initializeDatabase } = require('../server/db/database');
 const { ROLE_PERMS } = require('../server/config/Permissions');
 const { hashPassword } = require('../server/utils/Password');
 const { getAccountEmployee, isSetupAdministrator } = require('../server/utils/EmployeeIdentity');
+const { acquireEmployeeIdentityLock } = require('../server/utils/EmployeeIdentityLock');
+const { hasDuplicateEmployeeEmail, DUPLICATE_EMAIL } = require('../server/services/EmployeeEmailService');
 
 async function main() {
   const email = String(process.argv[2] || '')
@@ -24,7 +26,9 @@ async function main() {
   const password = crypto.randomBytes(18).toString('base64url');
   const connection = await pool.getConnection();
   let firstSetupAdmin = false;
+  let unlock;
   try {
+    unlock = await acquireEmployeeIdentityLock(connection);
     await connection.beginTransaction();
     // Lock account creation so concurrent setup commands cannot both be first.
     const [accounts] = await connection.query(
@@ -32,6 +36,8 @@ async function main() {
     );
     const existing = accounts.find((account) => account.email.toLowerCase() === email);
     const employee = await getAccountEmployee(email, connection, true);
+    if (employee && await hasDuplicateEmployeeEmail(connection, employee.personal_email, employee.record_id))
+      throw new Error(DUPLICATE_EMAIL);
     firstSetupAdmin = !employee && role === 'ADMIN' && accounts.length === 0;
     const resettingSetupAdmin = role === 'ADMIN' && isSetupAdministrator(existing);
     if (!employee && !firstSetupAdmin && !resettingSetupAdmin) {
@@ -53,9 +59,10 @@ async function main() {
     );
     await connection.commit();
   } catch (error) {
-    await connection.rollback();
+    if (unlock) await connection.rollback();
     throw error;
   } finally {
+    await unlock?.();
     connection.release();
   }
   if (firstSetupAdmin) {

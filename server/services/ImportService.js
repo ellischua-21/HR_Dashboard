@@ -11,6 +11,9 @@ const { logAudit } = require('./AuditService');
 const { validateEmployee } = require('../utils/Validation');
 const { cleanEmployee, dbValue } = require('../utils/EmployeeData');
 const { httpError } = require('../utils/HttpError');
+const { normalizeEmail } = require('../utils/EmployeeIdentity');
+const { acquireEmployeeIdentityLock } = require('../utils/EmployeeIdentityLock');
+const { DUPLICATE_EMAIL } = require('./EmployeeEmailService');
 
 async function importEmployees(req, records, commit) {
   const user = await requireEmployeeAccess(req, 'emp.write');
@@ -18,7 +21,9 @@ async function importEmployees(req, records, commit) {
     throw httpError('Import at most 500 rows per request.', 400);
   const lists = await getLists();
   const connection = await pool.getConnection();
+  let unlock;
   try {
+    unlock = await acquireEmployeeIdentityLock(connection);
     await connection.beginTransaction();
     const [existingRows] = await connection.execute(
       'SELECT emp_no FROM employees WHERE emp_no IS NOT NULL FOR UPDATE'
@@ -27,6 +32,13 @@ async function importEmployees(req, records, commit) {
       existingRows.map((row) => String(row.emp_no).toLowerCase())
     );
     const seen = new Set();
+    const [emailRows] = await connection.execute(
+      'SELECT personal_email FROM employees WHERE personal_email IS NOT NULL'
+    );
+    const existingEmails = new Set(
+      emailRows.map(row => normalizeEmail(row.personal_email)).filter(Boolean)
+    );
+    const seenEmails = new Set();
     const good = [];
     const errors = [];
 
@@ -50,6 +62,10 @@ async function importEmployees(req, records, commit) {
       });
       const rowErrors = validateEmployee(clean, lists);
       const employeeNumber = clean.emp_no.toLowerCase();
+      const email = normalizeEmail(clean.personal_email);
+      if (email && existingEmails.has(email)) rowErrors.push(DUPLICATE_EMAIL);
+      if (email && seenEmails.has(email))
+        rowErrors.push('Duplicate Personal Email in file.');
       if (employeeNumber && existing.has(employeeNumber))
         rowErrors.push('Employee Number already exists');
       if (employeeNumber && seen.has(employeeNumber))
@@ -58,6 +74,7 @@ async function importEmployees(req, records, commit) {
         errors.push({ row: record._line || index + 2, errors: rowErrors });
       else {
         seen.add(employeeNumber);
+        if (email) seenEmails.add(email);
         good.push(clean);
       }
     });
@@ -96,9 +113,10 @@ async function importEmployees(req, records, commit) {
     await connection.commit();
     return { total: records.length, valid: good.length, errors, imported };
   } catch (error) {
-    await connection.rollback();
+    if (unlock) await connection.rollback();
     throw error;
   } finally {
+    await unlock?.();
     connection.release();
   }
 }

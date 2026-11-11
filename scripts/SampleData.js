@@ -1,4 +1,5 @@
 require('dotenv').config();
+const { acquireEmployeeIdentityLock } = require('../server/utils/EmployeeIdentityLock');
 
 const { pool, initializeDatabase } = require('../server/db/database');
 const { LISTS } = require('../server/config/EmployeeSchema');
@@ -75,7 +76,9 @@ async function main() {
   } else if (action === 'archive') {
     const user = await requirePerm(req, 'emp.archive');
     const connection = await pool.getConnection();
+    let unlock;
     try {
+      unlock = await acquireEmployeeIdentityLock(connection);
       await connection.beginTransaction();
       const [result] = await connection.execute(
         "UPDATE employees SET record_status = 'Archived' WHERE emp_no LIKE 'SAMPLE-%' AND record_status <> 'Archived'"
@@ -90,9 +93,10 @@ async function main() {
       await connection.commit();
       console.log(`Archived ${result.affectedRows} sample employee(s).`);
     } catch (error) {
-      await connection.rollback();
+      if (unlock) await connection.rollback();
       throw error;
     } finally {
+      await unlock?.();
       connection.release();
     }
   } else {

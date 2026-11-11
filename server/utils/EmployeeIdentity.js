@@ -1,5 +1,7 @@
 const { pool } = require('../db/database');
 
+const normalizeEmail = (value) => String(value ?? '').trim().toLowerCase();
+
 // Account credentials remain separate; employee identity comes from employees.
 // Only the first setup ADMIN may sign in without an employee profile.
 function isSetupAdministrator(account) {
@@ -13,10 +15,10 @@ async function getAccountEmployee(email, connection = pool, lock = false) {
      WHERE LOWER(TRIM(personal_email)) = LOWER(TRIM(?))
        AND COALESCE(record_status, 'Active') <> 'Archived'
      LIMIT 2${lock ? ' FOR UPDATE' : ''}`,
-    [String(email || '').trim()]
+    [normalizeEmail(email)]
   );
   // An ambiguous match must not sign somebody in as the wrong employee.
   return rows.length === 1 ? rows[0] : null;
 }
 
-module.exports = { getAccountEmployee, isSetupAdministrator };
+module.exports = { getAccountEmployee, isSetupAdministrator, normalizeEmail };

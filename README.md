@@ -51,6 +51,14 @@ Login requires exactly one non-archived record in the central `employees` table 
 
 Credentials and permissions stay in `user_roles`; Master List, HR Reports, form autofill and leave eligibility use the central employee records. Setup does not create a placeholder employee. If a matching employee record is imported later, the setup ADMIN uses that employee's details automatically. All subsequent accounts, including additional ADMIN and HR accounts, need a genuine employee record first. Importing a profile does not replace its account password or role.
 
+Nonblank Personal Emails are reserved across current and archived employees,
+ignoring case and surrounding whitespace. Linked account emails (including inactive
+accounts) and pending-request emails cannot be changed through employee editing.
+Equivalent edits retain the stored spelling. Imports still permit blank emails;
+unrelated edits do not repair or reject pre-existing duplicate emails.
+See [Employee Email Integrity](docs/EmployeeEmailIntegrity.md) for locking limits
+and isolated QA scenarios.
+
 1. Start **Apache** and **MySQL** in the XAMPP Control Panel.
 2. The current workspace already has an empty `hr_dashboard` database and its tables. On a different XAMPP installation, create a database named `hr_dashboard` using `utf8mb4`; the Node setup command creates the tables and default lookup values.
 3. If Node.js is installed in the default location but PowerShell cannot find `node`, add it to this terminal's PATH:
