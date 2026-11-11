@@ -27,6 +27,14 @@ async function reassignOrRejectPendingHrForms(
          AND f.head_reviewer_email = ? AND submitter.role = 'HR'`,
       [newHeadEmail, oldHeadEmail]
     );
+    // The replacement's own submission must be reviewed by another HR.
+    await connection.execute(
+      `UPDATE user_forms SET review_stage = 'HR', head_reviewer_email = NULL
+       WHERE status = 'PENDING' AND review_stage = 'HEAD'
+         AND template_key <> 'nexus-accountability'
+         AND user_email = ? AND head_reviewer_email = ?`,
+      [newHeadEmail, newHeadEmail]
+    );
     return;
   }
 

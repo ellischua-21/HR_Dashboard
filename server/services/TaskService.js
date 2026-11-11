@@ -460,16 +460,34 @@ async function assertIncidentAssignmentScope(db, id, user) {
 // still explicitly takes it. Already-earned time stays with the previous owner.
 async function releaseChangedHeadTasks(db, actor) {
   const [rows] =
-    await db.execute(`SELECT t.* FROM hr_tasks t JOIN user_forms f ON f.id = t.resource_id
+    await db.execute(`SELECT t.*, f.review_stage FROM hr_tasks t JOIN user_forms f ON f.id = t.resource_id
     WHERE t.resource_type = 'FORM' AND t.phase = 'HEAD' AND t.state <> 'COMPLETED'
-      AND t.owner_email IS NOT NULL AND (f.head_reviewer_email IS NULL OR LOWER(t.owner_email) <> LOWER(f.head_reviewer_email)) FOR UPDATE`);
-  for (const task of rows)
-    await releaseOwner(
-      db,
-      task,
-      actor,
-      'Assigned Head HR changed. Awaiting the new reviewer to take the task.'
-    );
+      AND (f.review_stage = 'HR' OR (t.owner_email IS NOT NULL
+        AND (f.head_reviewer_email IS NULL OR LOWER(t.owner_email) <> LOWER(f.head_reviewer_email)))) FOR UPDATE`);
+  for (const task of rows) {
+    if (task.owner_email)
+      await releaseOwner(
+        db,
+        task,
+        actor,
+        'Assigned Head HR changed. Awaiting the new reviewer to take the task.'
+      );
+    if (task.review_stage === 'HR') {
+      // Keep the task identity and earned time instead of creating a second task.
+      await db.execute(
+        `UPDATE hr_tasks SET phase = 'HR', stage = 'HR', state = 'READY',
+          waiting_reason = '', run_started_ms = NULL, updated_ms = ? WHERE id = ?`,
+        [Math.max(Date.now(), Number(task.updated_ms) + 1), task.id]
+      );
+      await event(
+        db,
+        task,
+        'REROUTED',
+        actor,
+        'Head HR own form moved to HR review. Another HR must take the task.'
+      );
+    }
+  }
 }
 async function releaseOwner(db, task, actor, reason) {
   const now = Date.now(),

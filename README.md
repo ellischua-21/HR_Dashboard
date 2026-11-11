@@ -242,6 +242,8 @@ Use the updated user guide for manual verification of the new workflow.
 - Task ownership and earnings are retained per reviewer across transfers. ADMIN
   reassignment requires a reason. A changed Head HR releases previously taken
   Head HR tasks to the newly authorized reviewer, who must take them again.
+  The replacement's own pending Head HR forms move to the HR queue for another
+  HR reviewer, retaining the original task identity, history, and earned time.
 - `TaskUI.js` checks a lightweight revision every 10 seconds while an HR/ADMIN
   tab is visible. It refreshes ownership and actionable badge counts without
   deleting inbox history. Backend ownership checks also reject stale actions.

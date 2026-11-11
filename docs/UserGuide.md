@@ -419,7 +419,9 @@ Approval enables the requested account to sign in. Approve a pending reviewer be
 3. Select **Save Changes**.
 
 When the Head HR changes, pending HR forms assigned to the previous Head HR are
-transferred to the replacement. If pending forms still need a reviewer, the system
+transferred to the replacement. The replacement's own pending forms move to the
+HR review queue for another HR account to take and review. Existing task history
+and earned time are retained. If pending forms still need a reviewer, the system
 prevents removing the assignment without an eligible replacement.
 
 ## 9. Change your password
