@@ -179,11 +179,15 @@ test('employee display name uses the original surname-first format', () => {
   );
   assert.equal(
     EMP_FIELDS.find((field) => field[0] === 'personal_email')[1],
-    'Personal Email'
+    'Email'
   );
   assert.equal(
-    EMP_FIELDS.some((field) => ['email', 'corp_email'].includes(field[0])),
+    EMP_FIELDS.some((field) => field[0] === 'email'),
     false
+  );
+  assert.equal(
+    EMP_FIELDS.find((field) => field[0] === 'corp_email')[1],
+    'Corporate Email'
   );
 });
 

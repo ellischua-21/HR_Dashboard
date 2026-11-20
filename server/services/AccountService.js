@@ -133,7 +133,7 @@ async function createEmployeeAccountRequest(
     );
   }
   if (!EMAIL_PATTERN.test(email) || email.length > 191) {
-    throw httpError('Enter a valid Personal Email to create an account.', 400);
+    throw httpError('Enter a valid Email to create an account.', 400);
   }
   if (
     typeof password !== 'string' ||
@@ -184,7 +184,7 @@ async function createEmployeeAccountRequest(
   );
   if (existing.length) {
     throw httpError(
-      'An account or pending request already exists for this Personal Email.',
+      'An account or pending request already exists for this Email.',
       409
     );
   }

@@ -1,14 +1,46 @@
 // Employee lookup values, field definitions, and reporting bands used by the API.
 const LISTS = {
-  Company_List: ['Company A', 'Company B'],
-  Department_List: ['Human Resources', 'Finance', 'Operations', 'IT', 'Sales'],
-  Location_List: ['Head Office', 'Branch 1'],
+  Company_List: [
+    'SHOPEX',
+    'ECOPRESS',
+    'POWDER FACTORY',
+    'PRIMEMART FOOD PRODUCTS TRADING',
+    'NEXUS'
+  ],
+  Department_List: [
+    'Executive',
+    'E-Commerce',
+    'Purchasing',
+    'Logisitics',
+    'Creatives',
+    'Accounting',
+    'Marketing',
+    'Printing',
+    'Stores',
+    'Warehouse',
+    'HR',
+    'Engineering',
+    'IT',
+    'Product Management'
+  ],
+  Location_List: [
+    'Ramy',
+    'Paso De Blas',
+    'Becton',
+    'Guiguinto',
+    'Ramy Store',
+    'Cotimart Calapan',
+    'Cotimart Divisoria',
+    'Cotimart Greenhills',
+    'Cotimart Imus',
+    'Cotimart Guiguinto'
+  ],
   Position_List: ['Staff', 'Supervisor', 'Manager'],
   Employee_Rank_List: [
     'Rank and File',
-    'Supervisory',
-    'Managerial',
-    'Executive'
+    'Manager',
+    'Supervisor',
+    'Director'
   ],
   Employment_Status_List: [
     'Regular',
@@ -37,7 +69,7 @@ const LISTS = {
 const EMP_FIELDS = [
   ['record_id', 'Record ID', 'text', 'C'],
   ['seq_no', 'No.', 'number', 'C'],
-  ['name', 'Name Of Employee', 'text', 'C'],
+  ['name', 'Name of Employee', 'text', 'C'],
   ['emp_no', 'Employee Number', 'text', 'RU'],
   ['company', 'Company Name', 'list', 'R', 'Company_List'],
   ['location', 'Work Location', 'list', 'R', 'Location_List'],
@@ -45,16 +77,18 @@ const EMP_FIELDS = [
   ['department', 'Department', 'list', 'R', 'Department_List'],
   ['rank', 'Employee Rank', 'list', 'R', 'Employee_Rank_List'],
   ['reports_to', 'Reports To', 'text', ''],
-  ['date_employed', 'Date Of Employment', 'date', 'R'],
+  ['date_employed', 'Date of Employment', 'date', 'R'],
   ['status', 'Employment Status', 'list', 'R', 'Employment_Status_List'],
   ['address', 'Current Residential Address', 'text', 'S'],
   ['network', 'Network', 'text', ''],
   ['birthday', 'Birthday', 'date', 'RS'],
   ['civil_status', 'Civil Status', 'list', '', 'Civil_Status_List'],
-  ['personal_email', 'Personal Email', 'email', ''],
+  ['personal_email', 'Email', 'email', ''],
+  ['corp_email', 'Corporate Email', 'email', ''],
   ['contact_no', 'Mobile Number', 'text', 'S'],
   ['company_contact_no', 'Company Contact Number', 'text', ''],
   ['hmo', 'HMO Provider', 'list', '', 'HMO_Provider_List'],
+  ['hmo_details', 'HMO Details', 'text', ''],
   ['tin', 'TIN', 'text', 'S'],
   ['pagibig', 'Pag-IBIG Number', 'text', 'S'],
   ['sss', 'SSS Number', 'text', 'S'],
@@ -62,14 +96,14 @@ const EMP_FIELDS = [
   ['gov_deduction', 'Government Contributions Deduction', 'number', 'S'],
   ['emergency_name', 'Emergency Contact Name', 'text', 'S'],
   ['emergency_no', 'Emergency Contact No.', 'text', 'S'],
-  ['transfer_eff', 'Effectivity Of Transfer', 'date', ''],
+  ['transfer_eff', 'Effectivity of Transfer', 'date', ''],
   ['salary_structure', 'Salary Structure', 'text', 'S'],
   ['education', 'Education Level', 'list', '', 'Education_Level_List'],
   ['gender', 'Gender', 'list', '', 'Gender_List'],
   ['function_type', 'Function Type', 'list', '', 'Function_Type_List'],
   ['fte', 'FTE Allocation', 'number', 'R'],
   ['docs', 'Supporting Documents', 'text', 'S'],
-  ['record_status', 'Archive Status', 'text', 'C'],
+  ['record_status', 'Record Status', 'text', 'C'],
   ['created_at', 'Date Created', 'date', 'C'],
   ['created_by', 'Created By', 'text', 'C'],
   ['modified_at', 'Last Modified', 'date', 'C'],
@@ -77,7 +111,7 @@ const EMP_FIELDS = [
   ['last_name', 'Last Name', 'text', 'R'],
   ['first_name', 'First Name', 'text', 'R'],
   ['middle_name', 'Middle Name', 'text', 'O'],
-  ['birth_place', 'Birthplace', 'text', 'SO'],
+  ['birth_place', 'Birth Place', 'text', 'SO'],
   ['permanent_address', 'Permanent Address', 'text', 'SO'],
   ['landline_no', 'Landline Number', 'text', 'SO'],
   ['father_name', "Father's Full Name", 'text', 'SO'],
@@ -85,10 +119,10 @@ const EMP_FIELDS = [
   ['mother_maiden', "Mother's Maiden Name", 'text', 'SO'],
   ['mother_occupation', "Mother's Occupation", 'text', 'SO'],
   ['siblings', 'Siblings', 'json', 'SO'],
-  ['spouse_name', 'Name Of Spouse/Partner', 'text', 'SO'],
+  ['spouse_name', 'Name of Spouse/Partner', 'text', 'SO'],
   ['children', 'Children', 'json', 'SO'],
-  ['church_has', 'Position In Church?', 'list', 'SO', 'YesNo_List'],
-  ['church_position', 'Church Position (If Yes)', 'text', 'SO'],
+  ['church_has', 'Position in Church?', 'list', 'SO', 'YesNo_List'],
+  ['church_position', 'Church Position (if yes)', 'text', 'SO'],
   ['orgs', 'Organizations/Memberships', 'json', 'SO'],
   ['emergency_address', 'Emergency Contact Address', 'text', 'SO'],
   ['emergency_relationship', 'Emergency Contact Relationship', 'text', 'SO'],
@@ -106,10 +140,15 @@ const F = {
 };
 
 function masterReportFields() {
-  return EMP_FIELDS.filter((field) => field[0] !== 'docs').concat([
-    ['age', 'age', 'text', 'C'],
-    ['tenure_years', 'tenure_years', 'text', 'C']
-  ]);
+  const calculated = {
+    date_employed: ['tenure_years', 'Tenure', 'text', 'C'],
+    birthday: ['age', 'Age', 'text', 'C']
+  };
+  return EMP_FIELDS.filter(
+    (field) => !['record_id', 'docs'].includes(field[0])
+  ).flatMap((field) =>
+    calculated[field[0]] ? [field, calculated[field[0]]] : [field]
+  );
 }
 
 const ACTIVE_STATUSES = ['Regular', 'Probationary', 'Contractual'];

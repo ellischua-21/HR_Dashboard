@@ -10,7 +10,8 @@ const { requirePerm } = require('../middleware/Auth');
 
 const {
   manilaDate: todayInManila,
-  ageOnDate
+  ageOnDate,
+  tenureYearsOnDate
 } = require('../../shared/DateUtils');
 
 const {
@@ -26,13 +27,8 @@ const plusMonths = (date, count) =>
   new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + count, 1));
 
 function withCalc(employee, asOf = todayInManila()) {
-  const asOfDate = parseDate(asOf);
-  const yearsSince = (value) =>
-    value ? (asOfDate - parseDate(value)) / (365.25 * 86400000) : '';
   employee.age = ageOnDate(employee.birthday, asOf);
-  employee.tenure_years = employee.date_employed
-    ? Math.round(yearsSince(employee.date_employed) * 10) / 10
-    : '';
+  employee.tenure_years = tenureYearsOnDate(employee.date_employed, asOf);
   return employee;
 }
 

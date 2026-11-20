@@ -39,6 +39,15 @@
     return year - birthYear - Number(birthdayPending);
   }
 
+  function tenureYearsOnDate(employed, asOf = manilaDate()) {
+    if (!isValidDate(employed) || !isValidDate(asOf)) return '';
+    return (
+      Math.round(
+        ((Date.parse(asOf) - Date.parse(employed)) / (365.25 * DAY_MS)) * 10
+      ) / 10
+    );
+  }
+
   // The response period excludes its receipt day and skips Saturdays/Sundays.
   // Holidays are not part of the current HRIS calendar.
   function addWorkingDays(value, count) {
@@ -205,6 +214,7 @@
     isValidDate,
     manilaDate,
     ageOnDate,
+    tenureYearsOnDate,
     addWorkingDays,
     workingDaysBetween,
     formatDate,

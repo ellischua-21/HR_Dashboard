@@ -8,13 +8,14 @@ function sanitize(value) {
   return text.slice(0, 500);
 }
 
-function validateEmployee(data, lists) {
+function validateEmployee(data, lists, { requireFte = true } = {}) {
   const errors = [];
   EMP_FIELDS.forEach((field) => {
     if (F.has(field, 'C')) return;
     const value = data[field[0]];
     if (
       F.has(field, 'R') &&
+      (field[0] !== 'fte' || requireFte) &&
       (value === '' || value === undefined || value === null)
     ) {
       errors.push(field[1] + ' is required');

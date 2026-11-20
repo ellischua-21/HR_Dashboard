@@ -278,6 +278,196 @@ test('all browser controllers initialize in the declared asset order', () => {
   assert.equal(typeof browser.context.IncidentInvestigation.render, 'function');
 });
 
+test('registration exposes the supplied workbook headers without moving existing controls or submitting generated fields', async (t) => {
+  const { pool } = require('../server/db/database');
+  const { LISTS } = require('../server/config/EmployeeSchema');
+  const { getFormMeta } = require('../server/services/EmployeeService');
+  const { cleanEmployee } = require('../server/utils/EmployeeData');
+  const { validateEmployee } = require('../server/utils/Validation');
+  // Header row only from Employee Master List.xlsx; no employee data is included.
+  const headers = [
+    'No.',
+    'Name of Employee',
+    'Employee Number',
+    'Company Name',
+    'Work Location',
+    'Current Position',
+    'Department',
+    'Employee Rank',
+    'Reports To',
+    'Date of Employment',
+    'Tenure',
+    'Employment Status',
+    'Current Residential Address',
+    'Network',
+    'Birthday',
+    'Age',
+    'Civil Status',
+    'Email',
+    'Corporate Email',
+    'Mobile Number',
+    'Company Contact Number',
+    'HMO Provider',
+    'TIN',
+    'Pag-IBIG Number',
+    'SSS Number',
+    'PhilHealth Number',
+    'Government Contributions Deduction',
+    'Emergency Contact Name',
+    'Emergency Contact No.',
+    'Effectivity of Transfer',
+    'Salary Structure',
+    'Education Level',
+    'Gender',
+    'Function Type',
+    'FTE Allocation',
+    'Record Status',
+    'Date Created',
+    'Created By',
+    'Last Modified',
+    'Modified By',
+    'Last Name',
+    'First Name',
+    'Middle Name',
+    'Birth Place',
+    'Permanent Address',
+    'Landline Number',
+    "Father's Full Name",
+    "Father's Occupation",
+    "Mother's Maiden Name",
+    "Mother's Occupation",
+    'Siblings',
+    'Name of Spouse/Partner',
+    'Children',
+    'Position in Church?',
+    'Church Position (if yes)',
+    'Organizations/Memberships',
+    'Emergency Contact Address',
+    'Emergency Contact Relationship',
+    'Facebook',
+    'Instagram',
+    'TikTok',
+    'YouTube',
+    'Twitter/X'
+  ];
+  t.mock.method(pool, 'execute', async (sql) => {
+    if (sql.includes('FROM user_roles'))
+      return [[{ email: 'qa@example.invalid', role: 'ADMIN', active: 1 }]];
+    if (sql.includes('LOWER(TRIM(personal_email))'))
+      return [[{ record_id: 'SYNTHETIC-ACTOR', name: 'QA Actor' }]];
+    throw new Error('Unexpected query: ' + sql);
+  });
+  t.mock.method(pool, 'query', async () => [
+    Object.entries(LISTS).flatMap(([list_name, values]) =>
+      values.map((value) => ({ list_name, value }))
+    )
+  ]);
+  const metadata = await getFormMeta({
+    session: { userEmail: 'qa@example.invalid' }
+  });
+  const browser = createBrowser();
+  browser.loadDashboard();
+  browser.evaluate(
+    "session = { email: 'qa@example.invalid', role: 'ADMIN', perms: ['emp.write'] }"
+  );
+  browser.context.fetch = async (url) => ({
+    ok: true,
+    json: async () => (url.endsWith('getFormMeta') ? metadata : [])
+  });
+  await browser.evaluate('VIEWS.register()');
+  const labels = browser.evaluate(
+    `employeeFormSections().flatMap(section => section.keys.map(key => key === 'age' ? 'Age' : key === 'tenure_years' ? 'Tenure' : fld(key)?.label))`
+  );
+  assert.deepEqual(Array.from(labels).sort(), [...headers].sort());
+  const sections = browser.evaluate(
+    'employeeFormSections().map(section => section.keys)'
+  );
+  assert.deepEqual(Array.from(sections[0]).slice(0, 9), [
+    'last_name',
+    'first_name',
+    'middle_name',
+    'birthday',
+    'age',
+    'birth_place',
+    'gender',
+    'civil_status',
+    'education'
+  ]);
+  assert.deepEqual(Array.from(sections[1]).slice(0, 12), [
+    'emp_no',
+    'company',
+    'location',
+    'position',
+    'department',
+    'rank',
+    'reports_to',
+    'date_employed',
+    'status',
+    'function_type',
+    'network',
+    'transfer_eff'
+  ]);
+  assert.deepEqual(Array.from(sections[2]).slice(0, 6), [
+    'address',
+    'permanent_address',
+    'contact_no',
+    'landline_no',
+    'personal_email',
+    'company_contact_no'
+  ]);
+  const byId = (key) => browser.document.getElementById('ff_' + key);
+  assert.equal(byId('corp_email').type, 'email');
+  assert.equal(Boolean(byId('corp_email').required), false);
+  byId('corp_email').value = 'corporate@example.invalid';
+  byId('personal_email').value = 'login@example.invalid';
+  byId('date_employed').value = '2025-11-20';
+  byId('last_name').value = 'Example';
+  byId('first_name').value = 'Test';
+  byId('date_employed').onchange();
+  assert.equal(byId('name').value, 'Example, Test');
+  assert.equal(
+    Number(byId('tenure_years').value),
+    browser.context.DateUtils.tenureYearsOnDate('2025-11-20')
+  );
+  for (const key of [
+    'age',
+    'tenure_years',
+    'name',
+    'seq_no',
+    'record_status',
+    'created_at',
+    'created_by',
+    'modified_at',
+    'modified_by'
+  ]) {
+    assert.equal(byId(key).readOnly, true, key);
+    assert.equal(
+      Object.hasOwn(browser.evaluate('formData()'), key),
+      false,
+      key
+    );
+  }
+  const data = browser.evaluate('formData()');
+  assert.equal(data.personal_email, 'login@example.invalid');
+  assert.equal(data.corp_email, 'corporate@example.invalid');
+  assert.equal(cleanEmployee(data).corp_email, data.corp_email);
+  assert.ok(
+    validateEmployee(
+      cleanEmployee({ ...data, corp_email: 'invalid' }),
+      LISTS
+    ).includes('Corporate Email is not a valid email')
+  );
+  assert.ok(
+    metadata.reportFields.some(
+      (field) => field.key === 'corp_email' && field.label === 'Corporate Email'
+    )
+  );
+  await browser.evaluate('VIEWS.register()');
+  assert.equal(byId('corp_email').value, '');
+  assert.equal(byId('tenure_years').value, '');
+  assert.equal(byId('name').value, '');
+});
+
 test('form previews and incident documents share date/time formatting while input values stay ISO', () => {
   const browser = createBrowser();
   browser.loadDashboard();

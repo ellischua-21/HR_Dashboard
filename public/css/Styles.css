@@ -677,8 +677,8 @@ button.ghost {
 }
 .report-table-master tr > :nth-child(1) { left: 0; }
 .report-table-master tr > :nth-child(2) { left: 48px; }
-.report-table-master tr > :nth-child(3) { left: 168px; }
-.report-table-master tr > :nth-child(4) { left: 240px; box-shadow: 2px 0 4px rgb(23 32 51 / 12%); }
+.report-table-master tr > :nth-child(3) { left: 120px; }
+.report-table-master tr > :nth-child(4) { left: 320px; box-shadow: 2px 0 4px rgb(23 32 51 / 12%); }
 .tablewrap.report-table-scroll > table.report-table-master thead tr > th:nth-child(-n + 4):not(:only-child) {
   position: sticky;
   top: 0;

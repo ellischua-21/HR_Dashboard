@@ -69,7 +69,7 @@ const REPORTS = {
   hmo: {
     t: 'Employee HMO Enrollment Report',
     type: 'list',
-    cols: ['emp_no', 'name', 'company', 'hmo'],
+    cols: ['emp_no', 'name', 'company', 'hmo', 'hmo_details'],
     blank: { hmo: 'Not enrolled' }
   },
   gov_complete: { t: 'Government Information Completeness', type: 'gov' },
@@ -114,7 +114,8 @@ async function buildReport(id, filters) {
     )
     .filter((employee) => parseDate(employee.date_employed) <= parseDate(asOf));
   if (definition.where) rows = rows.filter(definition.where);
-  const label = (key) => (F.get(key) ? F.get(key)[1] : key);
+  const fields = masterReportFields();
+  const label = (key) => fields.find((field) => field[0] === key)?.[1] || key;
 
   if (definition.type === 'list') {
     let keys = definition.cols;

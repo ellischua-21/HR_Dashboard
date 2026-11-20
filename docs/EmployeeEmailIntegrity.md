@@ -2,7 +2,7 @@
 
 ## Rules
 
-Nonblank Personal Emails must be unique across current and archived employee
+Nonblank Emails must be unique across current and archived employee
 records. Comparisons normalize surrounding whitespace and case; stored email
 values are not automatically rewritten. Blank/null values remain allowed where
 the existing workflow permits them. New registration still requires an account

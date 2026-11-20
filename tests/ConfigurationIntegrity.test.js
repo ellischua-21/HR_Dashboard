@@ -15,6 +15,74 @@ const { cleanEmployee } = require('../server/utils/EmployeeData');
 const { validateEmployee } = require('../server/utils/Validation');
 const { LISTS } = require('../server/config/EmployeeSchema');
 
+test('corporate email migration adds only the missing column and preserves legacy login on reruns', async (t) => {
+  const { initializeDatabase } = require('../server/db/database');
+  const stop = new Error('Stop before account schema initialization');
+  for (const initial of [
+    { personal_email: 'login@example.invalid' },
+    {
+      personal_email: 'login@example.invalid',
+      corp_email: 'work@example.invalid',
+      email: 'legacy@example.invalid'
+    },
+    {
+      corp_email: 'legacy-login@example.invalid',
+      email: 'legacy@example.invalid'
+    }
+  ]) {
+    await t.test(Object.keys(initial).join('/'), async (subtest) => {
+      const employee = { ...initial };
+      const changes = [];
+      subtest.mock.method(pool, 'query', async (sql) => {
+        if (sql.startsWith('CREATE TABLE IF NOT EXISTS user_roles')) throw stop;
+        if (sql.startsWith('CREATE TABLE IF NOT EXISTS employees')) {
+          assert.match(sql, /`corp_email` TEXT NULL/);
+          return [{ affectedRows: 0 }];
+        }
+        if (sql.startsWith('SHOW COLUMNS')) {
+          const column = /LIKE '([^']+)'/.exec(sql)[1];
+          return [
+            column === 'regularized_on' || Object.hasOwn(employee, column)
+              ? [{ Field: column }]
+              : []
+          ];
+        }
+        if (
+          sql ===
+          'ALTER TABLE employees CHANGE COLUMN corp_email personal_email TEXT NULL'
+        ) {
+          employee.personal_email = employee.corp_email;
+          delete employee.corp_email;
+          changes.push(sql);
+          return [{ affectedRows: 0 }];
+        }
+        if (sql === 'ALTER TABLE employees ADD COLUMN corp_email TEXT NULL') {
+          assert.equal(Object.hasOwn(employee, 'corp_email'), false);
+          employee.corp_email = null;
+          changes.push(sql);
+          return [{ affectedRows: 0 }];
+        }
+        throw new Error('Unexpected or destructive migration: ' + sql);
+      });
+      await assert.rejects(initializeDatabase(), (error) => error === stop);
+      assert.equal(
+        employee.personal_email,
+        initial.personal_email || initial.corp_email
+      );
+      assert.equal(
+        employee.corp_email,
+        initial.personal_email ? initial.corp_email || null : null
+      );
+      assert.equal(employee.email, initial.email);
+      const firstRun = { ...employee };
+      const changeCount = changes.length;
+      await assert.rejects(initializeDatabase(), (error) => error === stop);
+      assert.deepEqual(employee, firstRun);
+      assert.equal(changes.length, changeCount);
+    });
+  }
+});
+
 const ADMIN = 'admin@example.invalid';
 const HEAD = 'head@example.invalid';
 const STAFF = 'staff@example.invalid';

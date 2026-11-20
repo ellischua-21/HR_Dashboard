@@ -20,7 +20,8 @@ Updated: 11/06/2026
 
 1. Open the dashboard link provided by your company.
 2. Enter your account email and password, then select **Sign in**. Your account
-   email is the Personal Email recorded when your account was requested.
+   email is the **Email** recorded when your account was requested. **Corporate Email**
+   is a separate optional address and does not change your login.
 3. Use the menu on the left to open a page. Select a group name to show its pages.
    On a small screen, select **Menu** to open the menu.
 4. Check your **Inbox** for announcements and requests that need your attention.
@@ -198,6 +199,15 @@ A STAFF account needs an assigned Supervisor, and a SUPERVISOR needs an assigned
 4. Run validation and review the valid-row count and errors.
 5. Correct the spreadsheet where necessary, then import the valid records.
 6. Check the **number of employees imported** in the result.
+
+FTE Allocation is required in Employee Registration but optional during import.
+Leave it blank if unavailable; supplied values must be numbers between 0 and 1.
+HMO Details is optional free text next to HMO Provider. It is included in the
+master list, HR master report, HMO enrollment report, and import/export columns.
+Company Name, Work Location, Department, Employee Rank, and HMO Provider must
+match their configured dropdown values. Import accepts differences in capitalization
+and repeated spaces, then stores the configured spelling. Company, location,
+department, and rank choices use the approved organization lists, not sample values.
 
 Rows with errors are skipped during import. Importing employee records does not
 replace the account-request and approval process.
@@ -400,7 +410,7 @@ matrix changes do not rewrite previously approved findings.
 ### Approve or reject a new account
 
 1. Open **Manage Accounts → Account Requests**.
-2. Check the name, Personal Email, assigned role, and assigned reviewer.
+2. Check the name, Email, assigned role, and assigned reviewer.
 3. Select **Approve** or **Reject** and confirm the action.
 4. Use **Refresh** to update the request list.
 

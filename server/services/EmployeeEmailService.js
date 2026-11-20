@@ -1,7 +1,6 @@
 const { normalizeEmail } = require('../utils/EmployeeIdentity');
 
-const DUPLICATE_EMAIL =
-  'Personal Email already exists on another employee record.';
+const DUPLICATE_EMAIL = 'Email already exists on another employee record.';
 async function hasDuplicateEmployeeEmail(connection, value, recordId = '') {
   const email = normalizeEmail(value);
   if (!email) return false;
@@ -28,7 +27,7 @@ async function validateEmailChange(connection, next, previous = null) {
       [oldEmail, oldEmail]
     );
     if (references.length)
-      return 'Personal Email cannot be changed while an account or pending account request uses it.';
+      return 'Email cannot be changed while an account or pending account request uses it.';
   }
   return (await hasDuplicateEmployeeEmail(
     connection,

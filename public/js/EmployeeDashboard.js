@@ -72,7 +72,7 @@
       renderFields(profileSummary, [
         ['Name', employee.name],
         ['Employee Number', employee.emp_no],
-        ['Personal Email', employee.personal_email],
+        ['Email', employee.personal_email],
         ['Mobile Number', employee.contact_no],
         ['Birthday', DateUtils.formatDate(employee.birthday)],
         ['Employment Status', employee.status]

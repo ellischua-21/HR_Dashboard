@@ -55,17 +55,19 @@ async function importEmployees(req, records, commit) {
         const value = clean[field[0]];
         if (field[2] === 'list' && value) {
           const match = (lists[field[4]] || []).find(
-            (item) => item.toLowerCase() === value.toLowerCase()
+            (item) =>
+              item.toLowerCase().replace(/\s+/g, ' ') ===
+              value.toLowerCase().replace(/\s+/g, ' ')
           );
           if (match) clean[field[0]] = match;
         }
       });
-      const rowErrors = validateEmployee(clean, lists);
+      const rowErrors = validateEmployee(clean, lists, { requireFte: false });
       const employeeNumber = clean.emp_no.toLowerCase();
       const email = normalizeEmail(clean.personal_email);
       if (email && existingEmails.has(email)) rowErrors.push(DUPLICATE_EMAIL);
       if (email && seenEmails.has(email))
-        rowErrors.push('Duplicate Personal Email in file.');
+        rowErrors.push('Duplicate Email in file.');
       if (employeeNumber && existing.has(employeeNumber))
         rowErrors.push('Employee Number already exists');
       if (employeeNumber && seen.has(employeeNumber))

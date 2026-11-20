@@ -44,8 +44,7 @@ async function initializeDatabase() {
   if (!regularizedColumn.length)
     await pool.query('ALTER TABLE employees ADD COLUMN regularized_on DATE NULL');
 
-  // Keep the existing personal login address while removing the obsolete Email and
-  // Corporate Email employee fields. Older installs used corp_email for Personal Email.
+  // Preserve the legacy login migration; Corporate Email is now a separate optional field.
   const [personalEmailColumn] = await pool.query(
     "SHOW COLUMNS FROM employees LIKE 'personal_email'"
   );
@@ -63,15 +62,16 @@ async function initializeDatabase() {
       );
     }
   }
-  for (const obsoleteColumn of ['corp_email', 'email']) {
-    const [column] = await pool.query(
-      `SHOW COLUMNS FROM employees LIKE '${obsoleteColumn}'`
+  if (!legacyCorpEmailColumn.length || !personalEmailColumn.length)
+    await pool.query('ALTER TABLE employees ADD COLUMN corp_email TEXT NULL');
+
+  const [hmoDetailsColumn] = await pool.query(
+    "SHOW COLUMNS FROM employees LIKE 'hmo_details'"
+  );
+  if (!hmoDetailsColumn.length)
+    await pool.query(
+      'ALTER TABLE employees ADD COLUMN hmo_details TEXT NULL AFTER hmo'
     );
-    if (column.length)
-      await pool.query(
-        `ALTER TABLE employees DROP COLUMN \`${obsoleteColumn}\``
-      );
-  }
 
   await pool.query(`CREATE TABLE IF NOT EXISTS user_roles (
     email VARCHAR(191) NOT NULL,
@@ -886,6 +886,17 @@ async function initializeDatabase() {
   await require('./IncidentWorkflowSchema').initializeIncidentWorkflowSchema(pool);
   await require('./TaskSchema').initializeTaskSchema(pool);
 
+  const lookupConnection = await pool.getConnection();
+  try {
+    await lookupConnection.beginTransaction();
+    await replaceEmployeeLookupValues(lookupConnection);
+    await lookupConnection.commit();
+  } catch (error) {
+    await lookupConnection.rollback();
+    throw error;
+  } finally {
+    lookupConnection.release();
+  }
   const insertLookup =
     'INSERT IGNORE INTO lookup_values (list_name, `value`, active) VALUES (?, ?, 1)';
   for (const [listName, values] of Object.entries(LISTS)) {
@@ -912,6 +923,24 @@ async function initializeDatabase() {
     await syncCounter(connection);
   } finally {
     connection.release();
+  }
+}
+
+async function replaceEmployeeLookupValues(connection) {
+  for (const listName of [
+    'Company_List',
+    'Location_List',
+    'Department_List',
+    'Employee_Rank_List'
+  ]) {
+    await connection.execute('DELETE FROM lookup_values WHERE list_name = ?', [
+      listName
+    ]);
+    for (const value of LISTS[listName])
+      await connection.execute(
+        'INSERT INTO lookup_values (list_name, `value`, active) VALUES (?, ?, 1)',
+        [listName, value]
+      );
   }
 }
 
@@ -956,6 +985,7 @@ async function syncCounter(connection) {
 module.exports = {
   pool,
   initializeDatabase,
+  replaceEmployeeLookupValues,
   getLists,
   nextSequence,
   syncCounter,

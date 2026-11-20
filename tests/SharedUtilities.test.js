@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   manilaDate,
   ageOnDate,
+  tenureYearsOnDate,
   addWorkingDays,
   workingDaysBetween,
   formatDate,
@@ -29,6 +30,23 @@ test('employee age changes on the calendar birthday and rejects invalid or futur
   assert.equal(ageOnDate('2026-11-05', '2026-11-04'), '');
   assert.equal(ageOnDate('2026-02-30', '2026-11-04'), '');
   assert.equal(ageOnDate('', '2026-11-04'), '');
+});
+
+test('employee tenure shares the existing report calculation and rejects missing or impossible dates', () => {
+  const { withCalc } = require('../server/services/DashboardService');
+  for (const [date, expected] of [
+    ['2025-11-20', 1],
+    ['2026-11-20', 0],
+    ['2027-11-20', -1],
+    ['2026-02-30', ''],
+    ['', '']
+  ]) {
+    assert.equal(tenureYearsOnDate(date, '2026-11-20'), expected);
+    assert.equal(
+      withCalc({ date_employed: date }, '2026-11-20').tenure_years,
+      expected
+    );
+  }
 });
 
 test('HR working time clips Manila shift boundaries, skips weekends and retains full elapsed hours', () => {

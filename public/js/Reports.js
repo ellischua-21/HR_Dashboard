@@ -71,20 +71,17 @@ async function runRep() {
   const h = $('rp_head');
   h.innerHTML = '';
   const tr = el('tr');
-  const isMaster =
-    $('rp_id').value === 'master' && r.columnKeys?.[0] === 'record_id';
+  const isMaster = $('rp_id').value === 'master';
   const table = h.closest('table');
   table.classList.toggle('report-table-master', isMaster);
   table.querySelector('colgroup')?.remove();
   const columns = document.createElement('colgroup');
   const widths = r.columns.map((_, index) =>
-    isMaster && index === 0
-      ? 120
-      : isMaster && index === 1
-        ? 72
-        : isMaster && index === 2
-          ? 200
-          : 180
+    isMaster && r.columnKeys?.[index] === 'seq_no'
+      ? 72
+      : isMaster && r.columnKeys?.[index] === 'name'
+        ? 200
+        : 180
   );
   if (isMaster) widths.unshift(48);
   widths.forEach((width) => {

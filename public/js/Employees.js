@@ -141,16 +141,9 @@ const collect = (k) =>
       return o;
     })
     .filter((o) => Object.values(o).some(Boolean));
-const COLS = [
-  ['emp_no', 'Employee no.', 1],
-  ['name', 'Name', 1],
-  ['company', 'Company', 1],
-  ['department', 'Department', 1],
-  ['position', 'Position', 1],
-  ['status', 'Status', 1],
-  ['tenure_years', 'Tenure (yrs)', 0]
-];
-const fld = (k) => META.fields.find((f) => f.key === k);
+const fld = (k) =>
+  META.fields.find((f) => f.key === k) ||
+  META.readOnlyFields?.find((f) => f.key === k);
 function employeeFormSections() {
   return Array.from($('r_form').querySelectorAll('[data-employee-fields]')).map(
     (group) => ({
@@ -271,8 +264,8 @@ VIEWS.employees = guard(async () => {
   $('e_import').hidden = !can('emp.write');
   $('e_add').hidden = !can('emp.write');
   $('e_export').hidden = !can('emp.export');
-  const list = loadEmployees(); // start the list right away
-  await ensureMeta(); // filter dropdowns load in parallel
+  await ensureMeta();
+  const list = loadEmployees();
   [
     ['company', 'Company_List', 'All Companies'],
     ['department', 'Department_List', 'All Departments'],
@@ -296,6 +289,8 @@ const empFilters = () => {
   return f;
 };
 async function loadEmployees() {
+  await ensureMeta();
+  const columns = META.reportFields;
   const r = await api(
     'listEmployees',
     Object.assign(
@@ -311,16 +306,17 @@ async function loadEmployees() {
   const h = $('e_head');
   h.innerHTML = '';
   const tr = el('tr');
-  COLS.forEach((c) => {
+  columns.forEach((c) => {
     const th = el(
       'th',
-      c[1] + (EQ.sortKey === c[0] ? (EQ.sortDir === 'asc' ? ' ▲' : ' ▼') : '')
+      c.label +
+        (EQ.sortKey === c.key ? (EQ.sortDir === 'asc' ? ' ▲' : ' ▼') : '')
     );
-    if (c[2])
+    if (c.type !== 'json' && !['age', 'tenure_years'].includes(c.key))
       th.onclick = guard(async () => {
         EQ.sortDir =
-          EQ.sortKey === c[0] && EQ.sortDir === 'asc' ? 'desc' : 'asc';
-        EQ.sortKey = c[0];
+          EQ.sortKey === c.key && EQ.sortDir === 'asc' ? 'desc' : 'asc';
+        EQ.sortKey = c.key;
         await loadEmployees();
       });
     tr.appendChild(th);
@@ -331,15 +327,15 @@ async function loadEmployees() {
   if (!r.rows.length) {
     const t = el('tr'),
       d = el('td', 'No employees match. Add an employee or import a file.');
-    d.colSpan = COLS.length;
+    d.colSpan = columns.length;
     t.appendChild(d);
     b.appendChild(t);
   }
   r.rows.forEach((e) => {
     const t = el('tr');
-    COLS.forEach((c) => {
+    columns.forEach((c) => {
       const d = el('td');
-      if (c[0] === 'status')
+      if (c.key === 'status')
         d.appendChild(
           el(
             'span',
@@ -347,7 +343,7 @@ async function loadEmployees() {
             'badge employee-status-' + String(e.status || '').toLowerCase()
           )
         );
-      else d.textContent = e[c[0]] === undefined ? '' : e[c[0]];
+      else d.textContent = formatReportValue(e[c.key], c.type, c.key) ?? '';
       t.appendChild(d);
     });
     t.tabIndex = 0;
@@ -431,12 +427,12 @@ VIEWS.register = guard(async () => {
     const tables = fs.querySelector('[data-employee-tables]');
     const tabs = [];
     keys.forEach((k) => {
-      if (k === 'age') {
-        const l = el('label', 'Age'),
+      if (['age', 'tenure_years'].includes(k)) {
+        const l = el('label', k === 'age' ? 'Age' : 'Tenure'),
           i = el('input');
-        i.id = 'ff_age';
+        i.id = 'ff_' + k;
         i.readOnly = true;
-        i.type = 'number';
+        i.type = k === 'age' ? 'number' : 'text';
         i.setAttribute('aria-readonly', 'true');
         l.appendChild(i);
         group.appendChild(l);
@@ -450,7 +446,13 @@ VIEWS.register = guard(async () => {
       }
       const lab = el('label', f.label);
       let inp;
-      if (['address', 'permanent_address'].includes(k)) {
+      if (f.readOnly) {
+        inp = el('input');
+        inp.type = 'text';
+        inp.readOnly = true;
+        inp.setAttribute('aria-readonly', 'true');
+        inp.placeholder = 'Assigned when saved';
+      } else if (['address', 'permanent_address'].includes(k)) {
         lab.classList.add('employee-address');
         inp = el('textarea');
         inp.rows = 2;
@@ -485,7 +487,9 @@ VIEWS.register = guard(async () => {
       if (k === 'personal_email' && !rec)
         inp.dataset.requiredIndicator = 'true';
       if (k === 'birthday') inp.max = DateUtils.manilaDate();
-      if (rec && rec[k] !== undefined) inp.value = rec[k];
+      if (rec && rec[k] !== undefined)
+        inp.value = f.readOnly ? DateUtils.formatField(rec[k], f.type) : rec[k];
+      if (k === 'record_status' && !rec) inp.value = 'Active';
       if (k === 'reports_to' && !rec) {
         inp.type = 'search';
         inp.placeholder = 'Search name or email';
@@ -557,11 +561,37 @@ VIEWS.register = guard(async () => {
   const calc = () => {
     const b = $('ff_birthday') && $('ff_birthday').value;
     if ($('ff_age')) $('ff_age').value = DateUtils.ageOnDate(b);
+    if ($('ff_tenure_years'))
+      $('ff_tenure_years').value = DateUtils.tenureYearsOnDate(
+        $('ff_date_employed').value
+      );
+    if ($('ff_name')) {
+      const [last, first, middle] = [
+        'last_name',
+        'first_name',
+        'middle_name'
+      ].map((key) => $('ff_' + key).value.trim());
+      $('ff_name').value =
+        last || first || middle
+          ? last + ', ' + first + (middle ? ' ' + middle : '')
+          : '';
+    }
   };
   if ($('ff_birthday')) {
     $('ff_birthday').onchange = calc;
     $('ff_birthday').oninput = calc;
     calc();
+  }
+  for (const key of [
+    'date_employed',
+    'last_name',
+    'first_name',
+    'middle_name'
+  ]) {
+    if ($('ff_' + key)) {
+      $('ff_' + key).onchange = calc;
+      $('ff_' + key).oninput = calc;
+    }
   }
 });
 function updateRegistrationRoleHelp() {
@@ -608,7 +638,7 @@ $('r_preview').onclick = () => {
       .filter((f) => f.required && !d[f.key])
       .map((f) => f.label);
   if (!CUR || !CUR.record_id) {
-    if (!d.personal_email) miss.push('Personal Email');
+    if (!d.personal_email) miss.push('Email');
     if (
       ['STAFF', 'SUPERVISOR'].includes(d.accountAccess.role) &&
       !d.accountAccess.assignedHeadEmail
@@ -684,17 +714,19 @@ const norm = (s) =>
   String(s)
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
-$('i_tpl').onclick = () =>
+$('i_tpl').onclick = guard(async () => {
+  META = await api('getFormMeta');
   download(
     'employee_import_template.csv',
-    META.fields
-      .filter((f) => f.type !== 'json')
+    META.reportFields
       .map((f) => '"' + f.label + '"')
       .join(',') + '\n'
   );
+});
 $('i_file').onchange = guard(async (e) => {
   const file = e.target.files[0];
   if (!file) return;
+  META = await api('getFormMeta');
   await loadXlsx();
   const wb = XLSX.read(await file.arrayBuffer(), {
     type: 'array',
@@ -733,15 +765,24 @@ $('i_file').onchange = guard(async (e) => {
     const sk = el('option', 'Skip this column');
     sk.value = '';
     s.appendChild(sk);
-    META.fields
-      .filter((f) => f.type !== 'json')
-      .forEach((f) => {
-        const o = el('option', f.label);
-        o.value = f.key;
-        if (norm(f.label) === norm(h) || norm(f.key) === norm(h))
-          o.selected = true;
-        s.appendChild(o);
-      });
+    META.reportFields.forEach((f) => {
+      const writable =
+        META.fields.some((field) => field.key === f.key) &&
+        f.type !== 'json';
+      const suffix = writable
+        ? ''
+        : f.type === 'json'
+          ? ' (edit in employee form)'
+          : ' (automatic)';
+      const o = el('option', f.label + suffix);
+      o.value = f.key;
+      o.disabled = !writable;
+      if (norm(f.label) === norm(h) || norm(f.key) === norm(h)) {
+        o.selected = true;
+        s.disabled = !writable;
+      }
+      s.appendChild(o);
+    });
     const td = el('td');
     td.appendChild(s);
     tr.appendChild(td);
@@ -770,7 +811,11 @@ const isoDate = (v) => {
 function buildRecords() {
   const map = {};
   document.querySelectorAll('#i_map select').forEach((s) => {
-    if (s.value) map[s.dataset.col] = s.value;
+    if (
+      !s.disabled &&
+      META.fields.some((f) => f.key === s.value && f.type !== 'json')
+    )
+      map[s.dataset.col] = s.value;
   });
   if (!Object.values(map).includes('emp_no'))
     throw new Error('Map a column to Employee Number before continuing.');

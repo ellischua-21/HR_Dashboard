@@ -264,11 +264,7 @@ test('startup preserves the approved legacy role mapping and is safe to rerun', 
       return [{ affectedRows: changed }];
     }
     if (sql.startsWith('SHOW COLUMNS'))
-      return [
-        sql.includes("LIKE 'corp_email'") || sql.includes("LIKE 'email'")
-          ? []
-          : [{ Field: 'exists' }]
-      ];
+      return [sql.includes("LIKE 'email'") ? [] : [{ Field: 'exists' }]];
     assert.match(sql, /^CREATE TABLE IF NOT EXISTS (employees|user_roles) \(/);
     return [{ affectedRows: 0 }];
   });

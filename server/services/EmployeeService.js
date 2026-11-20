@@ -17,18 +17,9 @@ const { manilaDate } = require('../../shared/DateUtils');
 const { acquireEmployeeIdentityLock } = require('../utils/EmployeeIdentityLock');
 const { validateEmailChange } = require('./EmployeeEmailService');
 
-const LIGHT = [
-  'record_id',
-  'name',
-  'emp_no',
-  'company',
-  'location',
-  'position',
-  'department',
-  'rank',
-  'date_employed',
-  'status'
-];
+const EMPLOYEE_LIST_FIELDS = EMP_FIELDS.filter(
+  (field) => field[0] !== 'docs'
+).map((field) => field[0]);
 
 async function listEmployees(req, params = {}) {
   await requireEmployeeAccess(req, 'emp.read');
@@ -62,20 +53,21 @@ async function listEmployees(req, params = {}) {
     `SELECT COUNT(*) AS total FROM employees WHERE ${where}`,
     values
   );
-  const sortKey = LIGHT.includes(params.sortKey) ? params.sortKey : 'name';
+  const sortKey =
+    EMPLOYEE_LIST_FIELDS.includes(params.sortKey) &&
+    F.get(params.sortKey)[2] !== 'json'
+      ? params.sortKey
+      : 'name';
   const direction = params.sortDir === 'desc' ? 'DESC' : 'ASC';
   const [rows] = await pool.execute(
-    `SELECT ${LIGHT.map(quote).join(', ')} FROM employees WHERE ${where} ORDER BY ${quote(sortKey)} ${direction}${params.allRows === true ? '' : ' LIMIT ? OFFSET ?'}`,
+    `SELECT ${EMPLOYEE_LIST_FIELDS.map(quote).join(', ')} FROM employees WHERE ${where} ORDER BY ${quote(sortKey)} ${direction}${params.allRows === true ? '' : ' LIMIT ? OFFSET ?'}`,
     params.allRows === true ? values : [...values, size, offset]
   );
   return {
     total: Number(count.total),
     page: params.allRows === true ? 1 : page,
     pageSize: params.allRows === true ? Math.max(1, Number(count.total)) : size,
-    rows: rows.map((row) => ({
-      ...row,
-      tenure_years: withCalc({ date_employed: row.date_employed }).tenure_years
-    }))
+    rows: rows.map((row) => withCalc(normalizeEmployee(row)))
   };
 }
 
@@ -142,6 +134,14 @@ async function getFormMeta(req) {
       key: field[0],
       label: field[1],
       type: field[2]
+    })),
+    readOnlyFields: EMP_FIELDS.filter(
+      (field) => F.has(field, 'C') && field[0] !== 'record_id'
+    ).map((field) => ({
+      key: field[0],
+      label: field[1],
+      type: field[2],
+      readOnly: true
     })),
     fields: EMP_FIELDS.filter(
       (field) => !F.has(field, 'C') && field[0] !== 'docs'

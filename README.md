@@ -47,11 +47,11 @@ Keep page components inside the isolated `#main` stacking context and use the sh
 
 ## First-time setup
 
-Login requires exactly one non-archived record in the central `employees` table whose Personal Email matches the account email. The sole exception is the first setup ADMIN created by `create-user` when the accounts table is empty. That account can sign in without an employee record to import the master list and set up the system. The exception is stored on that specific account and applies only while its role is ADMIN; creating other accounts never grants it. Login and existing sessions both enforce these rules.
+Login requires exactly one non-archived record in the central `employees` table whose Email matches the account email. The sole exception is the first setup ADMIN created by `create-user` when the accounts table is empty. That account can sign in without an employee record to import the master list and set up the system. The exception is stored on that specific account and applies only while its role is ADMIN; creating other accounts never grants it. Login and existing sessions both enforce these rules.
 
 Credentials and permissions stay in `user_roles`; Master List, HR Reports, form autofill and leave eligibility use the central employee records. Setup does not create a placeholder employee. If a matching employee record is imported later, the setup ADMIN uses that employee's details automatically. All subsequent accounts, including additional ADMIN and HR accounts, need a genuine employee record first. Importing a profile does not replace its account password or role.
 
-Nonblank Personal Emails are reserved across current and archived employees,
+Nonblank login Emails are reserved across current and archived employees,
 ignoring case and surrounding whitespace. Linked account emails (including inactive
 accounts) and pending-request emails cannot be changed through employee editing.
 Equivalent edits retain the stored spelling. Imports still permit blank emails;
@@ -105,7 +105,7 @@ and isolated QA scenarios.
 
 ## Account registration and management
 
-There is no public account-request option on the sign-in screen. HR and ADMIN create account requests through **Employee Registration** using the employee's Personal Email, role and initial password. STAFF requires an assigned SUPERVISOR, and SUPERVISOR requires an assigned HEAD. New accounts remain unable to sign in until an ADMIN approves them.
+There is no public account-request option on the sign-in screen. HR and ADMIN create account requests through **Employee Registration** using the employee's Email, role and initial password. STAFF requires an assigned SUPERVISOR, and SUPERVISOR requires an assigned HEAD. New accounts remain unable to sign in until an ADMIN approves them.
 
 All users can change their own password by entering the current password and a new password (12–128 characters) in **Change Password**. ADMIN manages registration requests and accounts in **Manage Accounts**.
 
@@ -139,7 +139,43 @@ A STAFF form goes to its assigned Supervisor; a SUPERVISOR form goes to its assi
 
 ## Moving employee records from Google Sheets
 
-Export the current employee rows from the source spreadsheet to CSV or Excel, then use **Employee master list → Import** in the local dashboard. Map the spreadsheet headers to the matching employee fields, validate, and import. The normal validation, duplicate employee-number check, permissions, and audit logging apply. Lookup values start with the defaults in the original Apps Script configuration; add any organization-specific values to the `lookup_values` table before importing those values.
+Employee fields reflect the 63 headers in the supplied Employee Master List
+workbook. Registration keeps its existing section layout and field order, with
+generated record information available in the master list and HR reports instead.
+The Employee Master List, HR Reports master list and master CSV use those
+63 headers plus HMO Details immediately after HMO Provider, for 64 columns.
+Tenure follows Date of Employment, Age follows Birthday, and the internal
+Record ID is excluded from the report columns. Employee details remain accessible
+through the row action.
+**Email** is the former **Personal Email** label and continues using `personal_email`
+for login/account linking. **Corporate Email** is an independent optional validated
+address stored in `corp_email`; it does not replace a login or change an account.
+The existing initializer adds this column when missing and preserves stored
+addresses. Its older `corp_email`-to-login compatibility migration is retained
+for installations predating `personal_email`, then a separate corporate field is
+added. This code change does not itself run the initializer or import workbook rows.
+
+Age and Tenure remain calculated from Birthday and Date of Employment. Only Age
+appears in registration. Name of Employee, Tenure, No., Record Status, Date Created,
+Created By, Modified By and Last Modified do not appear in registration or editing;
+they remain available in the master list and HR reports and controlled by the
+server. Internal record IDs,
+legacy supporting-document storage and existing audit/history columns are retained,
+not deleted to match a spreadsheet. Import mapping now recognizes Email and
+Corporate Email separately; calculated and audit columns are not writable imports.
+HMO Details is an optional text field immediately after HMO Provider in the form,
+master list, HR master report, HMO enrollment report, import template, and exports.
+It has no allowed-value list or field-specific validation; standard text sanitizing
+and the existing 500-character limit apply. HMO Provider keeps its configured list.
+Existing databases receive the nullable `hmo_details` column on startup.
+Import destination choices and the downloaded template use the same 64 master-list
+headers, in the same order. Automatic fields are labeled as automatic instead of
+appearing as unexplained skipped columns; structured family/membership fields are
+labeled for editing in the employee form. Neither can overwrite generated data
+through import. Selecting a file or downloading the template fetches fresh field
+metadata from the API.
+
+Export the current employee rows from the source spreadsheet to CSV or Excel, then use **Employee master list → Import** in the local dashboard. Map the spreadsheet headers to the matching employee fields, validate, and import. The normal validation, duplicate employee-number check, permissions, and audit logging apply. Company, work location, department, and employee rank dropdowns use the approved lists in `server/config/EmployeeSchema.js`. Startup replaces only these four lookup groups transactionally, removing obsolete choices without modifying existing employee records. Other lookup groups, including HMO Provider, retain their existing configuration. Imports normalize capitalization and repeated spaces to the configured spelling.
 
 For manual account provisioning, bootstrap or recovery administrators can use `npm.cmd run create-user`; routine STAFF/SUPERVISOR/HEAD/HR account creation should use Employee Registration so an ADMIN can approve it. Google account roles are not copied automatically. The existing import/export feature does not carry supporting-document files, matching the original report behavior.
 
@@ -153,7 +189,7 @@ For manual account provisioning, bootstrap or recovery administrators can use `n
   saves record audit events in the same transaction as their changes. An audit
   failure rolls back the save. Event details contain assignment/row counts and
   approver-selection status, without copying employee details or policy text.
-- Only HR and ADMIN can create accounts, using Employee Registration. Personal Email is the login email; HR/ADMIN select STAFF, SUPERVISOR, HEAD, or HR and set an initial password. New accounts remain pending until an ADMIN approves them. STAFF needs a Supervisor and SUPERVISOR needs a Head selected in Reports To; pending reviewers must be approved first.
+- Only HR and ADMIN can create accounts, using Employee Registration. Email is the login email; HR/ADMIN select STAFF, SUPERVISOR, HEAD, or HR and set an initial password. New accounts remain pending until an ADMIN approves them. STAFF needs a Supervisor and SUPERVISOR needs a Head selected in Reports To; pending reviewers must be approved first.
 - HR and ADMIN can publish announcements from the Announcements tab. STAFF, SUPERVISOR and HEAD see unacknowledged announcements in a blurred modal after login; acknowledging records that announcement as seen for that account.
 - All roles have an Inbox. STAFF, SUPERVISOR and HEAD see new and previously acknowledged HR announcements. Supervisors and Heads see forms assigned to them; HR and ADMIN see forms at the HR review stage; the Head HR also sees forms submitted by other HR accounts. Reviewed form notifications remain in the Inbox. Inbox filters support item type and status, and form items open the shared Manage Forms tab.
 - Existing report, import, export, employee privacy, audit, and role-permission rules are enforced by the API, not by the browser.

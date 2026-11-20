@@ -254,9 +254,7 @@ test('imports reject case/space email duplicates and preserve valid partial rows
   const result = await importEmployees(req, rows, false);
   assert.equal(result.valid, 1);
   assert.equal(result.errors.length, 1);
-  assert.ok(
-    result.errors[0].errors.some((message) => /Personal Email/.test(message))
-  );
+  assert.ok(result.errors[0].errors.some((message) => /Email/.test(message)));
 });
 
 test('archived emails remain reserved; blank and null imports remain permitted', async (t) => {
@@ -319,6 +317,51 @@ test('registration and editing reject duplicate employee emails', async (t) => {
     personal_email: ' used@example.invalid '
   });
   assert.equal(edit.ok, false);
+});
+
+test('corporate email persists through registration, editing and import without changing login identity', async (t) => {
+  const state = database(t);
+  const created = await saveEmployee(req, {
+    ...employee('CORP-1', 'login@example.invalid'),
+    record_id: undefined,
+    corp_email: 'work@example.invalid',
+    accountAccess: { role: 'HEAD', password: 'Synthetic-password-123' }
+  });
+  assert.equal(created.ok, true);
+  assert.equal(state.employees[0].corp_email, 'work@example.invalid');
+  assert.equal(state.requests[0].email, 'login@example.invalid');
+  await approveAccountRequest(req, state.requests[0].id);
+  const edited = await saveEmployee(req, {
+    ...state.employees[0],
+    corp_email: 'new-work@example.invalid'
+  });
+  assert.equal(edited.ok, true);
+  assert.equal(state.employees[0].corp_email, 'new-work@example.invalid');
+  assert.equal(state.employees[0].personal_email, 'login@example.invalid');
+  assert.ok(
+    state.accounts.some((account) => account.email === 'login@example.invalid')
+  );
+  assert.ok(
+    !state.accounts.some(
+      (account) => account.email === 'new-work@example.invalid'
+    )
+  );
+  const imported = await importEmployees(
+    req,
+    [
+      {
+        ...employee('CORP-2', 'import-login@example.invalid'),
+        corp_email: 'import-work@example.invalid'
+      }
+    ],
+    true
+  );
+  assert.equal(imported.imported, 1);
+  assert.equal(state.employees[1].corp_email, 'import-work@example.invalid');
+  assert.equal(
+    state.employees[1].personal_email,
+    'import-login@example.invalid'
+  );
 });
 
 for (const relationship of ['active', 'inactive', 'pending']) {
