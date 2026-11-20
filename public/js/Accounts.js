@@ -113,6 +113,7 @@ const appendEmptyRow = window.AppUI.emptyRow;
 const formatAccountDate = window.AppUI.dateTime;
 
 function renderAccountRequests(requestList) {
+  setAccountRequestsCount(requestList.length);
   const requests = $('am_requests');
   requests.replaceChildren();
 
@@ -203,6 +204,7 @@ async function loadAccountManagement() {
 }
 
 function renderAccountManagement(result) {
+  setAccountRequestsCount((result.requests || []).length);
   if (result.lookupLists) {
     for (const [key, list] of [
       ['company', 'Company_List'],

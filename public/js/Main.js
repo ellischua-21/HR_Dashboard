@@ -153,6 +153,14 @@ function updateFormsNotificationDot() {
   );
 }
 
+function updateAccountRequestsNotificationDot() {
+  const badge = document.getElementById('account-requests-count');
+  updateNavigationNotificationDot(
+    'accounts-notification-dot',
+    Boolean(badge && !badge.hidden)
+  );
+}
+
 window.updateIncidentNotificationDot = (activeCount) => {
   activeIncidentCaseCount = Number(activeCount) || 0;
   updateNavigationNotificationDot(
@@ -199,6 +207,13 @@ async function init() {
         count.hidden = true;
         count.setAttribute('aria-label', 'pending submissions');
         a.appendChild(count);
+      } else if (n[0] === 'account-requests') {
+        const count = document.createElement('span');
+        count.id = 'account-requests-count';
+        count.className = 'nav-count';
+        count.hidden = true;
+        count.setAttribute('aria-label', 'pending account requests');
+        a.appendChild(count);
       } else if (n[0] === 'inbox') {
         const count = document.createElement('span');
         count.id = 'inbox-count';
@@ -233,24 +248,31 @@ async function init() {
       const title = document.createElement('span');
       title.textContent = label;
       summary.appendChild(title);
-      if (label === 'Incident Management' || isForms) {
+      const isAccounts = label === 'Manage Accounts';
+      if (label === 'Incident Management' || isForms || isAccounts) {
         group.classList.add('notification-nav-group');
         const count = document.createElement('span');
         count.id = isForms
           ? 'forms-notification-dot'
-          : 'incident-management-count';
+          : isAccounts
+            ? 'accounts-notification-dot'
+            : 'incident-management-count';
         count.className = 'nav-count nav-notification-dot';
         count.hidden = true;
         count.setAttribute(
           'aria-label',
-          isForms ? 'pending form reviews' : 'active incident cases'
+          isForms
+            ? 'pending form reviews'
+            : isAccounts
+              ? 'pending account requests'
+              : 'active incident cases'
         );
         summary.appendChild(count);
-        group.addEventListener('toggle', () =>
-          isForms
-            ? updateFormsNotificationDot()
-            : window.updateIncidentNotificationDot(activeIncidentCaseCount)
-        );
+        group.addEventListener('toggle', () => {
+          if (isForms) updateFormsNotificationDot();
+          else if (isAccounts) updateAccountRequestsNotificationDot();
+          else window.updateIncidentNotificationDot(activeIncidentCaseCount);
+        });
       }
       group.appendChild(summary);
       const children = document.createElement('div');
@@ -608,9 +630,33 @@ function setInboxCount(count) {
 }
 
 async function refreshInboxBadge() {
-  setInboxCount(await api('getInboxNotificationCount'));
+  await Promise.all([
+    api('getInboxNotificationCount').then(setInboxCount),
+    refreshAccountRequestsBadge()
+  ]);
 }
 window.refreshInboxBadge = refreshInboxBadge;
+
+function setAccountRequestsCount(count) {
+  const badge = $('account-requests-count');
+  if (!badge) return;
+  const pending = Number(count) || 0;
+  badge.textContent = pending > 99 ? '99+' : String(pending);
+  badge.hidden = pending === 0;
+  const link = badge.parentElement;
+  link.setAttribute('aria-label', `Account Requests, ${pending} pending`);
+  link.title = `${pending} pending account request${pending === 1 ? '' : 's'}`;
+  updateAccountRequestsNotificationDot();
+}
+
+async function refreshAccountRequestsBadge() {
+  if (session?.role !== 'ADMIN') return;
+  const owner = session.email;
+  const count = await api('getAccountRequestCount');
+  if (session?.role === 'ADMIN' && session.email === owner)
+    setAccountRequestsCount(count);
+}
+window.refreshAccountRequestsBadge = refreshAccountRequestsBadge;
 
 async function loadOptions() {
   const o = await api('getFilterOptions');

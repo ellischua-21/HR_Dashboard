@@ -760,7 +760,7 @@ $('r_preview').onclick = () => {
     dl.appendChild(el('dt', 'Assigned Head'));
     dl.appendChild(el('dd', [d.accountAccess.assignedHeadEmail, d.accountAccess.secondaryHeadEmail].filter(Boolean).join(' / ') || 'None'));
     dl.appendChild(el('dt', 'Account approval'));
-    dl.appendChild(el('dd', 'Pending ADMIN approval'));
+    dl.appendChild(el('dd', session.role === 'ADMIN' ? 'Applied immediately on save' : 'Pending ADMIN approval'));
   }
   $('pv_body').innerHTML = '';
   $('pv_body').appendChild(dl);
@@ -775,8 +775,12 @@ $('pv_save').onclick = guard(async () => {
   }
   $('preview').close();
   showErr('');
-  AppFeedback.success('Saved successfully.');
+  AppFeedback.success(
+    r.accountAccessApplied ? 'Saved. Account access applied immediately.' :
+      r.accountRequestSubmitted ? 'Saved. Account request sent for ADMIN approval.' : 'Saved successfully.'
+  );
   $('r_preview').disabled = true;
+  window.refreshAccountRequestsBadge?.().catch((error) => showErr(error.message || String(error)));
 });
 $('r_cancel').onclick = () => go(NAV.find((n) => n[0] === 'employees'));
 

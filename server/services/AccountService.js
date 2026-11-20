@@ -247,6 +247,15 @@ async function createEmployeeAccountRequest(
     `${email} requested as ${role}${assignedHeadEmail ? `; Reviewers ${[assignedHeadEmail, secondaryHeadEmail].filter(Boolean).join(', ')}` : ''}`,
     connection
   );
+  if (user.role === 'ADMIN') {
+    const [[request]] = await connection.execute(
+      'SELECT id FROM account_requests WHERE email = ? FOR UPDATE',
+      [email]
+    );
+    await applyAccountRequest(user, request.id, connection);
+    return { accountRequestSubmitted: false, accountAccessApplied: true };
+  }
+  return { accountRequestSubmitted: true, accountAccessApplied: false };
 }
 
 async function getEmployeeAccountAccess(employee) {
@@ -313,6 +322,12 @@ async function addEmployeeLookupValue(req, listName, value) {
   } finally {
     connection.release();
   }
+}
+
+async function getAccountRequestCount(req) {
+  await requirePerm(req, 'admin.manage');
+  const [[row]] = await pool.query('SELECT COUNT(*) AS total FROM account_requests');
+  return Number(row.total);
 }
 
 async function getAccountManagement(req) {
@@ -549,6 +564,123 @@ async function saveAccountChanges(req, changes) {
   }
 }
 
+async function applyAccountRequest(admin, requestId, connection) {
+  const [requests] = await connection.execute(
+    `SELECT id, full_name, email, assigned_role, assigned_head_email, secondary_head_email, password_hash
+     FROM account_requests WHERE id = ? FOR UPDATE`,
+    [requestId]
+  );
+  if (!requests.length) {
+    throw httpError('This account request no longer exists.', 404);
+  }
+
+  const accountRequest = requests[0];
+  const employee = await getAccountEmployee(accountRequest.email, connection, true);
+  if (!employee)
+    throw httpError('A unique employee record must exist before this account can be approved.', 409);
+  if (await hasDuplicateEmployeeEmail(connection, employee.personal_email, employee.record_id))
+    throw httpError(DUPLICATE_EMAIL, 409);
+  const role = Object.prototype.hasOwnProperty.call(
+    ACCOUNT_ROLE_MAP,
+    accountRequest.assigned_role
+  )
+    ? ACCOUNT_ROLE_MAP[accountRequest.assigned_role]
+    : null;
+  const [accounts] = await connection.query(
+    'SELECT email, role, active, is_hr_head FROM user_roles FOR UPDATE'
+  );
+  const existingAccount = accounts.find(account => account.email.toLowerCase() === accountRequest.email.toLowerCase());
+  if (!['STAFF', 'SUPERVISOR', 'HEAD', 'HR', 'ADMIN'].includes(role)) {
+    throw httpError(
+      'This request has no valid assigned role; reject it and recreate it from Employee Registration.',
+      400
+    );
+  }
+  if (existingAccount && existingAccount.role !== role) {
+    if (existingAccount.role === 'ADMIN' && existingAccount.active &&
+        accounts.filter(account => account.role === 'ADMIN' && account.active).length <= 1)
+      throw httpError('The last active ADMIN cannot be changed to another role.', 409);
+    if (existingAccount.is_hr_head)
+      throw httpError('Designate another Head HR before changing this account role.', 409);
+    const email = accountRequest.email;
+    const [dependencies] = await connection.execute(
+      `SELECT email FROM user_roles WHERE assigned_head_email = ? OR secondary_head_email = ?
+       UNION SELECT email FROM account_requests WHERE email <> ? AND (assigned_head_email = ? OR secondary_head_email = ?)
+       UNION SELECT user_email FROM user_forms WHERE status = 'PENDING' AND
+         (user_email = ? OR head_reviewer_email = ? OR secondary_head_reviewer_email = ?)
+       UNION SELECT reviewer_email FROM incident_department_reviewers WHERE reviewer_email = ?
+       UNION SELECT management_email FROM incident_workflow_settings WHERE management_email = ?
+       UNION SELECT assigned_head_email FROM incident_reports WHERE status <> 'CLOSED' AND assigned_head_email = ? LIMIT 1`,
+      Array(11).fill(email)
+    );
+    if (dependencies.length)
+      throw httpError('Resolve pending forms and reassign this account\'s reviewer, department, or Management responsibilities before changing its role.', 409);
+  }
+  if (
+    ['STAFF', 'SUPERVISOR'].includes(role) &&
+    !accountRequest.assigned_head_email
+  ) {
+    throw httpError(
+      `This ${role} request has no assigned ${role === 'STAFF' ? 'Supervisor' : 'Head'}. Reject it and recreate it from Employee Registration.`,
+      400
+    );
+  }
+  if (
+    !['STAFF', 'SUPERVISOR'].includes(role) &&
+    (accountRequest.assigned_head_email || accountRequest.secondary_head_email)
+  ) {
+    throw httpError(
+      'This request has an invalid reviewer assignment. Reject it and recreate it from Employee Registration.',
+      400
+    );
+  }
+  if (accountRequest.secondary_head_email && accountRequest.secondary_head_email === accountRequest.assigned_head_email)
+    throw httpError('Choose two different reviewers.', 400);
+  for (const headEmail of [accountRequest.assigned_head_email, accountRequest.secondary_head_email].filter(Boolean)) {
+    if (headEmail === accountRequest.email) throw httpError('An account cannot be assigned to itself.', 400);
+    const [heads] = await connection.execute(
+      `SELECT email FROM user_roles WHERE email = ? AND (role = ? OR role = 'ADMIN') AND active = 1`,
+      [
+        headEmail,
+        role === 'STAFF' ? 'SUPERVISOR' : 'HEAD'
+      ]
+    );
+    if (!heads.length) {
+      throw httpError(
+        'Approve the assigned reviewer account first, then approve this request.',
+        409
+      );
+    }
+  }
+  await connection.execute(
+    `INSERT INTO user_roles
+       (email, full_name, role, assigned_head_email, secondary_head_email, active, extra_perms, password_hash)
+     VALUES (?, ?, ?, ?, ?, 1, '', ?)
+     ON DUPLICATE KEY UPDATE full_name = VALUES(full_name),
+       extra_perms = IF(role = VALUES(role), extra_perms, ''), role = VALUES(role),
+       assigned_head_email = VALUES(assigned_head_email), secondary_head_email = VALUES(secondary_head_email), password_hash = VALUES(password_hash)`,
+    [
+      accountRequest.email,
+      employee.name,
+      role,
+      accountRequest.assigned_head_email,
+      accountRequest.secondary_head_email || null,
+      accountRequest.password_hash
+    ]
+  );
+  await connection.execute('DELETE FROM account_requests WHERE id = ?', [
+    accountRequest.id
+  ]);
+  await logAudit(
+    admin.email,
+    'ACCOUNT_APPROVED',
+    '',
+    `${accountRequest.email} approved as ${role}`,
+    connection
+  );
+  return { ok: true, email: accountRequest.email, role };
+}
+
 async function approveAccountRequest(req, requestId) {
   const admin = await requirePerm(req, 'admin.manage');
   const connection = await pool.getConnection();
@@ -556,121 +688,9 @@ async function approveAccountRequest(req, requestId) {
   try {
     unlock = await acquireEmployeeIdentityLock(connection);
     await connection.beginTransaction();
-    const [requests] = await connection.execute(
-      `SELECT id, full_name, email, assigned_role, assigned_head_email, secondary_head_email, password_hash
-       FROM account_requests WHERE id = ? FOR UPDATE`,
-      [requestId]
-    );
-    if (!requests.length) {
-      throw httpError('This account request no longer exists.', 404);
-    }
-
-    const accountRequest = requests[0];
-    const employee = await getAccountEmployee(accountRequest.email, connection, true);
-    if (!employee)
-      throw httpError('A unique employee record must exist before this account can be approved.', 409);
-    if (await hasDuplicateEmployeeEmail(connection, employee.personal_email, employee.record_id))
-      throw httpError(DUPLICATE_EMAIL, 409);
-    const role = Object.prototype.hasOwnProperty.call(
-      ACCOUNT_ROLE_MAP,
-      accountRequest.assigned_role
-    )
-      ? ACCOUNT_ROLE_MAP[accountRequest.assigned_role]
-      : null;
-    const [accounts] = await connection.query(
-      'SELECT email, role, active, is_hr_head FROM user_roles FOR UPDATE'
-    );
-    const existingAccount = accounts.find(account => account.email.toLowerCase() === accountRequest.email.toLowerCase());
-    if (!['STAFF', 'SUPERVISOR', 'HEAD', 'HR', 'ADMIN'].includes(role)) {
-      throw httpError(
-        'This request has no valid assigned role; reject it and recreate it from Employee Registration.',
-        400
-      );
-    }
-    if (existingAccount && existingAccount.role !== role) {
-      if (existingAccount.role === 'ADMIN' && existingAccount.active &&
-          accounts.filter(account => account.role === 'ADMIN' && account.active).length <= 1)
-        throw httpError('The last active ADMIN cannot be changed to another role.', 409);
-      if (existingAccount.is_hr_head)
-        throw httpError('Designate another Head HR before changing this account role.', 409);
-      const email = accountRequest.email;
-      const [dependencies] = await connection.execute(
-        `SELECT email FROM user_roles WHERE assigned_head_email = ? OR secondary_head_email = ?
-         UNION SELECT email FROM account_requests WHERE email <> ? AND (assigned_head_email = ? OR secondary_head_email = ?)
-         UNION SELECT user_email FROM user_forms WHERE status = 'PENDING' AND
-           (user_email = ? OR head_reviewer_email = ? OR secondary_head_reviewer_email = ?)
-         UNION SELECT reviewer_email FROM incident_department_reviewers WHERE reviewer_email = ?
-         UNION SELECT management_email FROM incident_workflow_settings WHERE management_email = ?
-         UNION SELECT assigned_head_email FROM incident_reports WHERE status <> 'CLOSED' AND assigned_head_email = ? LIMIT 1`,
-        Array(11).fill(email)
-      );
-      if (dependencies.length)
-        throw httpError('Resolve pending forms and reassign this account\'s reviewer, department, or Management responsibilities before changing its role.', 409);
-    }
-    if (
-      ['STAFF', 'SUPERVISOR'].includes(role) &&
-      !accountRequest.assigned_head_email
-    ) {
-      throw httpError(
-        `This ${role} request has no assigned ${role === 'STAFF' ? 'Supervisor' : 'Head'}. Reject it and recreate it from Employee Registration.`,
-        400
-      );
-    }
-    if (
-      !['STAFF', 'SUPERVISOR'].includes(role) &&
-      (accountRequest.assigned_head_email || accountRequest.secondary_head_email)
-    ) {
-      throw httpError(
-        'This request has an invalid reviewer assignment. Reject it and recreate it from Employee Registration.',
-        400
-      );
-    }
-    if (accountRequest.secondary_head_email && accountRequest.secondary_head_email === accountRequest.assigned_head_email)
-      throw httpError('Choose two different reviewers.', 400);
-    for (const headEmail of [accountRequest.assigned_head_email, accountRequest.secondary_head_email].filter(Boolean)) {
-      if (headEmail === accountRequest.email) throw httpError('An account cannot be assigned to itself.', 400);
-      const [heads] = await connection.execute(
-        `SELECT email FROM user_roles WHERE email = ? AND (role = ? OR role = 'ADMIN') AND active = 1`,
-        [
-          headEmail,
-          role === 'STAFF' ? 'SUPERVISOR' : 'HEAD'
-        ]
-      );
-      if (!heads.length) {
-        throw httpError(
-          'Approve the assigned reviewer account first, then approve this request.',
-          409
-        );
-      }
-    }
-    await connection.execute(
-      `INSERT INTO user_roles
-         (email, full_name, role, assigned_head_email, secondary_head_email, active, extra_perms, password_hash)
-       VALUES (?, ?, ?, ?, ?, 1, '', ?)
-       ON DUPLICATE KEY UPDATE full_name = VALUES(full_name),
-         extra_perms = IF(role = VALUES(role), extra_perms, ''), role = VALUES(role),
-         assigned_head_email = VALUES(assigned_head_email), secondary_head_email = VALUES(secondary_head_email), password_hash = VALUES(password_hash)`,
-      [
-        accountRequest.email,
-        employee.name,
-        role,
-        accountRequest.assigned_head_email,
-        accountRequest.secondary_head_email || null,
-        accountRequest.password_hash
-      ]
-    );
-    await connection.execute('DELETE FROM account_requests WHERE id = ?', [
-      accountRequest.id
-    ]);
-    await logAudit(
-      admin.email,
-      'ACCOUNT_APPROVED',
-      '',
-      `${accountRequest.email} approved as ${role}`,
-      connection
-    );
+    const result = await applyAccountRequest(admin, requestId, connection);
     await connection.commit();
-    return { ok: true, email: accountRequest.email, role };
+    return result;
   } catch (error) {
     if (unlock) await connection.rollback();
     throw error;
@@ -765,6 +785,7 @@ module.exports = {
   createEmployeeAccountRequest,
   getEmployeeAccountAccess,
   getAccountManagement,
+  getAccountRequestCount,
   addEmployeeLookupValue,
   approveAccountRequest,
   rejectAccountRequest,

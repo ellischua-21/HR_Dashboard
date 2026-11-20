@@ -4,9 +4,10 @@
 
 Nonblank Primary Emails (`personal_email`) must be unique across current and archived employee
 records. Comparisons normalize surrounding whitespace and case; stored email
-values are not automatically rewritten. Blank/null values remain allowed where
-registration and import. A new registration with Primary Email requires an account
-request and ADMIN approval. Without Primary Email, registration saves only the
+values are not automatically rewritten. Blank/null values remain allowed in
+registration and import. A new registration with Primary Email requires account
+access details: ADMIN saves create the account immediately, while HR saves need
+ADMIN approval. Without Primary Email, registration saves only the
 employee record; Secondary Email and Corporate Email never create accounts.
 
 Employee edits cannot change or clear an email referenced by any account, active

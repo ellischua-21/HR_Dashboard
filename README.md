@@ -105,7 +105,7 @@ and isolated QA scenarios.
 
 ## Account registration and management
 
-There is no public account-request option on the sign-in screen. HR and ADMIN create account requests through **Employee Registration** using the employee's Primary Email, role and initial password. STAFF requires an assigned SUPERVISOR or ADMIN, and SUPERVISOR requires an assigned HEAD or ADMIN. New accounts remain unable to sign in until an ADMIN approves them. Registration without Primary Email saves an employee record without an account request, role, password or reviewer requirement. Secondary Email and Corporate Email do not create accounts. Imports also retain employees without Primary Email in records and reports.
+There is no public account-request option on the sign-in screen. HR and ADMIN create account requests through **Employee Registration** using the employee's Primary Email, role and initial password. STAFF requires an assigned SUPERVISOR or ADMIN, and SUPERVISOR requires an assigned HEAD or ADMIN. Accounts created by ADMIN are available immediately; HR-created accounts need ADMIN approval. Registration without Primary Email saves an employee record without an account request, role, password or reviewer requirement. Secondary Email and Corporate Email do not create accounts. Imports also retain employees without Primary Email in records and reports.
 
 All users can change their own password by entering the current password and a new password (12–128 characters) in **Change Password**. ADMIN manages registration requests and accounts in **Manage Accounts**.
 
@@ -193,7 +193,7 @@ For manual account provisioning, bootstrap or recovery administrators can use `n
   saves record audit events in the same transaction as their changes. An audit
   failure rolls back the save. Event details contain assignment/row counts and
   approver-selection status, without copying employee details or policy text.
-- Only HR and ADMIN can create accounts, using Employee Registration. Primary Email is the login email; HR/ADMIN select STAFF, SUPERVISOR, HEAD, or HR and set an initial password. ADMIN can also assign ADMIN during registration or editing; HR cannot submit an ADMIN role request. New accounts remain pending until an ADMIN approves them. STAFF needs a Supervisor or ADMIN and SUPERVISOR needs a Head or ADMIN selected in Reports To; pending reviewers must be approved first.
+- Only HR and ADMIN can create accounts, using Employee Registration. Primary Email is the login email; HR/ADMIN select STAFF, SUPERVISOR, HEAD, or HR and set an initial password. ADMIN can also assign ADMIN during registration or editing; HR cannot submit an ADMIN role request. ADMIN account saves apply immediately; HR account saves remain pending until an ADMIN approves them. STAFF needs a Supervisor or ADMIN and SUPERVISOR needs a Head or ADMIN selected in Reports To; pending reviewers must be approved first.
 - HR and ADMIN can publish announcements from the Announcements tab. STAFF, SUPERVISOR and HEAD see unacknowledged announcements in a blurred modal after login; acknowledging records that announcement as seen for that account.
 - All roles have an Inbox. STAFF, SUPERVISOR and HEAD see new and previously acknowledged HR announcements. Supervisors and Heads see forms assigned to them; HR and ADMIN see forms at the HR review stage; the Head HR also sees forms submitted by other HR accounts. Reviewed form notifications remain in the Inbox. Inbox filters support item type and status, and form items open the shared Manage Forms tab.
 - Existing report, import, export, employee privacy, audit, and role-permission rules are enforced by the API, not by the browser.
@@ -373,8 +373,9 @@ spreadsheet date cells remain blank during browser conversion.
 ### Account edits and optional FTE
 
 Employee editing loads safe role/reviewer metadata from existing or pending
-accounts. Changed account fields queue an ADMIN-approved request in the same
-transaction as the employee edit; blank passwords preserve the existing hash.
+accounts. HR account changes queue an ADMIN-approved request; ADMIN account
+changes apply immediately in the employee transaction. Blank passwords preserve
+the existing hash. Both paths share the same approval validation and audit logic.
 Ordinary profile edits do not queue account changes. Imported profiles can request
 their first account here as well. No password hash is returned to the browser.
 
@@ -398,3 +399,14 @@ reviewer decision can advance that stage. ADMIN uses forms.view for this narrowl
 assigned action; forms.review, HR-stage processing, and HR task ownership remain
 restricted to their existing roles. The combined form queue and inbox include
 these assigned forms, without duplicating inbox entries after forwarding.
+
+### Account approval notifications
+
+ADMIN sees a number beside Account Requests and the shared yellow notification
+indicator on the collapsed Manage Accounts group while requests are pending.
+The count refreshes on sign-in, every 60 seconds while visible, on returning to
+the tab, and after request decisions or employee account saves. The count-only
+endpoint requires admin.manage. ADMIN saves create/update accounts immediately
+in the employee transaction and leave no pending request; HR saves still queue
+approval. Assigned reviewer accounts must already be active for immediate saves.
+Any account-validation or audit failure rolls back the employee and account save.

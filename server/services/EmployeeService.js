@@ -168,7 +168,7 @@ async function saveEmployee(req, data = {}) {
     return {
       ok: false,
       errors: [
-        'Complete the account access section to submit this employee for ADMIN approval.'
+        'Complete the account access section for this employee.'
       ]
     };
   }
@@ -250,10 +250,17 @@ async function saveEmployee(req, data = {}) {
         'Fields changed: ' + changed.join(','),
         connection
       );
-      if (data.accountAccess)
-        await createEmployeeAccountRequest(req, next, data.accountAccess, connection, true);
+      const accountResult = data.accountAccess
+        ? await createEmployeeAccountRequest(
+            req,
+            next,
+            data.accountAccess,
+            connection,
+            true
+          )
+        : { accountRequestSubmitted: false, accountAccessApplied: false };
       await connection.commit();
-      return { ok: true, record_id: old.record_id, accountRequestSubmitted: Boolean(data.accountAccess) };
+      return { ok: true, record_id: old.record_id, ...accountResult };
     }
 
     const emailError = await validateEmailChange(connection, clean);
@@ -290,18 +297,19 @@ async function saveEmployee(req, data = {}) {
       'Employee created',
       connection
     );
-    if (clean.personal_email)
-      await createEmployeeAccountRequest(
-        req,
-        clean,
-        data.accountAccess,
-        connection
-      );
+    const accountResult = clean.personal_email
+      ? await createEmployeeAccountRequest(
+          req,
+          clean,
+          data.accountAccess,
+          connection
+        )
+      : { accountRequestSubmitted: false, accountAccessApplied: false };
     await connection.commit();
     return {
       ok: true,
       record_id: recordId,
-      accountRequestSubmitted: Boolean(clean.personal_email),
+      ...accountResult,
       accountEmail: clean.personal_email || null
     };
   } catch (error) {

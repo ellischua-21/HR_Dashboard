@@ -465,9 +465,9 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Choose STAFF access, select SUP-A from Reports To, enter matching initial passwords.
 3. Review the preview and select Save employee; reopen the saved profile.
 
-**Expected Result:** One employee and one pending account request are saved together; preview matches input; calculated name uses Last, First Middle; request is visible to ADMIN.
+**Expected Result:** HR saves one employee and one pending account request; ADMIN saves one employee and a usable account immediately, with no pending request. Preview reflects the correct outcome; calculated name uses Last, First Middle.
 
-**Data Integrity Check:** One EMP record, one account_requests row, CREATE and ACCOUNT_REQUESTED audit events; no approved login yet.
+**Data Integrity Check:** One employee identity; HR leaves one account_requests row and no login; ADMIN leaves one user_roles row and no pending request. Employee and account audit events commit together. An account/audit failure rolls back all related writes.
 
 **Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.  
 **Notes / Evidence:** ____________________  
@@ -1156,11 +1156,11 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Test Steps:**
 
 1. Inspect Accounts and Account Requests sections.
-2. Check that Refresh reloads counts and saved names.
-3. Open an employee in Edit, change the account role/reviewers or password, and save. As ADMIN, approve or reject the resulting request.
-4. As ADMIN, select ADMIN during registration and when editing another employee; verify it takes effect only after approval. As HR, verify ADMIN is unavailable for assignment and a direct request with role ADMIN fails with 403.
+2. Create pending requests as HR. Check the Account Requests number and yellow indicator on collapsed Manage Accounts; open/close the group, approve/reject, and verify the count clears at zero and refreshes after returning to the browser tab.
+3. Save account changes as HR and approve/reject as ADMIN; repeat an edit as ADMIN and verify it applies immediately without a second approval.
+4. As ADMIN, select ADMIN during registration and when editing another employee; verify it takes effect immediately. As HR, verify ADMIN is unavailable for assignment and a direct request with role ADMIN fails with 403.
 
-**Expected Result:** Employee Edit loads interactive account controls. Role/reviewer/password changes require ADMIN approval; blank password retains the current password. Profile-only edits create no request. Unsafe role changes (last active ADMIN, designated Head HR, or unresolved reviewer/pending-form responsibilities) are blocked; no general disable/delete control is claimed.
+**Expected Result:** Employee Edit loads interactive account controls. HR role/reviewer/password changes require ADMIN approval; ADMIN saves apply immediately. Blank password retains the current password. Profile-only edits create no request. Unsafe role changes (last active ADMIN, designated Head HR, or unresolved reviewer/pending-form responsibilities) are blocked; no general disable/delete control is claimed.
 
 **Data Integrity Check:** Rejected requests leave account access unchanged. Approved same-role edits preserve permissions and active status; role changes clear extra permissions.
 
@@ -1181,9 +1181,9 @@ Every listed value, account or browser variant is required. Preserve per-variant
 
 1. Open an imported profile in Edit and save a profile-only change; verify no account request is created.
 2. Reopen Edit, provide a unique Primary Email, choose a role/reviewer where applicable, enter and confirm a valid password, and save.
-3. Verify login is unavailable until ADMIN approves the request; approve, then sign in with the requested credentials.
+3. When saved by HR, verify login is unavailable until ADMIN approves; when saved by ADMIN, verify immediate login and no pending request.
 
-**Expected Result:** Existing imported employees can request account access from Edit without duplicate registration. A first account requires Primary Email and a valid password; STAFF/SUPERVISOR require an eligible reviewer. Import and profile-only edits do not grant access; ADMIN approval creates the account.
+**Expected Result:** Existing imported employees can request account access from Edit without duplicate registration. A first account requires Primary Email and a valid password; STAFF/SUPERVISOR require an eligible reviewer. Import and profile-only edits do not grant access; HR requests need approval and ADMIN account saves apply immediately.
 
 **Data Integrity Check:** Exactly one employee identity remains; the request and approval are audited. Failed account requests roll back the accompanying employee edit.
 

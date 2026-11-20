@@ -26,7 +26,7 @@ Updated: 11/06/2026
    On a small screen, select **Menu** to open the menu.
 4. Check your **Inbox** for announcements and requests that need your attention.
 
-An ADMIN must approve a new account before it can sign in. If you need an account
+Accounts created by ADMIN can sign in immediately. HR-created accounts need ADMIN approval. If you need an account
 or cannot remember your password, contact HR or the system administrator.
 
 ## 2. Find your menus
@@ -191,7 +191,7 @@ it. Read the confirmation before archiving an employee.
 4. **Account access request** stays visible and can be filled in any order. Choose STAFF,
    SUPERVISOR, HEAD, or HR, then enter and confirm the initial password.
 5. Select **Review and save**, check the preview, and save.
-6. If an account was requested, ask an ADMIN to approve it in **Manage Accounts → Account Requests**.
+6. If HR saved the account, ask ADMIN to approve it in **Manage Accounts → Account Requests**. Accounts saved by ADMIN are ready immediately; assigned reviewers must already be active.
 
 A STAFF account needs a Supervisor or ADMIN; a SUPERVISOR needs a Head or ADMIN.
 An optional second reviewer must be a different account with an eligible role. Either reviewer can approve or reject a submitted form.
@@ -568,14 +568,14 @@ assigned a Head immediately; older case assignments remain unchanged.
 
 Open an employee record and select Edit. The Account Access Request card loads
 the current or pending role and assigned reviewers. Choose the changes and save;
-ADMIN approves them in Account Requests before they take effect. A blank Password
+HR changes need ADMIN approval in Account Requests; ADMIN changes take effect immediately. A blank Password
 keeps the current or pending password. Enter and confirm a new password only to
 replace it. Editing employee details alone does not create an account request.
 An imported employee with Primary Email can also request their first account
 from this card; that request needs a password.
 
 Only ADMIN can choose ADMIN in Assigned Role during registration or editing;
-HR cannot grant ADMIN access. These requests still require ADMIN approval.
+HR cannot grant ADMIN access. ADMIN account saves take effect immediately.
 Only ADMIN can request changes to an ADMIN account. Approval cannot remove the
 last active ADMIN, and an account's pending forms and reviewer responsibilities
 must be resolved before its role changes. Changing the password or reviewers
@@ -587,3 +587,8 @@ Pending ADMIN reviewers must be approved before employee accounts assigned to th
 An assigned ADMIN uses **View Forms** to sign/forward or reject that first stage;
 no HR task ownership or HR performance time is recorded for this first-stage action.
 Other ADMIN accounts cannot act on that stage; HR final review is unchanged.
+
+Pending HR-created accounts appear as a number beside **Account Requests**.
+A yellow dot marks the collapsed **Manage Accounts** group while any are pending.
+Approval/rejection updates the count; it also refreshes every 60 seconds while
+the page is visible and when you return to the browser tab.
