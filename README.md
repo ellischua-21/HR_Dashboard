@@ -354,3 +354,34 @@ configured choices plus existing employee/assignment departments for compatibili
 The Heads group retains its two ADMIN reviewer slots and existing case routing.
 Adding a department preserves unsaved department Head and Management Approver
 selections. Historical case assignments are unchanged.
+
+### Employee records without employee numbers
+
+Employee Number is optional in registration, editing, and import. Blank or omitted
+values are stored as SQL NULL; each record still receives its internal record ID
+and sequence number. Supplied numbers retain the existing unique constraint and
+duplicate checks. Import no longer requires an Employee Number mapping. Primary
+Email identity and account linking remain unchanged. Personal attendance and
+form templates that require an employee number still need a real number later.
+Rows missing both Employee Number and Primary Email cannot be reliably detected
+as duplicates on a repeated import. Sales is included in department choices.
+Import converts a standalone `-` to blank before cleaning and validation, so it
+does not become a shared employee number or an invalid optional email/date/number.
+Required fields remain required. Embedded hyphens are preserved, and empty/null
+spreadsheet date cells remain blank during browser conversion.
+
+### Account edits and optional FTE
+
+Employee editing loads safe role/reviewer metadata from existing or pending
+accounts. Changed account fields queue an ADMIN-approved request in the same
+transaction as the employee edit; blank passwords preserve the existing hash.
+Ordinary profile edits do not queue account changes. Imported profiles can request
+their first account here as well. No password hash is returned to the browser.
+
+Approval preserves existing activation state and preserves extra permissions for
+same-role changes. Role changes clear extra permissions and reject removal of the
+last active ADMIN, current Head HR changes, and unresolved reviewer or pending-form
+responsibilities. Existing ADMIN roles can be retained; this edit flow does not
+create new ADMIN accounts or extend the first-setup exception. FTE Allocation is
+optional in registration, editing, and import, with numeric 0?1 validation when
+supplied. Empty FTE uses the existing NULL conversion.

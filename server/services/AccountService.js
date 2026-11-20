@@ -111,7 +111,8 @@ async function createEmployeeAccountRequest(
   req,
   employee,
   accountData,
-  connection
+  connection,
+  allowExisting = false
 ) {
   const user = await requirePerm(req, 'emp.write');
   if (!['HR', 'ADMIN'].includes(user.role)) {
@@ -124,11 +125,44 @@ async function createEmployeeAccountRequest(
     sanitize(accountData && accountData.assignedHeadEmail).toLowerCase() ||
     null;
   const secondaryHeadEmail =
-    sanitize(accountData && accountData.secondaryHeadEmail).toLowerCase() || null;
-  const password = accountData && accountData.password;
+    sanitize(accountData && accountData.secondaryHeadEmail).toLowerCase() ||
+    null;
+  const password = (accountData && accountData.password) ?? '';
   const email = sanitize(employee.personal_email).toLowerCase();
   const name = sanitize(employee.name);
-  if (!['STAFF', 'SUPERVISOR', 'HEAD', 'HR'].includes(role)) {
+  let previous = null;
+  let existingAccount = null;
+  if (allowExisting) {
+    const linked = await getAccountEmployee(email, connection, true);
+    if (!linked || linked.record_id !== employee.record_id)
+      throw httpError(
+        'A unique employee record with Primary Email is required.',
+        409
+      );
+    if (await hasDuplicateEmployeeEmail(connection, email, employee.record_id))
+      throw httpError(DUPLICATE_EMAIL, 409);
+    const [[account]] = await connection.execute(
+      'SELECT role, password_hash FROM user_roles WHERE email = ? FOR UPDATE',
+      [email]
+    );
+    const [[pending]] = await connection.execute(
+      'SELECT assigned_role AS role, password_hash FROM account_requests WHERE email = ? FOR UPDATE',
+      [email]
+    );
+    existingAccount = account;
+    previous = pending || account;
+    if (account?.role === 'ADMIN' && user.role !== 'ADMIN')
+      throw httpError(
+        'Only ADMIN can request changes to an ADMIN account.',
+        403
+      );
+  }
+  const keepAdminRole =
+    allowExisting && existingAccount?.role === 'ADMIN' && user.role === 'ADMIN';
+  if (
+    !['STAFF', 'SUPERVISOR', 'HEAD', 'HR'].includes(role) &&
+    !(role === 'ADMIN' && keepAdminRole)
+  ) {
     throw httpError(
       'Choose STAFF, SUPERVISOR, HEAD, or HR for the account role.',
       400
@@ -139,8 +173,7 @@ async function createEmployeeAccountRequest(
   }
   if (
     typeof password !== 'string' ||
-    password.length < 12 ||
-    password.length > 128
+    ((password || !previous) && (password.length < 12 || password.length > 128))
   ) {
     throw httpError(
       'Initial password must be between 12 and 128 characters.',
@@ -153,7 +186,10 @@ async function createEmployeeAccountRequest(
       400
     );
   }
-  if (!['STAFF', 'SUPERVISOR'].includes(role) && (assignedHeadEmail || secondaryHeadEmail)) {
+  if (
+    !['STAFF', 'SUPERVISOR'].includes(role) &&
+    (assignedHeadEmail || secondaryHeadEmail)
+  ) {
     throw httpError(
       'Only STAFF and SUPERVISOR accounts can be assigned a reviewer.',
       400
@@ -161,7 +197,9 @@ async function createEmployeeAccountRequest(
   }
   if (secondaryHeadEmail && secondaryHeadEmail === assignedHeadEmail)
     throw httpError('Choose two different reviewers.', 400);
-  for (const headEmail of [assignedHeadEmail, secondaryHeadEmail].filter(Boolean)) {
+  for (const headEmail of [assignedHeadEmail, secondaryHeadEmail].filter(
+    Boolean
+  )) {
     const [headRows] = await connection.execute(
       `SELECT email FROM user_roles WHERE email = ? AND role = ? AND active = 1
        UNION
@@ -186,7 +224,7 @@ async function createEmployeeAccountRequest(
      UNION SELECT email FROM account_requests WHERE email = ?`,
     [email, email]
   );
-  if (existing.length) {
+  if (existing.length && !allowExisting) {
     throw httpError(
       'An account or pending request already exists for this Primary Email.',
       409
@@ -195,16 +233,53 @@ async function createEmployeeAccountRequest(
   await connection.execute(
     `INSERT INTO account_requests
        (full_name, email, assigned_role, assigned_head_email, secondary_head_email, password_hash)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [name, email, role, assignedHeadEmail, secondaryHeadEmail, hashPassword(password)]
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE full_name = VALUES(full_name), assigned_role = VALUES(assigned_role),
+       assigned_head_email = VALUES(assigned_head_email), secondary_head_email = VALUES(secondary_head_email),
+       password_hash = VALUES(password_hash)`,
+    [
+      name,
+      email,
+      role,
+      assignedHeadEmail,
+      secondaryHeadEmail,
+      password ? hashPassword(password) : previous.password_hash
+    ]
   );
   await logAudit(
     user.email,
-    'ACCOUNT_REQUESTED',
+    allowExisting && previous
+      ? 'ACCOUNT_UPDATE_REQUESTED'
+      : 'ACCOUNT_REQUESTED',
     '',
-    `${email} requested as ${role}${assignedHeadEmail ? `; Reviewers ${[assignedHeadEmail, secondaryHeadEmail].filter(Boolean).join(", ")}` : ''}`,
+    `${email} requested as ${role}${assignedHeadEmail ? `; Reviewers ${[assignedHeadEmail, secondaryHeadEmail].filter(Boolean).join(', ')}` : ''}`,
     connection
   );
+}
+
+async function getEmployeeAccountAccess(employee) {
+  const email = String(employee.personal_email || '')
+    .trim()
+    .toLowerCase();
+  if (!email) return null;
+  const [[accounts], [requests]] = await Promise.all([
+    pool.execute(
+      'SELECT role, assigned_head_email AS assignedHeadEmail, secondary_head_email AS secondaryHeadEmail FROM user_roles WHERE email = ?',
+      [email]
+    ),
+    pool.execute(
+      'SELECT assigned_role AS role, assigned_head_email AS assignedHeadEmail, secondary_head_email AS secondaryHeadEmail FROM account_requests WHERE email = ?',
+      [email]
+    )
+  ]);
+  const selected = requests[0] || accounts[0];
+  return selected
+    ? {
+        ...selected,
+        existingRole: accounts[0]?.role || null,
+        pending: Boolean(requests.length)
+      }
+    : null;
 }
 
 async function addEmployeeLookupValue(req, listName, value) {
@@ -504,11 +579,36 @@ async function approveAccountRequest(req, requestId) {
     )
       ? ACCOUNT_ROLE_MAP[accountRequest.assigned_role]
       : null;
-    if (!['STAFF', 'SUPERVISOR', 'HEAD', 'HR'].includes(role)) {
+    const [accounts] = await connection.query(
+      'SELECT email, role, active, is_hr_head FROM user_roles FOR UPDATE'
+    );
+    const existingAccount = accounts.find(account => account.email.toLowerCase() === accountRequest.email.toLowerCase());
+    if (!['STAFF', 'SUPERVISOR', 'HEAD', 'HR'].includes(role) &&
+        !(role === 'ADMIN' && existingAccount?.role === 'ADMIN')) {
       throw httpError(
         'This request has no valid assigned role; reject it and recreate it from Employee Registration.',
         400
       );
+    }
+    if (existingAccount && existingAccount.role !== role) {
+      if (existingAccount.role === 'ADMIN' && existingAccount.active &&
+          accounts.filter(account => account.role === 'ADMIN' && account.active).length <= 1)
+        throw httpError('The last active ADMIN cannot be changed to another role.', 409);
+      if (existingAccount.is_hr_head)
+        throw httpError('Designate another Head HR before changing this account role.', 409);
+      const email = accountRequest.email;
+      const [dependencies] = await connection.execute(
+        `SELECT email FROM user_roles WHERE assigned_head_email = ? OR secondary_head_email = ?
+         UNION SELECT email FROM account_requests WHERE email <> ? AND (assigned_head_email = ? OR secondary_head_email = ?)
+         UNION SELECT user_email FROM user_forms WHERE status = 'PENDING' AND
+           (user_email = ? OR head_reviewer_email = ? OR secondary_head_reviewer_email = ?)
+         UNION SELECT reviewer_email FROM incident_department_reviewers WHERE reviewer_email = ?
+         UNION SELECT management_email FROM incident_workflow_settings WHERE management_email = ?
+         UNION SELECT assigned_head_email FROM incident_reports WHERE status <> 'CLOSED' AND assigned_head_email = ? LIMIT 1`,
+        Array(11).fill(email)
+      );
+      if (dependencies.length)
+        throw httpError('Resolve pending forms and reassign this account\'s reviewer, department, or Management responsibilities before changing its role.', 409);
     }
     if (
       ['STAFF', 'SUPERVISOR'].includes(role) &&
@@ -550,8 +650,9 @@ async function approveAccountRequest(req, requestId) {
       `INSERT INTO user_roles
          (email, full_name, role, assigned_head_email, secondary_head_email, active, extra_perms, password_hash)
        VALUES (?, ?, ?, ?, ?, 1, '', ?)
-       ON DUPLICATE KEY UPDATE full_name = VALUES(full_name), role = VALUES(role), active = 1,
-         assigned_head_email = VALUES(assigned_head_email), secondary_head_email = VALUES(secondary_head_email), extra_perms = '', password_hash = VALUES(password_hash)`,
+       ON DUPLICATE KEY UPDATE full_name = VALUES(full_name),
+         extra_perms = IF(role = VALUES(role), extra_perms, ''), role = VALUES(role),
+         assigned_head_email = VALUES(assigned_head_email), secondary_head_email = VALUES(secondary_head_email), password_hash = VALUES(password_hash)`,
       [
         accountRequest.email,
         employee.name,
@@ -665,6 +766,7 @@ async function changeMyPassword(req, currentPassword, newPassword) {
 module.exports = {
   listAssignableHeads,
   createEmployeeAccountRequest,
+  getEmployeeAccountAccess,
   getAccountManagement,
   addEmployeeLookupValue,
   approveAccountRequest,

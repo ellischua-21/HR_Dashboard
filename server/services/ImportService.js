@@ -50,7 +50,13 @@ async function importEmployees(req, records, commit) {
         });
         return;
       }
-      const clean = cleanEmployee(record);
+      const values = Object.fromEntries(
+        Object.entries(record).map(([key, value]) => [
+          key,
+          typeof value === 'string' && value.trim() === '-' ? '' : value
+        ])
+      );
+      const clean = cleanEmployee(values);
       EMP_FIELDS.forEach((field) => {
         const value = clean[field[0]];
         if (field[2] === 'list' && value) {
@@ -62,7 +68,7 @@ async function importEmployees(req, records, commit) {
           if (match) clean[field[0]] = match;
         }
       });
-      const rowErrors = validateEmployee(clean, lists, { requireFte: false });
+      const rowErrors = validateEmployee(clean, lists);
       const employeeNumber = clean.emp_no.toLowerCase();
       const email = normalizeEmail(clean.personal_email);
       if (email && existingEmails.has(email)) rowErrors.push(DUPLICATE_EMAIL);
@@ -75,7 +81,7 @@ async function importEmployees(req, records, commit) {
       if (rowErrors.length)
         errors.push({ row: record._line || index + 2, errors: rowErrors });
       else {
-        seen.add(employeeNumber);
+        if (employeeNumber) seen.add(employeeNumber);
         if (email) seenEmails.add(email);
         good.push(clean);
       }

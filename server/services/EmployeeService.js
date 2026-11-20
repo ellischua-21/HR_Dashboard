@@ -11,7 +11,7 @@ const { httpError } = require('../utils/HttpError');
 const { logAudit } = require('./AuditService');
 const { sanitize, validateEmployee } = require('../utils/Validation');
 const { withCalc, normalizeEmployee } = require('./DashboardService');
-const { createEmployeeAccountRequest } = require('./AccountService');
+const { createEmployeeAccountRequest, getEmployeeAccountAccess } = require('./AccountService');
 const { cleanEmployee, dbValue } = require('../utils/EmployeeData');
 const { manilaDate } = require('../../shared/DateUtils');
 const { acquireEmployeeIdentityLock } = require('../utils/EmployeeIdentityLock');
@@ -85,7 +85,7 @@ async function getEmployee(req, recordId) {
     recordId,
     'Employee profile viewed'
   );
-  return withCalc(employee);
+  return { ...withCalc(employee), accountAccess: await getEmployeeAccountAccess(employee) };
 }
 
 async function getFormOptions(req) {
@@ -172,25 +172,21 @@ async function saveEmployee(req, data = {}) {
       ]
     };
   }
-  if (data.record_id && data.accountAccess) {
-    return {
-      ok: false,
-      errors: ['Account requests can only be submitted for a new employee.']
-    };
-  }
 
   const connection = await pool.getConnection();
   let unlock;
   try {
     unlock = await acquireEmployeeIdentityLock(connection);
     await connection.beginTransaction();
-    const [duplicates] = await connection.execute(
-      'SELECT record_id FROM employees WHERE emp_no = ? AND record_id <> ? LIMIT 1',
-      [clean.emp_no, data.record_id || '']
-    );
-    if (duplicates.length) {
-      await connection.rollback();
-      return { ok: false, errors: ['Employee Number already exists'] };
+    if (clean.emp_no) {
+      const [duplicates] = await connection.execute(
+        'SELECT record_id FROM employees WHERE emp_no = ? AND record_id <> ? LIMIT 1',
+        [clean.emp_no, data.record_id || '']
+      );
+      if (duplicates.length) {
+        await connection.rollback();
+        return { ok: false, errors: ['Employee Number already exists'] };
+      }
     }
 
     const keys = F.keys();
@@ -254,8 +250,10 @@ async function saveEmployee(req, data = {}) {
         'Fields changed: ' + changed.join(','),
         connection
       );
+      if (data.accountAccess)
+        await createEmployeeAccountRequest(req, next, data.accountAccess, connection, true);
       await connection.commit();
-      return { ok: true, record_id: old.record_id };
+      return { ok: true, record_id: old.record_id, accountRequestSubmitted: Boolean(data.accountAccess) };
     }
 
     const emailError = await validateEmailChange(connection, clean);

@@ -181,7 +181,7 @@ it. Read the confirmation before archiving an employee.
 ### Register an employee and request account access
 
 1. Open **Employees → Employee Registration**.
-2. Complete the employee details and employee number. Primary Email is optional;
+2. Complete the employee details. Employee Number and Primary Email are optional;
    leave it blank to save a record without a login account. Secondary Email and
    Corporate Email do not create accounts.
 3. If Primary Email is entered, select the correct **Reports To** suggestion:
@@ -214,11 +214,24 @@ Reports To text does not automatically assign reviewer accounts.
 5. Correct the spreadsheet where necessary, then import the valid records.
 6. Check the **number of employees imported** in the result.
 
+Employee Number is optional in registration and import. Leave it blank if no
+number was supplied; you may also skip mapping that column. The record still
+gets its own internal ID. Supplied employee numbers must be unique. Do not use
+shared placeholders such as N/A or 0 for missing numbers. Personal attendance
+matching and forms that require Employee Number need the real number later.
+Rows without both Employee Number and Primary Email have no reliable import
+duplicate identifier; review them before importing the same file again.
+
+During import, a cell containing only `-` (with optional surrounding spaces) is
+treated as blank before validation and stored as NULL for an optional field.
+Required fields still need real values. Hyphens inside names, employee numbers,
+phone numbers, and other text are preserved. Leaving a cell empty works too.
+
 Primary Email is the login/account-linking address. Secondary Email is optional
 and accepts one valid email address. Corporate Email remains separate. Landline
 Number is no longer available. Mobile Number accepts multiple numbers as text.
 
-FTE Allocation is required in Employee Registration but optional during import.
+FTE Allocation is optional in Employee Registration, editing, and import.
 Leave it blank if unavailable; supplied values must be numbers between 0 and 1.
 HMO Details is optional free text next to HMO Provider. It is included in the
 master list, HR master report, HMO enrollment report, and import/export columns.
@@ -551,3 +564,19 @@ STAFF, SUPERVISOR, HEAD, HR, and ADMINS each have a role tab showing one account
 list. Switching tabs keeps unsaved assignments. Adding a name also preserves
 unsaved department Head and Management Approver choices. New departments can be
 assigned a Head immediately; older case assignments remain unchanged.
+
+### Edit account access from an employee record
+
+Open an employee record and select Edit. The Account Access Request card loads
+the current or pending role and assigned reviewers. Choose the changes and save;
+ADMIN approves them in Account Requests before they take effect. A blank Password
+keeps the current or pending password. Enter and confirm a new password only to
+replace it. Editing employee details alone does not create an account request.
+An imported employee with Primary Email can also request their first account
+from this card; that request needs a password.
+
+Only ADMIN can request changes to an ADMIN account. Approval cannot remove the
+last active ADMIN, and an account's pending forms and reviewer responsibilities
+must be resolved before its role changes. Changing the password or reviewers
+without changing role does not require clearing those responsibilities.
+FTE Allocation may be left blank in both registration and editing.

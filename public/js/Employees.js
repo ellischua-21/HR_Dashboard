@@ -407,24 +407,28 @@ $('p_archive').onclick = guard(async () => {
 VIEWS.register = guard(async () => {
   registrationReviewerSearch = null;
   META = await api('getFormMeta');
-  const rec = PENDING;
+  let rec = PENDING;
+  if (rec) rec = await api('getEmployee', rec.record_id);
   PENDING = null;
   CUR = rec;
-  HEAD_OPTIONS = rec ? [] : await api('listAssignableHeads');
+  HEAD_OPTIONS = await api('listAssignableHeads');
   $('r_mode').textContent = rec
     ? 'Editing ' + rec.name + ' (' + rec.record_id + ')'
     : '';
   $('r_mode').hidden = !rec;
   $('r_account_access').hidden = false;
-  $('r_account_role').disabled = Boolean(rec);
-  $('r_secondary_head').disabled = Boolean(rec);
-  $('r_account_password').disabled = Boolean(rec);
-  $('r_account_password_confirm').disabled = Boolean(rec);
+  $('r_account_role').disabled = false;
+  $('r_secondary_head').disabled = false;
+  $('r_account_password').disabled = false;
+  $('r_account_password_confirm').disabled = false;
   $('r_account_password').value = '';
   $('r_account_password_confirm').value = '';
-  if (rec) {
-    $('r_secondary_head').replaceChildren();
-    $('r_head_assignment_note').textContent = '';
+  $('r_account_role').querySelectorAll('[data-existing-admin]').forEach(option => option.remove());
+  if (rec?.accountAccess?.existingRole === 'ADMIN') {
+    const adminOption = el('option', 'ADMIN');
+    adminOption.value = 'ADMIN';
+    adminOption.setAttribute('data-existing-admin', 'true');
+    $('r_account_role').appendChild(adminOption);
   }
   $('r_preview').disabled = false;
   const sections = employeeFormSections();
@@ -494,7 +498,7 @@ VIEWS.register = guard(async () => {
       }
       inp.id = 'ff_' + k;
       inp.required = Boolean(f.required);
-      if (k === 'personal_email' && !rec) {
+      if (k === 'personal_email') {
         inp.placeholder = 'Leave blank for a record without a login account';
         inp.addEventListener('input', updateRegistrationAccountAccess);
       }
@@ -502,7 +506,7 @@ VIEWS.register = guard(async () => {
       if (rec && rec[k] !== undefined)
         inp.value = f.readOnly ? DateUtils.formatField(rec[k], f.type) : rec[k];
       if (k === 'record_status' && !rec) inp.value = 'Active';
-      if (k === 'reports_to' && !rec) {
+      if (k === 'reports_to') {
         inp.type = 'search';
         inp.placeholder = 'Search name or email';
         inp.autocomplete = 'off';
@@ -555,10 +559,17 @@ VIEWS.register = guard(async () => {
     );
     fs.hidden = !group.childElementCount && !tables.childElementCount;
   });
-  $('r_account_role').value = rec ? '' : 'STAFF';
+  $('r_account_role').value = rec?.accountAccess?.role || 'STAFF';
   $('r_account_role').onchange = updateRegistrationRoleHelp;
   if ($('ff_assigned_head_email')) $('ff_assigned_head_email').value = '';
-  if (!rec) updateRegistrationRoleHelp();
+  updateRegistrationRoleHelp();
+  if (rec?.accountAccess) {
+    const account = rec.accountAccess;
+    const first = HEAD_OPTIONS.find(head => head.email === account.assignedHeadEmail);
+    $('ff_assigned_head_email').value = account.assignedHeadEmail || '';
+    $('ff_reports_to').value = first?.full_name || account.assignedHeadEmail || rec.reports_to || '';
+    $('r_secondary_head').value = account.secondaryHeadEmail || '';
+  } else if (rec) $('ff_reports_to').value = rec.reports_to || '';
   updateRegistrationAccountAccess();
   const churchChoice = $('ff_church_has');
   const churchPosition = $('ff_church_position');
@@ -608,11 +619,10 @@ VIEWS.register = guard(async () => {
   }
 });
 function updateRegistrationAccountAccess() {
-  if (CUR && CUR.record_id) return;
   const hasEmail = Boolean($('ff_personal_email').value.trim());
   $('r_account_role').dataset.requiredIndicator = String(hasEmail);
   for (const id of ['r_account_password', 'r_account_password_confirm'])
-    $(id).required = hasEmail;
+    $(id).required = hasEmail && !CUR?.record_id;
   const supportsReviewers = ['STAFF', 'SUPERVISOR'].includes(
     $('r_account_role').value
   );
@@ -623,7 +633,6 @@ function updateRegistrationAccountAccess() {
   );
 }
 function updateRegistrationRoleHelp() {
-  if (CUR && CUR.record_id) return;
   const role = $('r_account_role').value;
   const hasEmail = Boolean($('ff_personal_email').value.trim());
   const secondary = $('r_secondary_head');
@@ -670,18 +679,25 @@ const formData = () => {
     }
   });
   if (CUR && CUR.record_id) d.record_id = CUR.record_id;
-  else if (d.personal_email)
-    d.accountAccess = {
+  if (d.personal_email) {
+    const account = {
       role: $('r_account_role').value,
       password: $('r_account_password').value,
-      assignedHeadEmail: $('ff_assigned_head_email')
-        ? $('ff_assigned_head_email').value
-        : '',
+      assignedHeadEmail: ['STAFF', 'SUPERVISOR'].includes($('r_account_role').value)
+        ? $('ff_assigned_head_email').value : '',
       secondaryHeadEmail: $('r_secondary_head').disabled ? '' : $('r_secondary_head').value
     };
-  if (d.accountAccess?.secondaryHeadEmail) {
-    const second = HEAD_OPTIONS.find(head => head.email === d.accountAccess.secondaryHeadEmail);
-    d.reports_to = [d.reports_to, second?.full_name || second?.email].filter(Boolean).join(' / ');
+    const previous = CUR?.accountAccess;
+    const requestNew = !CUR?.record_id || account.password || account.assignedHeadEmail ||
+      account.secondaryHeadEmail || account.role !== 'STAFF';
+    if ((!previous && requestNew) || (previous && (account.password || account.role !== previous.role ||
+        account.assignedHeadEmail !== (previous.assignedHeadEmail || '') ||
+        account.secondaryHeadEmail !== (previous.secondaryHeadEmail || ''))))
+      d.accountAccess = account;
+    if (account.secondaryHeadEmail) {
+      const second = HEAD_OPTIONS.find(head => head.email === account.secondaryHeadEmail);
+      d.reports_to = [d.reports_to, second?.full_name || second?.email].filter(Boolean).join(' / ');
+    }
   }
   return d;
 };
@@ -702,11 +718,11 @@ $('r_preview').onclick = () => {
           ? 'Assigned Supervisor'
           : 'Assigned Head'
       );
-    if (
+    if ((d.accountAccess.password || !CUR?.accountAccess) && (
       d.accountAccess.password.length < 12 ||
       d.accountAccess.password.length > 128
-    )
-      miss.push('Initial password (12–128 characters)');
+    ))
+      miss.push('Password (12–128 characters)');
     if (d.accountAccess.password !== $('r_account_password_confirm').value)
       miss.push('Matching password confirmation');
   }
@@ -857,7 +873,7 @@ const isoDate = (v) => {
       '-' +
       String(v.getDate()).padStart(2, '0')
     );
-  const s = String(v).trim();
+  const s = String(v ?? '').trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   const d = new Date(s);
   return s && !isNaN(d) ? isoDate(d) : s;
@@ -871,15 +887,13 @@ function buildRecords() {
     )
       map[s.dataset.col] = s.value;
   });
-  if (!Object.values(map).includes('emp_no'))
-    throw new Error('Map a column to Employee Number before continuing.');
   return IMP.data.map((r, n) => {
     const o = { _line: n + 2 };
     Object.keys(map).forEach((c) => {
       const f = fld(map[c]);
       let v = r[c];
       if (f.type === 'date') v = isoDate(v);
-      o[map[c]] = v === undefined ? '' : String(v);
+      o[map[c]] = v === undefined || v === null ? '' : String(v);
     });
     return o;
   });

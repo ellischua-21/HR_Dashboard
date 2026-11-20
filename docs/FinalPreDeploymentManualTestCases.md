@@ -484,11 +484,11 @@ Every listed value, account or browser variant is required. Preserve per-variant
 
 **Test Steps:**
 
-1. Leave each required name, employee number, company/location/department/rank/status, employment date, birthday and FTE blank in turn.
+1. Leave each required name, company/location/department/rank/status, employment date and birthday blank in turn.
 2. Try FTE -0.01, 0, 1 and 1.01; try a future birthday.
-3. Review/save after each correction.
+3. Register and edit with Employee Number and FTE blank; review/save after each correction.
 
-**Expected Result:** Missing fields, future birthday and FTE outside 0–1 are rejected; 0 and 1 are valid. Invalid lookup selections sent through DevTools are rejected server-side.
+**Expected Result:** Missing required fields, future birthday and supplied FTE outside 0–1 are rejected; blank Employee Number/FTE and FTE values 0 and 1 are valid in registration and editing. Invalid lookup selections sent through DevTools are rejected server-side.
 
 **Data Integrity Check:** Invalid requests save neither employee nor pending account.
 
@@ -1157,34 +1157,34 @@ Every listed value, account or browser variant is required. Preserve per-variant
 
 1. Inspect Accounts and Account Requests sections.
 2. Check that Refresh reloads counts and saved names.
-3. Record whether needed account disable, role edit or password reset controls exist.
+3. Open an employee in Edit, change the account role/reviewers or password, and save. As ADMIN, approve or reject the resulting request.
 
-**Expected Result:** Only implemented reviewer/Head HR/incident configuration and request decisions are claimed; ordinary UI has no general role-change, disable, reset or delete control.
+**Expected Result:** Employee Edit loads interactive account controls. Role/reviewer/password changes require ADMIN approval; blank password retains the current password. Profile-only edits create no request. Unsafe role changes (last active ADMIN, designated Head HR, or unresolved reviewer/pending-form responsibilities) are blocked; no general disable/delete control is claimed.
 
-**Data Integrity Check:** No administrative mutation is performed merely to test an absent UI.
+**Data Integrity Check:** Rejected requests leave account access unchanged. Approved same-role edits preserve permissions and active status; role changes clear extra permissions.
 
 **Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.  
 **Notes / Evidence:** ____________________  
 **Variant / tester / execution date / defect reference:** ____________________
 
-### ACC-11 — Imported employee account provisioning limit
+### ACC-11 — Imported employee account provisioning
 
 **Test ID:** ACC-11  
-**Module and Feature:** Accounts — Imported employee account provisioning limit  
+**Module and Feature:** Accounts — Imported employee account provisioning
 **Priority:** High  
 **Test Type:** Integration  
-**Required Role:** HR/ADMIN and authorized operator  
+**Required Role:** HR/ADMIN requests; ADMIN approves
 **Preconditions:** Imported employee with no account; do not create a second employee.
 
 **Test Steps:**
 
-1. Open imported profile in Edit and inspect account-request options.
-2. Check Employee Registration versus duplicate number/email protections.
-3. Have operator demonstrate separately authorized documented provisioning on disposable copy, then sign in.
+1. Open an imported profile in Edit and save a profile-only change; verify no account request is created.
+2. Reopen Edit, provide a unique Primary Email, choose a role/reviewer where applicable, enter and confirm a valid password, and save.
+3. Verify login is unavailable until ADMIN approves the request; approve, then sign in with the requested credentials.
 
-**Expected Result:** UI account request applies only to new registration; imported existing profile cannot add one through editing. Controlled CLI provisioning is documented, not an assumed browser button; import does not grant access.
+**Expected Result:** Existing imported employees can request account access from Edit without duplicate registration. A first account requires Primary Email and a valid password; STAFF/SUPERVISOR require an eligible reviewer. Import and profile-only edits do not grant access; ADMIN approval creates the account.
 
-**Data Integrity Check:** Exactly one employee identity; no duplicate registration used to obtain login; operator action separately audited/recorded.
+**Data Integrity Check:** Exactly one employee identity remains; the request and approval are audited. Failed account requests roll back the accompanying employee edit.
 
 **Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.  
 **Notes / Evidence:** ____________________  
