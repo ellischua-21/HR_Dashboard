@@ -17,6 +17,18 @@ function buildReviewScope(reviewer, requestedScope = null) {
     branches.push({ where, values, pendingStage });
   }
 
+  if (
+    hasReviewAccess &&
+    reviewer.role === 'ADMIN' &&
+    ['ALL', 'HEAD'].includes(scope)
+  ) {
+    addBranch(
+      "f.template_key <> 'nexus-accountability' AND (f.head_reviewer_email = ? OR f.secondary_head_reviewer_email = ?) AND f.user_email IN (SELECT email FROM user_roles WHERE role IN ('STAFF', 'SUPERVISOR'))",
+      [reviewer.email, reviewer.email],
+      'HEAD'
+    );
+  }
+
   if (scope === 'ALL') {
     if (['SUPERVISOR', 'HEAD'].includes(reviewer.role)) {
       addBranch(

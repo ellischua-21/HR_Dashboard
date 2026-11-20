@@ -135,8 +135,8 @@ are checked again at final approval.
 
 ### Understand where a form goes
 
-- STAFF forms go to their assigned Supervisor(s); either may approve, then HR reviews.
-- SUPERVISOR forms go to their assigned Head(s); either may approve, then HR reviews.
+- STAFF forms go to their assigned Supervisor(s) or ADMIN reviewer(s); either may approve, then HR reviews.
+- SUPERVISOR forms go to their assigned Head(s) or ADMIN reviewer(s); either may approve, then HR reviews.
 - HEAD forms go directly to HR.
 - HR forms go to the designated Head HR. The Head HR's own forms go to another
   eligible HR reviewer.
@@ -154,7 +154,7 @@ serial number or details.
 1. Open **Forms → Review Requests**, or **View Forms** for ADMIN.
 2. Use status, form type, search, and submission-date filters to find the request.
 3. Select **View form** and read the request.
-   HR must select **Take Task** before processing it. ADMIN can view requests and assign or reassign them, but cannot process them. If another
+   HR must select **Take Task** before processing it. ADMIN can review the first stage of STAFF/SUPERVISOR forms explicitly assigned to them; HR-stage processing remains HR-only. ADMIN can also view requests and assign or reassign HR tasks. If another
    reviewer has taken it, their name is shown and you can still view the form.
 4. Select **Sign** when a signature is required, or **Approve** when it is not. Supervisor or Head approval normally forwards the request to HR.
 5. To reject a request, select **Reject** and enter the reason.
@@ -185,17 +185,16 @@ it. Read the confirmation before archiving an employee.
    leave it blank to save a record without a login account. Secondary Email and
    Corporate Email do not create accounts.
 3. If Primary Email is entered, select the correct **Reports To** suggestion:
-   a Supervisor for STAFF or a Head for SUPERVISOR. Optionally select a second
-   Supervisor/Head under Account Access Request. Without Primary Email,
+   a Supervisor or ADMIN for STAFF, or a Head or ADMIN for SUPERVISOR.
+   Optionally select a second reviewer under Account Access Request. Without Primary Email,
    Reports To can be recorded as optional text.
 4. **Account access request** stays visible and can be filled in any order. Choose STAFF,
    SUPERVISOR, HEAD, or HR, then enter and confirm the initial password.
 5. Select **Review and save**, check the preview, and save.
 6. If an account was requested, ask an ADMIN to approve it in **Manage Accounts → Account Requests**.
 
-A STAFF account needs one or two assigned Supervisors; a SUPERVISOR needs one or
-two assigned Heads. The second reviewer is optional and must be a different account
-with the same required role. Either reviewer can approve or reject a submitted form.
+A STAFF account needs a Supervisor or ADMIN; a SUPERVISOR needs a Head or ADMIN.
+An optional second reviewer must be a different account with an eligible role. Either reviewer can approve or reject a submitted form.
 The first approval forwards it to HR; the other reviewer cannot approve that stage
 again. Both assigned reviewers see it in their review queue and inbox. Approve any
 pending reviewer accounts before approving the employee account request.
@@ -475,7 +474,7 @@ prevents removing the assignment without an eligible replacement.
 
 **Available to:** ADMIN, on **Dashboard**.
 
-Only HR accounts are included in the performance figures. ADMIN can view performance and assign or reassign permitted tasks, but cannot take HR tasks, process form reviews, or edit the COC matrix. Department HEAD duties and Management approvals performed by ADMIN are separate from HR performance.
+Only HR accounts are included in the performance figures. ADMIN can view performance and assign or reassign permitted tasks, but cannot take HR tasks, process the HR stage of forms, or edit the COC matrix. ADMIN can sign or reject the first stage of STAFF/SUPERVISOR forms explicitly assigned to them. Department HEAD duties and Management approvals performed by ADMIN are separate from HR performance.
 
 1. Choose a date range, reviewer, and request type, then select **Apply Filters**.
 2. Use the overview cards and charts to compare completed form reviews, reviewed
@@ -575,8 +574,16 @@ replace it. Editing employee details alone does not create an account request.
 An imported employee with Primary Email can also request their first account
 from this card; that request needs a password.
 
+Only ADMIN can choose ADMIN in Assigned Role during registration or editing;
+HR cannot grant ADMIN access. These requests still require ADMIN approval.
 Only ADMIN can request changes to an ADMIN account. Approval cannot remove the
 last active ADMIN, and an account's pending forms and reviewer responsibilities
 must be resolved before its role changes. Changing the password or reviewers
 without changing role does not require clearing those responsibilities.
 FTE Allocation may be left blank in both registration and editing.
+
+ADMIN accounts appear in Reports To suggestions and both reviewer selectors.
+Pending ADMIN reviewers must be approved before employee accounts assigned to them.
+An assigned ADMIN uses **View Forms** to sign/forward or reject that first stage;
+no HR task ownership or HR performance time is recorded for this first-stage action.
+Other ADMIN accounts cannot act on that stage; HR final review is unchanged.

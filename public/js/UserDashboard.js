@@ -1087,12 +1087,15 @@ function reviewRow(form) {
   const canReviewStage = isHead
     ? (session.role === 'SUPERVISOR' && form.submitter_role === 'STAFF') ||
       (session.role === 'HEAD' && form.submitter_role === 'SUPERVISOR') ||
+      (session.role === 'ADMIN' &&
+        ['STAFF', 'SUPERVISOR'].includes(form.submitter_role) &&
+        FormStatus.isAssignedReviewer(form, session.email)) ||
       (session.role === 'HR' &&
         session.is_hr_head &&
         form.submitter_role === 'HR')
     : session.role === 'HR' &&
       session.perms.includes('forms.review');
-  const requiresTask = ['HR', 'ADMIN'].includes(session.role);
+  const requiresTask = session.role === 'HR' || (session.role === 'ADMIN' && !isHead);
   if (requiresTask && form.task)
     actions.appendChild(TaskUI.render(form.task, () => loadFormsForReview(), true));
   const awaitingReviewer = form.status === 'PENDING' && canReviewStage &&
@@ -1133,7 +1136,7 @@ function reviewRow(form) {
     form.status === 'PENDING' &&
     form.review_stage === 'HR' &&
     FormStatus.isAssignedReviewer(form, session.email) &&
-    ['SUPERVISOR', 'HEAD'].includes(session.role)
+    ['SUPERVISOR', 'HEAD', 'ADMIN'].includes(session.role)
   ) {
     actions.appendChild(
       document.createTextNode(

@@ -506,7 +506,7 @@ async function getSubmissionHeads(email, role) {
           (head) =>
             head.email &&
             head.email !== email &&
-            head.role === expectedRole &&
+            [expectedRole, 'ADMIN'].includes(head.role) &&
             head.active
         )
         .map((head) => head.email)
@@ -810,7 +810,7 @@ async function listFormsForReview(req, scope = 'HR', filters = {}) {
   const reviewer = await requireFormView(req, current);
   if (
     isHead &&
-    !['HEAD', 'SUPERVISOR'].includes(reviewer.role) &&
+    !['HEAD', 'SUPERVISOR', 'ADMIN'].includes(reviewer.role) &&
     !(reviewer.role === 'HR' && reviewer.is_hr_head)
   ) {
     throw httpError('This account cannot view the assigned review queue.', 403);
@@ -879,15 +879,15 @@ async function getFormReviewSummaryForUser(req, scope = 'HR') {
   if (isHead) {
     const reviewer = await requireFormView(req, current);
     if (
-      !['HEAD', 'SUPERVISOR'].includes(reviewer.role) &&
+      !['HEAD', 'SUPERVISOR', 'ADMIN'].includes(reviewer.role) &&
       !(reviewer.role === 'HR' && reviewer.is_hr_head)
     ) {
       throw httpError(
-        'Only an assigned Supervisor, Head, or Head HR can review this queue.',
+        'Only an assigned Supervisor, Head, Admin, or Head HR can review this queue.',
         403
       );
     }
-    return getFormReviewSummary(reviewer);
+    return getFormReviewSummary(reviewer, 'HEAD');
   }
   if (
     !current.perms.some((permission) => ['forms.review', 'forms.view'].includes(permission)) ||
@@ -925,7 +925,6 @@ async function reviewUserForm(
   const current = await getCurrentUser(req);
   if (!current) await requirePerm(req, 'forms.review');
   const reviewer = current;
-  if (reviewer.role === 'ADMIN') throw httpError('ADMIN can only view forms.', 403);
   if (!['APPROVED', 'REJECTED'].includes(decision)) {
     throw httpError('Choose Approved or Rejected.', 400);
   }
@@ -955,11 +954,13 @@ async function reviewUserForm(
     const isHead =
       rows[0].review_stage === 'HEAD' && template?.headReviewRequired !== false;
     if (isHead) {
-      await requirePerm(req, 'forms.review');
+      await requireFormView(req, reviewer);
       const mayReviewAsHead =
         (reviewer.role === 'SUPERVISOR' &&
           rows[0].submitter_role === 'STAFF') ||
         (reviewer.role === 'HEAD' && rows[0].submitter_role === 'SUPERVISOR') ||
+        (reviewer.role === 'ADMIN' &&
+          ['STAFF', 'SUPERVISOR'].includes(rows[0].submitter_role)) ||
         (reviewer.role === 'HR' &&
           reviewer.is_hr_head &&
           rows[0].submitter_role === 'HR');
@@ -980,7 +981,7 @@ async function reviewUserForm(
         );
       }
     }
-    if (['HR', 'ADMIN'].includes(reviewer.role))
+    if (reviewer.role === 'HR')
       await Tasks.assertOwner(connection, 'FORM', Number(formId), reviewer);
     validateApprovalSignature(
       isHead,

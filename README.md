@@ -105,7 +105,7 @@ and isolated QA scenarios.
 
 ## Account registration and management
 
-There is no public account-request option on the sign-in screen. HR and ADMIN create account requests through **Employee Registration** using the employee's Primary Email, role and initial password. STAFF requires an assigned SUPERVISOR, and SUPERVISOR requires an assigned HEAD. New accounts remain unable to sign in until an ADMIN approves them. Registration without Primary Email saves an employee record without an account request, role, password or reviewer requirement. Secondary Email and Corporate Email do not create accounts. Imports also retain employees without Primary Email in records and reports.
+There is no public account-request option on the sign-in screen. HR and ADMIN create account requests through **Employee Registration** using the employee's Primary Email, role and initial password. STAFF requires an assigned SUPERVISOR or ADMIN, and SUPERVISOR requires an assigned HEAD or ADMIN. New accounts remain unable to sign in until an ADMIN approves them. Registration without Primary Email saves an employee record without an account request, role, password or reviewer requirement. Secondary Email and Corporate Email do not create accounts. Imports also retain employees without Primary Email in records and reports.
 
 All users can change their own password by entering the current password and a new password (12–128 characters) in **Change Password**. ADMIN manages registration requests and accounts in **Manage Accounts**.
 
@@ -122,7 +122,7 @@ Only an account with the `ADMIN` role sees **Manage Accounts** and can approve o
 - **HR**: dashboard, full employee registration and record read/write, and reports, plus **Manage Forms** for requests forwarded to HR. The designated Head HR can also review forms submitted by other HR accounts. HR and ADMIN have the same complete employee fields; no separate sensitive-data permission is required.
 - **ADMIN**: account management, full employee-record access, View Forms, and HR performance monitoring. Department-assigned ADMIN HEADs can file/review incidents; designated Management approvers approve recommendations. Other incident access is view-only and limited to available cases.
 
-The searchable Reports To field offers active or pending SUPERVISOR accounts for STAFF, and HEAD accounts for SUPERVISOR. Approve the assigned reviewer before approving their subordinate's account. ADMIN can change saved assignments in Manage Accounts. STAFF forms go to their Supervisor then HR; SUPERVISOR forms go to their Head then HR; HEAD forms go directly to HR. At API startup, legacy USER, MANAGER, and EXECUTIVE accounts are migrated to STAFF; HR_STAFF migrates to HR; HR_ADMIN and SYSTEM_ADMIN migrate to ADMIN. Bootstrap the initial administrator with the `create-user` command above. Grant **ADMIN** only to trusted administrators.
+The searchable Reports To field offers active or pending SUPERVISOR/ADMIN accounts for STAFF, and HEAD/ADMIN accounts for SUPERVISOR. Approve the assigned reviewer before approving their subordinate's account. ADMIN can change saved assignments in Manage Accounts. STAFF forms go to their Supervisor or assigned ADMIN then HR; SUPERVISOR forms go to their Head or assigned ADMIN then HR; HEAD forms go directly to HR. At API startup, legacy USER, MANAGER, and EXECUTIVE accounts are migrated to STAFF; HR_STAFF migrates to HR; HR_ADMIN and SYSTEM_ADMIN migrate to ADMIN. Bootstrap the initial administrator with the `create-user` command above. Grant **ADMIN** only to trusted administrators.
 
 ## User forms and leave requests
 
@@ -135,7 +135,7 @@ allowances only when the employee also meets the rank requirement.
 
 STAFF, SUPERVISOR and HEAD sign in to a personal dashboard, review submission status, filter by status or form type, and open the **Forms** tab. A STAFF, SUPERVISOR or HEAD account can edit a submitted form only while it is pending with its assigned reviewer; saving changes requires a new electronic signature. Forms rejected by the assigned reviewer or already forwarded to HR/Admin cannot be edited. Available templates use generic names: **Leave Application**, **Authority to Deduct**, **Time-In/Out Correction Request**, **Official Business / Travel Request**, **Overtime Request**, and **Time In/Out Record**. Forms collect the applicant's required details, their electronic signature, and their approved account name automatically. New submissions receive a serial number in `PREFIX-YEAR-SEQUENCE` format, with a separate sequence per form type and Manila calendar year. Each form type starts at `000001` in a new year. Prefixes and sequence widths are configured on each template in `shared/FormTemplates.js`. Previously assigned serial numbers are retained. Submitting a form does not open the print dialog; users can print or save a PDF later from their dashboard.
 
-A STAFF form goes to its assigned Supervisor; a SUPERVISOR form goes to its assigned Head. The assigned reviewer can sign and forward it to HR or reject it with a reason. HEAD requests go directly to HR. Forms submitted by HR go to the designated Head HR; the Head HR's own forms go to the HR review queue so another HR account can review them. HR reviews forms forwarded to the HR stage. All reviewers use one **Manage Forms** tab; the API limits each account to the forms and review actions allowed by its role, Head HR designation, and the form's assigned reviewer and stage. Approval signatures are required only for form templates configured to require them; all rejections require a reason. Form lists are ordered by submission date/time, newest first, and can be filtered by status and form type. STAFF, SUPERVISOR and HEAD can view their submitted forms, including signatures and approver names.
+A STAFF form goes to its assigned Supervisor or ADMIN; a SUPERVISOR form goes to its assigned Head or ADMIN. The assigned reviewer can sign and forward it to HR or reject it with a reason. HEAD requests go directly to HR. Forms submitted by HR go to the designated Head HR; the Head HR's own forms go to the HR review queue so another HR account can review them. HR reviews forms forwarded to the HR stage. All reviewers use one **Manage Forms** tab; the API limits each account to the forms and review actions allowed by its role, Head HR designation, and the form's assigned reviewer and stage. Approval signatures are required only for form templates configured to require them; all rejections require a reason. Form lists are ordered by submission date/time, newest first, and can be filtered by status and form type. STAFF, SUPERVISOR and HEAD can view their submitted forms, including signatures and approver names.
 
 ## Moving employee records from Google Sheets
 
@@ -193,7 +193,7 @@ For manual account provisioning, bootstrap or recovery administrators can use `n
   saves record audit events in the same transaction as their changes. An audit
   failure rolls back the save. Event details contain assignment/row counts and
   approver-selection status, without copying employee details or policy text.
-- Only HR and ADMIN can create accounts, using Employee Registration. Primary Email is the login email; HR/ADMIN select STAFF, SUPERVISOR, HEAD, or HR and set an initial password. New accounts remain pending until an ADMIN approves them. STAFF needs a Supervisor and SUPERVISOR needs a Head selected in Reports To; pending reviewers must be approved first.
+- Only HR and ADMIN can create accounts, using Employee Registration. Primary Email is the login email; HR/ADMIN select STAFF, SUPERVISOR, HEAD, or HR and set an initial password. ADMIN can also assign ADMIN during registration or editing; HR cannot submit an ADMIN role request. New accounts remain pending until an ADMIN approves them. STAFF needs a Supervisor or ADMIN and SUPERVISOR needs a Head or ADMIN selected in Reports To; pending reviewers must be approved first.
 - HR and ADMIN can publish announcements from the Announcements tab. STAFF, SUPERVISOR and HEAD see unacknowledged announcements in a blurred modal after login; acknowledging records that announcement as seen for that account.
 - All roles have an Inbox. STAFF, SUPERVISOR and HEAD see new and previously acknowledged HR announcements. Supervisors and Heads see forms assigned to them; HR and ADMIN see forms at the HR review stage; the Head HR also sees forms submitted by other HR accounts. Reviewed form notifications remain in the Inbox. Inbox filters support item type and status, and form items open the shared Manage Forms tab.
 - Existing report, import, export, employee privacy, audit, and role-permission rules are enforced by the API, not by the browser.
@@ -272,7 +272,7 @@ expectations and checks still requiring an isolated MySQL database or real brows
   next API restart. It creates task/event/revision tables and reporting
   indexes, and registers existing unresolved work as unassigned. It does not
   invent historical ownership or timing and does not delete existing records.
-- Only HR can take a task and process form reviews or HR incident
+- Only HR can take a task and process HR-stage form reviews or HR incident
   actions. Claims lock the underlying request row and enforce a unique task
   identity in the same transaction. Employee and assigned Supervisor/Head
   signature permissions remain separate. Head HR form reviews also use claims.
@@ -381,7 +381,20 @@ their first account here as well. No password hash is returned to the browser.
 Approval preserves existing activation state and preserves extra permissions for
 same-role changes. Role changes clear extra permissions and reject removal of the
 last active ADMIN, current Head HR changes, and unresolved reviewer or pending-form
-responsibilities. Existing ADMIN roles can be retained; this edit flow does not
-create new ADMIN accounts or extend the first-setup exception. FTE Allocation is
+responsibilities. Only ADMIN can request ADMIN access during registration or
+editing; approval still requires a unique employee record and does not extend
+the first-setup exception. FTE Allocation is
 optional in registration, editing, and import, with numeric 0?1 validation when
 supplied. Empty FTE uses the existing NULL conversion.
+
+### ADMIN as an assigned form reviewer
+
+Active and pending ADMIN accounts appear in Reports To and optional second-reviewer
+choices for STAFF and SUPERVISOR. Manage Accounts permits the same assignments.
+Approval requires the reviewer account to be active. Submitted forms capture both
+reviewers; an assigned ADMIN may sign/forward or reject the first stage, with the
+same signature and transaction guards as other assigned reviewers. Only one
+reviewer decision can advance that stage. ADMIN uses forms.view for this narrowly
+assigned action; forms.review, HR-stage processing, and HR task ownership remain
+restricted to their existing roles. The combined form queue and inbox include
+these assigned forms, without duplicating inbox entries after forwarding.

@@ -424,9 +424,10 @@ VIEWS.register = guard(async () => {
   $('r_account_password').value = '';
   $('r_account_password_confirm').value = '';
   $('r_account_role').querySelectorAll('[data-existing-admin]').forEach(option => option.remove());
-  if (rec?.accountAccess?.existingRole === 'ADMIN') {
+  if (session?.role === 'ADMIN' || rec?.accountAccess?.role === 'ADMIN') {
     const adminOption = el('option', 'ADMIN');
     adminOption.value = 'ADMIN';
+    adminOption.disabled = session?.role !== 'ADMIN';
     adminOption.setAttribute('data-existing-admin', 'true');
     $('r_account_role').appendChild(adminOption);
   }
@@ -527,10 +528,11 @@ VIEWS.register = guard(async () => {
           search: (query) =>
             HEAD_OPTIONS.filter(
               (head) =>
-                head.role ===
-                  ($('r_account_role').value === 'STAFF'
-                    ? 'SUPERVISOR'
-                    : 'HEAD') &&
+                (head.role === 'ADMIN' ||
+                  head.role ===
+                    ($('r_account_role').value === 'STAFF'
+                      ? 'SUPERVISOR'
+                      : 'HEAD')) &&
                 `${head.full_name} ${head.email}`
                   .toLowerCase()
                   .includes(query.toLowerCase())
@@ -644,7 +646,9 @@ function updateRegistrationRoleHelp() {
   secondary.disabled = !supportsReviewers;
   if (supportsReviewers)
     HEAD_OPTIONS.filter(
-      (head) => head.role === (role === 'STAFF' ? 'SUPERVISOR' : 'HEAD')
+      (head) =>
+        head.role === 'ADMIN' ||
+        head.role === (role === 'STAFF' ? 'SUPERVISOR' : 'HEAD')
     ).forEach((head) => {
       const option = el(
         'option',
@@ -664,9 +668,9 @@ function updateRegistrationRoleHelp() {
   }
   $('r_head_assignment_note').textContent =
     role === 'STAFF'
-      ? 'Assign one or two Supervisors. Either may approve before HR review.'
+      ? 'Assign one or two Supervisors or Admins. Either may approve before HR review.'
       : role === 'SUPERVISOR'
-        ? 'Assign one or two Heads. Either may approve before HR review.'
+        ? 'Assign one or two Heads or Admins. Either may approve before HR review.'
         : 'This role does not need an assigned reviewer.';
 }
 const formData = () => {

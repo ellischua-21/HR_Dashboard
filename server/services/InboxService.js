@@ -48,7 +48,10 @@ async function getInbox(req) {
 
   const targets = [];
   if (['HR', 'ADMIN'].includes(user.role)) {
-    targets.push({ target: 'leave-requests', stage: 'HR' });
+    targets.push({
+      target: 'leave-requests',
+      stage: user.role === 'ADMIN' ? 'ALL' : 'HR'
+    });
   }
   if (
     ['SUPERVISOR', 'HEAD'].includes(user.role) ||
@@ -75,7 +78,7 @@ async function getInbox(req) {
     );
     forms.forEach((form) => {
       const actionable = form.status === 'PENDING' &&
-        (form.review_stage === stage ||
+        (stage === 'ALL' || form.review_stage === stage ||
           (stage === 'HR' && form.template_key === 'nexus-accountability'));
       items.push({
         id: `form-${form.id}`,

@@ -1158,6 +1158,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 1. Inspect Accounts and Account Requests sections.
 2. Check that Refresh reloads counts and saved names.
 3. Open an employee in Edit, change the account role/reviewers or password, and save. As ADMIN, approve or reject the resulting request.
+4. As ADMIN, select ADMIN during registration and when editing another employee; verify it takes effect only after approval. As HR, verify ADMIN is unavailable for assignment and a direct request with role ADMIN fails with 403.
 
 **Expected Result:** Employee Edit loads interactive account controls. Role/reviewer/password changes require ADMIN approval; blank password retains the current password. Profile-only edits create no request. Unsafe role changes (last active ADMIN, designated Head HR, or unresolved reviewer/pending-form responsibilities) are blocked; no general disable/delete control is claimed.
 
@@ -1591,7 +1592,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Module and Feature:** Forms — Supervisor/Head sign and forward  
 **Priority:** Critical  
 **Test Type:** Functional  
-**Required Role:** Assigned SUPERVISOR or HEAD  
+**Required Role:** Assigned SUPERVISOR, HEAD or ADMIN
 **Preconditions:** A pending assigned STAFF/SUPERVISOR ordinary form.
 
 **Test Steps:**
@@ -1599,6 +1600,8 @@ Every listed value, account or browser variant is required. Preserve per-variant
 1. Open Review Requests → View form.
 2. Try approval without signature, then draw it and Sign.
 3. Reload applicant, assigned reviewer and HR queues.
+4. Assign ADMIN in either Reports To/reviewer slot for STAFF and SUPERVISOR; repeat signing and rejection. Check the ADMIN combined queue and inbox before and after forwarding.
+5. Attempt the same actions as an unassigned ADMIN, on an HR-stage form, on an HR employee form, and after the other reviewer has already advanced the stage; verify denial and unchanged data.
 
 **Expected Result:** Required signature enforced; approval forwards with status still PENDING and stage HR; signed-by/time retained; applicant can no longer edit.
 
@@ -1623,7 +1626,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Take Task; approve a leave/correction/overtime form with required signature.
 3. Approve ATD/TRV/TIO/NAC examples using their signature-free HR action.
 
-**Expected Result:** Processing requires ownership; signature required only for configured templates; final APPROVED displays reviewer/time; ADMIN remains view-only.
+**Expected Result:** Processing requires ownership; signature required only for configured templates; final APPROVED displays reviewer/time; ADMIN remains view-only at the HR stage. Explicitly assigned ADMIN first-stage reviews are covered by FORM-14.
 
 **Data Integrity Check:** FORM_REVIEWED and task completion commit with status; no fabricated signature for signature-free templates.
 
@@ -3705,7 +3708,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 
 1. Replay ADMIN dashboard/history as HR or STAFF.
 2. As ADMIN send invalid date, reversed or over-one-year range, unknown reviewer/type/state/interval.
-3. Attempt ADMIN Take Task/form review and HR duration-target endpoint.
+3. Attempt ADMIN Take Task/HR-stage form review and HR duration-target endpoint.
 
 **Expected Result:** Unauthorized analytics denied; invalid filters reject; ADMIN cannot take/process HR tasks; retired duration-target feature/endpoint unavailable.
 

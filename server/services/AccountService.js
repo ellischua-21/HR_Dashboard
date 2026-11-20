@@ -81,8 +81,8 @@ function validateHeadAssignment(
   const head = accountByEmail.get(assignedEmail);
   if (!owner || !owner.active) return { error: 'This account is not active.' };
   const expectedRole = accountRole === 'STAFF' ? 'SUPERVISOR' : 'HEAD';
-  if (!head || !head.active || head.role !== expectedRole) {
-    return { error: `Choose an active ${expectedRole} account.` };
+  if (!head || !head.active || ![expectedRole, 'ADMIN'].includes(head.role)) {
+    return { error: `Choose an active ${expectedRole} or ADMIN account.` };
   }
   return { headEmail: assignedEmail };
 }
@@ -97,10 +97,10 @@ async function listAssignableHeads(req) {
   }
   const [rows] = await pool.query(
     `SELECT email, full_name, role, 'ACTIVE' AS assignment_status
-     FROM user_roles WHERE role IN ('HEAD', 'SUPERVISOR') AND active = 1
+     FROM user_roles WHERE role IN ('HEAD', 'SUPERVISOR', 'ADMIN') AND active = 1
      UNION ALL
      SELECT email, full_name, assigned_role AS role, 'PENDING' AS assignment_status
-     FROM account_requests WHERE assigned_role IN ('HEAD', 'SUPERVISOR')
+     FROM account_requests WHERE assigned_role IN ('HEAD', 'SUPERVISOR', 'ADMIN')
        AND email NOT IN (SELECT email FROM user_roles)
      ORDER BY full_name, email`
   );
@@ -121,6 +121,8 @@ async function createEmployeeAccountRequest(
   const role = String((accountData && accountData.role) || '')
     .trim()
     .toUpperCase();
+  if (role === 'ADMIN' && user.role !== 'ADMIN')
+    throw httpError('Only ADMIN can assign the ADMIN role.', 403);
   const assignedHeadEmail =
     sanitize(accountData && accountData.assignedHeadEmail).toLowerCase() ||
     null;
@@ -131,7 +133,6 @@ async function createEmployeeAccountRequest(
   const email = sanitize(employee.personal_email).toLowerCase();
   const name = sanitize(employee.name);
   let previous = null;
-  let existingAccount = null;
   if (allowExisting) {
     const linked = await getAccountEmployee(email, connection, true);
     if (!linked || linked.record_id !== employee.record_id)
@@ -149,7 +150,6 @@ async function createEmployeeAccountRequest(
       'SELECT assigned_role AS role, password_hash FROM account_requests WHERE email = ? FOR UPDATE',
       [email]
     );
-    existingAccount = account;
     previous = pending || account;
     if (account?.role === 'ADMIN' && user.role !== 'ADMIN')
       throw httpError(
@@ -157,16 +157,8 @@ async function createEmployeeAccountRequest(
         403
       );
   }
-  const keepAdminRole =
-    allowExisting && existingAccount?.role === 'ADMIN' && user.role === 'ADMIN';
-  if (
-    !['STAFF', 'SUPERVISOR', 'HEAD', 'HR'].includes(role) &&
-    !(role === 'ADMIN' && keepAdminRole)
-  ) {
-    throw httpError(
-      'Choose STAFF, SUPERVISOR, HEAD, or HR for the account role.',
-      400
-    );
+  if (!['STAFF', 'SUPERVISOR', 'HEAD', 'HR', 'ADMIN'].includes(role)) {
+    throw httpError('Choose a valid account role.', 400);
   }
   if (!EMAIL_PATTERN.test(email) || email.length > 191) {
     throw httpError('Enter a valid Primary Email to create an account.', 400);
@@ -201,9 +193,9 @@ async function createEmployeeAccountRequest(
     Boolean
   )) {
     const [headRows] = await connection.execute(
-      `SELECT email FROM user_roles WHERE email = ? AND role = ? AND active = 1
+      `SELECT email FROM user_roles WHERE email = ? AND (role = ? OR role = 'ADMIN') AND active = 1
        UNION
-       SELECT email FROM account_requests WHERE email = ? AND assigned_role = ?`,
+       SELECT email FROM account_requests WHERE email = ? AND (assigned_role = ? OR assigned_role = 'ADMIN')`,
       [
         headEmail,
         role === 'STAFF' ? 'SUPERVISOR' : 'HEAD',
@@ -213,7 +205,7 @@ async function createEmployeeAccountRequest(
     );
     if (!headRows.length || headEmail === email) {
       throw httpError(
-        `Choose an active or pending ${role === 'STAFF' ? 'SUPERVISOR' : 'HEAD'} account in Reports To.`,
+        `Choose an active or pending ${role === 'STAFF' ? 'SUPERVISOR' : 'HEAD'} or ADMIN account in Reports To.`,
         400
       );
     }
@@ -353,8 +345,14 @@ async function getAccountManagement(req) {
   const availableHeads = [];
   const availableSupervisors = [];
   accounts.forEach((account) => {
-    if (account.role === 'ADMIN') adminAccounts.push(account);
-    else if (account.role === 'HR') hrAccounts.push(account);
+    if (account.role === 'ADMIN') {
+      adminAccounts.push(account);
+      if (account.active) {
+        const reviewer = { email: account.email, full_name: account.full_name };
+        availableHeads.push(reviewer);
+        availableSupervisors.push(reviewer);
+      }
+    } else if (account.role === 'HR') hrAccounts.push(account);
     else if (account.role === 'SUPERVISOR') {
       supervisorAccounts.push(account);
       if (account.active)
@@ -583,8 +581,7 @@ async function approveAccountRequest(req, requestId) {
       'SELECT email, role, active, is_hr_head FROM user_roles FOR UPDATE'
     );
     const existingAccount = accounts.find(account => account.email.toLowerCase() === accountRequest.email.toLowerCase());
-    if (!['STAFF', 'SUPERVISOR', 'HEAD', 'HR'].includes(role) &&
-        !(role === 'ADMIN' && existingAccount?.role === 'ADMIN')) {
+    if (!['STAFF', 'SUPERVISOR', 'HEAD', 'HR', 'ADMIN'].includes(role)) {
       throw httpError(
         'This request has no valid assigned role; reject it and recreate it from Employee Registration.',
         400
@@ -633,7 +630,7 @@ async function approveAccountRequest(req, requestId) {
     for (const headEmail of [accountRequest.assigned_head_email, accountRequest.secondary_head_email].filter(Boolean)) {
       if (headEmail === accountRequest.email) throw httpError('An account cannot be assigned to itself.', 400);
       const [heads] = await connection.execute(
-        `SELECT email FROM user_roles WHERE email = ? AND role = ? AND active = 1`,
+        `SELECT email FROM user_roles WHERE email = ? AND (role = ? OR role = 'ADMIN') AND active = 1`,
         [
           headEmail,
           role === 'STAFF' ? 'SUPERVISOR' : 'HEAD'
