@@ -47,11 +47,11 @@ Keep page components inside the isolated `#main` stacking context and use the sh
 
 ## First-time setup
 
-Login requires exactly one non-archived record in the central `employees` table whose Email matches the account email. The sole exception is the first setup ADMIN created by `create-user` when the accounts table is empty. That account can sign in without an employee record to import the master list and set up the system. The exception is stored on that specific account and applies only while its role is ADMIN; creating other accounts never grants it. Login and existing sessions both enforce these rules.
+Login requires exactly one non-archived record in the central `employees` table whose Primary Email matches the account email. The sole exception is the first setup ADMIN created by `create-user` when the accounts table is empty. That account can sign in without an employee record to import the master list and set up the system. The exception is stored on that specific account and applies only while its role is ADMIN; creating other accounts never grants it. Login and existing sessions both enforce these rules.
 
 Credentials and permissions stay in `user_roles`; Master List, HR Reports, form autofill and leave eligibility use the central employee records. Setup does not create a placeholder employee. If a matching employee record is imported later, the setup ADMIN uses that employee's details automatically. All subsequent accounts, including additional ADMIN and HR accounts, need a genuine employee record first. Importing a profile does not replace its account password or role.
 
-Nonblank login Emails are reserved across current and archived employees,
+Nonblank Primary Emails are reserved across current and archived employees,
 ignoring case and surrounding whitespace. Linked account emails (including inactive
 accounts) and pending-request emails cannot be changed through employee editing.
 Equivalent edits retain the stored spelling. Imports still permit blank emails;
@@ -105,7 +105,7 @@ and isolated QA scenarios.
 
 ## Account registration and management
 
-There is no public account-request option on the sign-in screen. HR and ADMIN create account requests through **Employee Registration** using the employee's Email, role and initial password. STAFF requires an assigned SUPERVISOR, and SUPERVISOR requires an assigned HEAD. New accounts remain unable to sign in until an ADMIN approves them.
+There is no public account-request option on the sign-in screen. HR and ADMIN create account requests through **Employee Registration** using the employee's Primary Email, role and initial password. STAFF requires an assigned SUPERVISOR, and SUPERVISOR requires an assigned HEAD. New accounts remain unable to sign in until an ADMIN approves them. Registration without Primary Email saves an employee record without an account request, role, password or reviewer requirement. Secondary Email and Corporate Email do not create accounts. Imports also retain employees without Primary Email in records and reports.
 
 All users can change their own password by entering the current password and a new password (12–128 characters) in **Change Password**. ADMIN manages registration requests and accounts in **Manage Accounts**.
 
@@ -143,14 +143,19 @@ Employee fields reflect the 63 headers in the supplied Employee Master List
 workbook. Registration keeps its existing section layout and field order, with
 generated record information available in the master list and HR reports instead.
 The Employee Master List, HR Reports master list and master CSV use those
-63 headers plus HMO Details immediately after HMO Provider, for 64 columns.
+63 original headers with Email renamed Primary Email, Landline Number removed,
+and HMO Details and Secondary Email added, for 64 columns.
 Tenure follows Date of Employment, Age follows Birthday, and the internal
 Record ID is excluded from the report columns. Employee details remain accessible
 through the row action.
-**Email** is the former **Personal Email** label and continues using `personal_email`
+**Primary Email** is the former **Personal Email** / **Email** label and continues using `personal_email`
 for login/account linking. **Corporate Email** is an independent optional validated
 address stored in `corp_email`; it does not replace a login or change an account.
-The existing initializer adds this column when missing and preserves stored
+Secondary Email is optional, email-validated, and stored in `secondary_email`;
+it is not used for login or account linking. Landline Number is removed from the
+field definitions and database; startup drops the legacy `landline_no` column.
+Mobile Number remains text, allowing multiple contact numbers in one cell.
+The existing initializer adds missing email columns and preserves stored
 addresses. Its older `corp_email`-to-login compatibility migration is retained
 for installations predating `personal_email`, then a separate corporate field is
 added. This code change does not itself run the initializer or import workbook rows.
@@ -160,8 +165,7 @@ appears in registration. Name of Employee, Tenure, No., Record Status, Date Crea
 Created By, Modified By and Last Modified do not appear in registration or editing;
 they remain available in the master list and HR reports and controlled by the
 server. Internal record IDs,
-legacy supporting-document storage and existing audit/history columns are retained,
-not deleted to match a spreadsheet. Import mapping now recognizes Email and
+legacy supporting-document storage and existing audit/history columns are retained. Import mapping recognizes Primary Email, Secondary Email and
 Corporate Email separately; calculated and audit columns are not writable imports.
 HMO Details is an optional text field immediately after HMO Provider in the form,
 master list, HR master report, HMO enrollment report, import template, and exports.
@@ -175,7 +179,7 @@ labeled for editing in the employee form. Neither can overwrite generated data
 through import. Selecting a file or downloading the template fetches fresh field
 metadata from the API.
 
-Export the current employee rows from the source spreadsheet to CSV or Excel, then use **Employee master list → Import** in the local dashboard. Map the spreadsheet headers to the matching employee fields, validate, and import. The normal validation, duplicate employee-number check, permissions, and audit logging apply. Company, work location, department, and employee rank dropdowns use the approved lists in `server/config/EmployeeSchema.js`. Startup replaces only these four lookup groups transactionally, removing obsolete choices without modifying existing employee records. Other lookup groups, including HMO Provider, retain their existing configuration. Imports normalize capitalization and repeated spaces to the configured spelling.
+Export the current employee rows from the source spreadsheet to CSV or Excel, then use **Employee master list → Import** in the local dashboard. Map the spreadsheet headers to the matching employee fields, validate, and import. The normal validation, duplicate employee-number check, permissions, and audit logging apply. Company, work location, department, and employee rank dropdowns use the approved lists in `server/config/EmployeeSchema.js`. Startup seeds missing defaults without replacing saved choices. ADMIN can add companies, work locations and departments from Manage Accounts > Organization Settings; additions persist across restarts and are available in employee dropdowns. Other lookup groups, including HMO Provider, retain their existing configuration. Imports normalize capitalization and repeated spaces to the configured spelling.
 
 For manual account provisioning, bootstrap or recovery administrators can use `npm.cmd run create-user`; routine STAFF/SUPERVISOR/HEAD/HR account creation should use Employee Registration so an ADMIN can approve it. Google account roles are not copied automatically. The existing import/export feature does not carry supporting-document files, matching the original report behavior.
 
@@ -189,7 +193,7 @@ For manual account provisioning, bootstrap or recovery administrators can use `n
   saves record audit events in the same transaction as their changes. An audit
   failure rolls back the save. Event details contain assignment/row counts and
   approver-selection status, without copying employee details or policy text.
-- Only HR and ADMIN can create accounts, using Employee Registration. Email is the login email; HR/ADMIN select STAFF, SUPERVISOR, HEAD, or HR and set an initial password. New accounts remain pending until an ADMIN approves them. STAFF needs a Supervisor and SUPERVISOR needs a Head selected in Reports To; pending reviewers must be approved first.
+- Only HR and ADMIN can create accounts, using Employee Registration. Primary Email is the login email; HR/ADMIN select STAFF, SUPERVISOR, HEAD, or HR and set an initial password. New accounts remain pending until an ADMIN approves them. STAFF needs a Supervisor and SUPERVISOR needs a Head selected in Reports To; pending reviewers must be approved first.
 - HR and ADMIN can publish announcements from the Announcements tab. STAFF, SUPERVISOR and HEAD see unacknowledged announcements in a blurred modal after login; acknowledging records that announcement as seen for that account.
 - All roles have an Inbox. STAFF, SUPERVISOR and HEAD see new and previously acknowledged HR announcements. Supervisors and Heads see forms assigned to them; HR and ADMIN see forms at the HR review stage; the Head HR also sees forms submitted by other HR accounts. Reviewed form notifications remain in the Inbox. Inbox filters support item type and status, and form items open the shared Manage Forms tab.
 - Existing report, import, export, employee privacy, audit, and role-permission rules are enforced by the API, not by the browser.
@@ -313,3 +317,40 @@ Optional synthetic data commands (use an active account with the indicated permi
 npm.cmd run sample-data -- generate hr-admin@example.com 60
 npm.cmd run sample-data -- archive hr-admin@example.com
 ```
+
+### Two assigned form reviewers
+
+STAFF accounts can have one or two SUPERVISOR reviewers; SUPERVISOR accounts can
+have one or two HEAD reviewers. Manage Accounts and new registration support an
+optional second reviewer. Either may approve or reject; the existing row lock
+serializes decisions, and the first approval advances the form to HR. Only the
+acting reviewer's signature and identity are recorded for that stage. Both
+reviewers receive queue/inbox access; unrelated accounts retain no access.
+
+`user_roles.secondary_head_email` and `account_requests.secondary_head_email`
+store the optional second assignment. New submissions snapshot it into
+`user_forms.secondary_head_reviewer_email`; older submissions retain their
+original assignments. Startup adds missing nullable columns without backfilling
+reviewers or changing historical decisions. The existing primary columns remain
+compatible with single-reviewer accounts and API callers. Head HR and incident
+department review assignments retain their existing routing.
+
+### Manage Accounts tabs and organization settings
+
+Manage Accounts shows STAFF, SUPERVISOR, HEAD, HR and ADMINS as role tabs, with
+one full-width list visible at a time. Switching tabs preserves staged reviewer
+and Head HR assignments until Save Changes is selected.
+
+Organization Settings lets ADMIN add a Company Name, Work Location or Department.
+Add saves the name immediately through the ADMIN-only `addEmployeeLookupValue`
+API, with server validation, case-insensitive duplicate handling, parameterized
+SQL, a transaction and audit logging. Choices are stored in `lookup_values` and
+remain available after restart. Registration and master-list options refresh;
+report and dashboard filter options refresh within the current browser too.
+
+Department Heads and the Management Approver are configured in this tab through
+the existing incident configuration service and Save Changes. Departments include
+configured choices plus existing employee/assignment departments for compatibility.
+The Heads group retains its two ADMIN reviewer slots and existing case routing.
+Adding a department preserves unsaved department Head and Management Approver
+selections. Historical case assignments are unchanged.

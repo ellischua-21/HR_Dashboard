@@ -65,6 +65,20 @@ async function initializeDatabase() {
   if (!legacyCorpEmailColumn.length || !personalEmailColumn.length)
     await pool.query('ALTER TABLE employees ADD COLUMN corp_email TEXT NULL');
 
+  const [secondaryEmailColumn] = await pool.query(
+    "SHOW COLUMNS FROM employees LIKE 'secondary_email'"
+  );
+  if (!secondaryEmailColumn.length)
+    await pool.query(
+      'ALTER TABLE employees ADD COLUMN secondary_email TEXT NULL AFTER personal_email'
+    );
+
+  const [landlineColumn] = await pool.query(
+    "SHOW COLUMNS FROM employees LIKE 'landline_no'"
+  );
+  if (landlineColumn.length)
+    await pool.query('ALTER TABLE employees DROP COLUMN landline_no');
+
   const [hmoDetailsColumn] = await pool.query(
     "SHOW COLUMNS FROM employees LIKE 'hmo_details'"
   );
@@ -109,6 +123,13 @@ async function initializeDatabase() {
       'ALTER TABLE user_roles ADD COLUMN assigned_head_email VARCHAR(191) NULL AFTER role'
     );
   }
+  const [secondaryHeadColumns] = await pool.query(
+    "SHOW COLUMNS FROM user_roles LIKE 'secondary_head_email'"
+  );
+  if (!secondaryHeadColumns.length)
+    await pool.query(
+      'ALTER TABLE user_roles ADD COLUMN secondary_head_email VARCHAR(191) NULL AFTER assigned_head_email'
+    );
   const [hrHeadColumns] = await pool.query(
     "SHOW COLUMNS FROM user_roles LIKE 'is_hr_head'"
   );
@@ -142,7 +163,8 @@ async function initializeDatabase() {
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
   const accountRequestColumns = [
     ['assigned_role', "VARCHAR(16) NOT NULL DEFAULT 'STAFF' AFTER email"],
-    ['assigned_head_email', 'VARCHAR(191) NULL AFTER assigned_role']
+    ['assigned_head_email', 'VARCHAR(191) NULL AFTER assigned_role'],
+    ['secondary_head_email', 'VARCHAR(191) NULL AFTER assigned_head_email']
   ];
   for (const [column, definition] of accountRequestColumns) {
     const [existing] = await pool.query(
@@ -205,6 +227,7 @@ async function initializeDatabase() {
   const formColumns = [
     ['review_stage', "VARCHAR(10) NOT NULL DEFAULT 'HR' AFTER status"],
     ['head_reviewer_email', 'VARCHAR(191) NULL AFTER review_stage'],
+    ['secondary_head_reviewer_email', 'VARCHAR(191) NULL AFTER head_reviewer_email'],
     ['head_signature', 'MEDIUMTEXT NULL AFTER head_reviewer_email'],
     ['head_signed_by', 'VARCHAR(191) NULL AFTER head_signature'],
     ['head_signed_at', 'TIMESTAMP NULL AFTER head_signed_by'],
@@ -886,17 +909,6 @@ async function initializeDatabase() {
   await require('./IncidentWorkflowSchema').initializeIncidentWorkflowSchema(pool);
   await require('./TaskSchema').initializeTaskSchema(pool);
 
-  const lookupConnection = await pool.getConnection();
-  try {
-    await lookupConnection.beginTransaction();
-    await replaceEmployeeLookupValues(lookupConnection);
-    await lookupConnection.commit();
-  } catch (error) {
-    await lookupConnection.rollback();
-    throw error;
-  } finally {
-    lookupConnection.release();
-  }
   const insertLookup =
     'INSERT IGNORE INTO lookup_values (list_name, `value`, active) VALUES (?, ?, 1)';
   for (const [listName, values] of Object.entries(LISTS)) {
@@ -923,24 +935,6 @@ async function initializeDatabase() {
     await syncCounter(connection);
   } finally {
     connection.release();
-  }
-}
-
-async function replaceEmployeeLookupValues(connection) {
-  for (const listName of [
-    'Company_List',
-    'Location_List',
-    'Department_List',
-    'Employee_Rank_List'
-  ]) {
-    await connection.execute('DELETE FROM lookup_values WHERE list_name = ?', [
-      listName
-    ]);
-    for (const value of LISTS[listName])
-      await connection.execute(
-        'INSERT INTO lookup_values (list_name, `value`, active) VALUES (?, ?, 1)',
-        [listName, value]
-      );
   }
 }
 
@@ -985,7 +979,6 @@ async function syncCounter(connection) {
 module.exports = {
   pool,
   initializeDatabase,
-  replaceEmployeeLookupValues,
   getLists,
   nextSequence,
   syncCounter,

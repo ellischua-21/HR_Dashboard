@@ -67,7 +67,7 @@ async function importEmployees(req, records, commit) {
       const email = normalizeEmail(clean.personal_email);
       if (email && existingEmails.has(email)) rowErrors.push(DUPLICATE_EMAIL);
       if (email && seenEmails.has(email))
-        rowErrors.push('Duplicate Email in file.');
+        rowErrors.push('Duplicate Primary Email in file.');
       if (employeeNumber && existing.has(employeeNumber))
         rowErrors.push('Employee Number already exists');
       if (employeeNumber && seen.has(employeeNumber))

@@ -42,7 +42,7 @@ async function main() {
     const resettingSetupAdmin = role === 'ADMIN' && isSetupAdministrator(existing);
     if (!employee && !firstSetupAdmin && !resettingSetupAdmin) {
       throw new Error(
-        'Create or import one non-archived employee record with this Personal Email before creating the login account. Only the first ADMIN on an empty accounts table can be created without an employee record.'
+        'Create or import one non-archived employee record with this Primary Email before creating the login account. Only the first ADMIN on an empty accounts table can be created without an employee record.'
       );
     }
     await connection.execute(

@@ -6,7 +6,7 @@ const { logAudit } = require('./AuditService');
 const { sanitize, isValidDate } = require('../utils/Validation');
 const FORM_TEMPLATES = require('../../shared/FormTemplates');
 const { hasSufficientExplanation } = require('../../shared/FormValidation');
-const { canEditForm } = require('../../shared/FormStatus');
+const { canEditForm, isAssignedReviewer } = require('../../shared/FormStatus');
 const { httpError } = require('../utils/HttpError');
 const { buildReviewScope } = require('./FormReviewScope');
 const LeaveService = require('./LeaveService');
@@ -373,15 +373,39 @@ async function getAssignedFormReviewer(email) {
             CASE WHEN owner.role = 'HR' AND owner.is_hr_head = 0
               THEN COALESCE(NULLIF(hr_head.full_name, ''), hr_head.email)
               ELSE COALESCE(NULLIF(h.full_name, ''), h.email) END AS full_name,
+            h2.email AS secondary_email, h2.full_name AS secondary_name, h2.active AS secondary_active,
             CASE WHEN owner.role = 'HR' AND owner.is_hr_head = 0 THEN hr_head.active ELSE h.active END AS active
      FROM user_roles owner
      LEFT JOIN user_roles h ON h.email = owner.assigned_head_email
+     LEFT JOIN user_roles h2 ON h2.email = owner.secondary_head_email AND owner.role IN ('STAFF', 'SUPERVISOR')
      LEFT JOIN user_roles hr_head ON hr_head.role = 'HR' AND hr_head.is_hr_head = 1 AND hr_head.active = 1
      WHERE owner.email = ? AND owner.active = 1 LIMIT 1`,
     [email]
   );
   return head && head.email
-    ? { email: head.email, full_name: head.full_name, active: Boolean(head.active) }
+    ? {
+        email: head.email,
+        full_name: [head.full_name, head.secondary_name || head.secondary_email]
+          .filter(Boolean)
+          .join(' / '),
+        active: Boolean(head.active),
+        reviewers: [
+          {
+            email: head.email,
+            full_name: head.full_name,
+            active: Boolean(head.active)
+          },
+          ...(head.secondary_email
+            ? [
+                {
+                  email: head.secondary_email,
+                  full_name: head.secondary_name || head.secondary_email,
+                  active: Boolean(head.secondary_active)
+                }
+              ]
+            : [])
+        ]
+      }
     : null;
 }
 
@@ -403,7 +427,7 @@ async function listMyForms(req) {
   const [rows] = await pool.execute(
     `SELECT f.id, f.control_no, f.template_key, f.form_data, f.status, f.review_stage,
             f.head_signature, f.head_signed_by, f.head_signed_at, f.hr_signature,
-            f.submitted_at, f.reviewed_by, f.reviewed_at, f.review_notes, f.head_reviewer_email,
+            f.submitted_at, f.reviewed_by, f.reviewed_at, f.review_notes, f.head_reviewer_email, f.secondary_head_reviewer_email,
             EXISTS (SELECT 1 FROM hr_tasks task WHERE task.resource_type = 'FORM' AND task.resource_id = f.id AND task.owner_email IS NOT NULL) AS task_taken,
             COALESCE(NULLIF(reviewer.full_name, ''), 'HR/Admin') AS reviewed_by_name,
             reviewer.role AS reviewed_by_role,
@@ -430,17 +454,19 @@ async function listMyForms(req) {
   };
 }
 
-async function getSubmissionHead(email, role) {
+async function getSubmissionHeads(email, role) {
   const [rows] = await pool.execute(
-    `SELECT u.assigned_head_email, u.is_hr_head,
-            h.role AS head_role, h.active AS head_active
+    `SELECT u.assigned_head_email, u.secondary_head_email, u.is_hr_head,
+            h.role AS head_role, h.active AS head_active,
+            h2.role AS secondary_role, h2.active AS secondary_active
      FROM user_roles u LEFT JOIN user_roles h ON h.email = u.assigned_head_email
+     LEFT JOIN user_roles h2 ON h2.email = u.secondary_head_email
      WHERE u.email = ? AND u.active = 1 LIMIT 1`,
     [email]
   );
   if (!rows.length) throw httpError('Your account is not active.', 401);
   if (role === 'HR') {
-    if (rows[0].is_hr_head) return null;
+    if (rows[0].is_hr_head) return [];
     const [heads] = await pool.query(
       "SELECT email FROM user_roles WHERE role = 'HR' AND active = 1 AND is_hr_head = 1 LIMIT 1"
     );
@@ -449,7 +475,7 @@ async function getSubmissionHead(email, role) {
         'An Admin must designate an active HR account as Head HR before HR forms can be submitted.',
         409
       );
-    return heads[0].email;
+    return [heads[0].email];
   }
   const assignedHead = rows[0].assigned_head_email;
   if (!assignedHead) {
@@ -458,18 +484,40 @@ async function getSubmissionHead(email, role) {
         `An Admin must assign a ${role === 'STAFF' ? 'Supervisor' : 'Head'} to your account before you can submit forms.`,
         409
       );
-    return null;
+    return [];
   }
-  if (
-    rows[0].head_role !== (role === 'STAFF' ? 'SUPERVISOR' : 'HEAD') ||
-    !rows[0].head_active
-  ) {
+  const expectedRole = role === 'STAFF' ? 'SUPERVISOR' : 'HEAD';
+  const candidates = [
+    {
+      email: assignedHead,
+      role: rows[0].head_role,
+      active: rows[0].head_active
+    },
+    {
+      email: rows[0].secondary_head_email,
+      role: rows[0].secondary_role,
+      active: rows[0].secondary_active
+    }
+  ];
+  const available = [
+    ...new Set(
+      candidates
+        .filter(
+          (head) =>
+            head.email &&
+            head.email !== email &&
+            head.role === expectedRole &&
+            head.active
+        )
+        .map((head) => head.email)
+    )
+  ];
+  if (!available.length)
     throw httpError(
       `Your assigned ${role === 'STAFF' ? 'Supervisor' : 'Head'} is inactive or has an invalid role. Contact an Admin before submitting.`,
       409
     );
-  }
-  return assignedHead;
+  return available;
 }
 
 async function checkPaidLeave(email, data) {
@@ -491,7 +539,7 @@ async function submitLeaveForm(req, data = {}) {
   if (errors.length) throw httpError(errors.join(' '), 400);
   await checkPaidLeave(user.email, formData);
 
-  const headEmail = await getSubmissionHead(user.email, user.role);
+  const headEmails = await getSubmissionHeads(user.email, user.role);
   const cleanData = {
     ...formData,
     name: sanitize(formData.name),
@@ -512,7 +560,7 @@ async function submitLeaveForm(req, data = {}) {
   return persistUserForm(
     user.email,
     user.role,
-    headEmail,
+    headEmails,
     'leave-2026',
     cleanData,
     'Leave Application'
@@ -534,14 +582,14 @@ async function submitUserForm(req, templateKey, data = {}) {
   if (errors.length) throw httpError(errors.join(' '), 400);
 
   const template = FORM_TEMPLATES.find((item) => item.key === templateKey);
-  const headEmail =
+  const headEmails =
     template.headReviewRequired === false
-      ? null
-      : await getSubmissionHead(user.email, user.role);
+      ? []
+      : await getSubmissionHeads(user.email, user.role);
   return persistUserForm(
     user.email,
     user.role,
-    headEmail,
+    headEmails,
     templateKey,
     cleanData,
     template.title
@@ -654,11 +702,12 @@ async function updateMyForm(req, formId, templateKey, data = {}) {
 async function persistUserForm(
   email,
   role,
-  headEmail,
+  headEmails,
   templateKey,
   formData,
   description
 ) {
+  const [headEmail = null, secondaryHeadEmail = null] = headEmails;
   const template = FORM_TEMPLATES.find((item) => item.key === templateKey);
   if (!template) throw httpError('Choose a valid form template.', 400);
   const connection = await pool.getConnection();
@@ -666,14 +715,15 @@ async function persistUserForm(
     await connection.beginTransaction();
     const [result] = await connection.execute(
       `INSERT INTO user_forms
-         (control_no, user_email, template_key, form_data, status, review_stage, head_reviewer_email)
-       VALUES (NULL, ?, ?, ?, 'PENDING', ?, ?)`,
+         (control_no, user_email, template_key, form_data, status, review_stage, head_reviewer_email, secondary_head_reviewer_email)
+       VALUES (NULL, ?, ?, ?, 'PENDING', ?, ?, ?)`,
       [
         email,
         templateKey,
         JSON.stringify(formData),
         headEmail ? 'HEAD' : 'HR',
-        headEmail
+        headEmail,
+        secondaryHeadEmail
       ]
     );
     const id = result.insertId;
@@ -798,7 +848,7 @@ async function listFormsForReview(req, scope = 'HR', filters = {}) {
   );
   const [rows] = await pool.execute(
     `SELECT f.id, f.control_no, f.user_email, u.role AS submitter_role, u.full_name AS applicant_name,
-            f.template_key, f.form_data, f.status, f.review_stage, f.head_reviewer_email,
+            f.template_key, f.form_data, f.status, f.review_stage, f.head_reviewer_email, f.secondary_head_reviewer_email,
             f.head_signature, f.head_signed_by, f.head_signed_at, f.hr_signature, f.submitted_at,
             f.reviewed_by, f.reviewed_at, f.review_notes,
             COALESCE(NULLIF(reviewer.full_name, ''), 'HR/Admin') AS reviewed_by_name,
@@ -888,7 +938,7 @@ async function reviewUserForm(
   try {
     await connection.beginTransaction();
     const [rows] = await connection.execute(
-      `SELECT f.id, f.control_no, f.status, f.review_stage, f.head_reviewer_email,
+      `SELECT f.id, f.control_no, f.status, f.review_stage, f.head_reviewer_email, f.secondary_head_reviewer_email,
               f.user_email, f.template_key, f.form_data, applicant.role AS submitter_role
        FROM user_forms f LEFT JOIN user_roles applicant ON applicant.email = f.user_email
        WHERE f.id = ? FOR UPDATE`,
@@ -918,7 +968,7 @@ async function reviewUserForm(
           'Access denied: this form requires its assigned reviewer.',
           403
         );
-      if (rows[0].head_reviewer_email !== reviewer.email) {
+      if (!isAssignedReviewer(rows[0], reviewer.email)) {
         throw httpError('This form is not assigned to you.', 403);
       }
     } else {

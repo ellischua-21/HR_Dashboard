@@ -1,4 +1,4 @@
-const { pool } = require('../db/database');
+const { pool, getLists } = require('../db/database');
 const { httpError } = require('../utils/HttpError');
 const { ACCOUNT_ROLE_MAP } = require('../config/Permissions');
 const { requirePerm } = require('../middleware/Auth');
@@ -123,6 +123,8 @@ async function createEmployeeAccountRequest(
   const assignedHeadEmail =
     sanitize(accountData && accountData.assignedHeadEmail).toLowerCase() ||
     null;
+  const secondaryHeadEmail =
+    sanitize(accountData && accountData.secondaryHeadEmail).toLowerCase() || null;
   const password = accountData && accountData.password;
   const email = sanitize(employee.personal_email).toLowerCase();
   const name = sanitize(employee.name);
@@ -133,7 +135,7 @@ async function createEmployeeAccountRequest(
     );
   }
   if (!EMAIL_PATTERN.test(email) || email.length > 191) {
-    throw httpError('Enter a valid Email to create an account.', 400);
+    throw httpError('Enter a valid Primary Email to create an account.', 400);
   }
   if (
     typeof password !== 'string' ||
@@ -151,25 +153,27 @@ async function createEmployeeAccountRequest(
       400
     );
   }
-  if (!['STAFF', 'SUPERVISOR'].includes(role) && assignedHeadEmail) {
+  if (!['STAFF', 'SUPERVISOR'].includes(role) && (assignedHeadEmail || secondaryHeadEmail)) {
     throw httpError(
       'Only STAFF and SUPERVISOR accounts can be assigned a reviewer.',
       400
     );
   }
-  if (assignedHeadEmail) {
+  if (secondaryHeadEmail && secondaryHeadEmail === assignedHeadEmail)
+    throw httpError('Choose two different reviewers.', 400);
+  for (const headEmail of [assignedHeadEmail, secondaryHeadEmail].filter(Boolean)) {
     const [headRows] = await connection.execute(
       `SELECT email FROM user_roles WHERE email = ? AND role = ? AND active = 1
        UNION
        SELECT email FROM account_requests WHERE email = ? AND assigned_role = ?`,
       [
-        assignedHeadEmail,
+        headEmail,
         role === 'STAFF' ? 'SUPERVISOR' : 'HEAD',
-        assignedHeadEmail,
+        headEmail,
         role === 'STAFF' ? 'SUPERVISOR' : 'HEAD'
       ]
     );
-    if (!headRows.length || assignedHeadEmail === email) {
+    if (!headRows.length || headEmail === email) {
       throw httpError(
         `Choose an active or pending ${role === 'STAFF' ? 'SUPERVISOR' : 'HEAD'} account in Reports To.`,
         400
@@ -184,40 +188,85 @@ async function createEmployeeAccountRequest(
   );
   if (existing.length) {
     throw httpError(
-      'An account or pending request already exists for this Email.',
+      'An account or pending request already exists for this Primary Email.',
       409
     );
   }
   await connection.execute(
     `INSERT INTO account_requests
-       (full_name, email, assigned_role, assigned_head_email, password_hash)
-     VALUES (?, ?, ?, ?, ?)`,
-    [name, email, role, assignedHeadEmail, hashPassword(password)]
+       (full_name, email, assigned_role, assigned_head_email, secondary_head_email, password_hash)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [name, email, role, assignedHeadEmail, secondaryHeadEmail, hashPassword(password)]
   );
   await logAudit(
     user.email,
     'ACCOUNT_REQUESTED',
     '',
-    `${email} requested as ${role}${assignedHeadEmail ? `; Reviewer ${assignedHeadEmail}` : ''}`,
+    `${email} requested as ${role}${assignedHeadEmail ? `; Reviewers ${[assignedHeadEmail, secondaryHeadEmail].filter(Boolean).join(", ")}` : ''}`,
     connection
   );
+}
+
+async function addEmployeeLookupValue(req, listName, value) {
+  const admin = await requirePerm(req, 'admin.manage');
+  if (admin.role !== 'ADMIN')
+    throw httpError('Only ADMIN can add organization choices.', 403);
+  if (!['Company_List', 'Location_List', 'Department_List'].includes(listName))
+    throw httpError('Choose Company Name, Work Location, or Department.', 400);
+  if (typeof value !== 'string') throw httpError('Enter a valid name.', 400);
+  const name = value.trim().replace(/\s+/g, ' ');
+  if (!name || name.length > 191 || sanitize(name) !== name)
+    throw httpError(
+      'Enter a name of 1 to 191 characters without unsupported symbols.',
+      400
+    );
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    await connection.execute(
+      'INSERT INTO lookup_values (list_name, `value`, active) VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE active = 1',
+      [listName, name]
+    );
+    const [[stored]] = await connection.execute(
+      'SELECT `value` FROM lookup_values WHERE list_name = ? AND `value` = ?',
+      [listName, name]
+    );
+    await logAudit(
+      admin.email,
+      'LOOKUP_ADDED',
+      '',
+      `${listName}: ${stored.value}`,
+      connection
+    );
+    await connection.commit();
+    return { ok: true, value: stored.value };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 async function getAccountManagement(req) {
   await requirePerm(req, 'admin.manage');
   const [requests] = await pool.query(
-    `SELECT r.id, r.full_name, r.email, r.assigned_role, r.assigned_head_email,
+    `SELECT r.id, r.full_name, r.email, r.assigned_role, r.assigned_head_email, r.secondary_head_email,
             COALESCE(NULLIF(h.full_name, ''), NULLIF(p.full_name, ''), r.assigned_head_email, '') AS assigned_head_name,
+            COALESCE(NULLIF(h2.full_name, ''), NULLIF(p2.full_name, ''), r.secondary_head_email, '') AS secondary_head_name,
             r.requested_at
      FROM account_requests r
      LEFT JOIN user_roles h ON h.email = r.assigned_head_email
      LEFT JOIN account_requests p ON p.email = r.assigned_head_email
+     LEFT JOIN user_roles h2 ON h2.email = r.secondary_head_email
+     LEFT JOIN account_requests p2 ON p2.email = r.secondary_head_email
      ORDER BY r.requested_at, r.id`
   );
   const [accounts] = await pool.query(
-    `SELECT u.email, u.full_name, u.role, u.active, u.created_at, u.assigned_head_email, u.is_hr_head,
-            h.full_name AS assigned_head_name
+    `SELECT u.email, u.full_name, u.role, u.active, u.created_at, u.assigned_head_email, u.secondary_head_email, u.is_hr_head,
+            h.full_name AS assigned_head_name, h2.full_name AS secondary_head_name
      FROM user_roles u LEFT JOIN user_roles h ON h.email = u.assigned_head_email
+     LEFT JOIN user_roles h2 ON h2.email = u.secondary_head_email
      ORDER BY u.role, u.email`
   );
 
@@ -250,6 +299,7 @@ async function getAccountManagement(req) {
 
   return {
     requests,
+    lookupLists: await getLists(),
     accounts: {
       users: userAccounts,
       heads: headAccounts,
@@ -297,7 +347,7 @@ async function saveAccountChanges(req, changes) {
   try {
     await connection.beginTransaction();
     const [accounts] = await connection.query(
-      'SELECT email, role, active, assigned_head_email, is_hr_head FROM user_roles FOR UPDATE'
+      'SELECT email, role, active, assigned_head_email, secondary_head_email, is_hr_head FROM user_roles FOR UPDATE'
     );
     const byEmail = new Map(
       accounts.map((account) => [account.email.toLowerCase(), account])
@@ -326,7 +376,16 @@ async function saveAccountChanges(req, changes) {
         accounts
       );
       if (assignment.error) throw httpError(assignment.error, 400);
-      normalizedAssignments.push({ email, headEmail: assignment.headEmail });
+      const secondaryHeadEmail = Object.prototype.hasOwnProperty.call(item, 'secondaryHeadEmail')
+        ? sanitize(item.secondaryHeadEmail).toLowerCase()
+        : owner.secondary_head_email || '';
+      if (secondaryHeadEmail) {
+        if (secondaryHeadEmail === assignment.headEmail)
+          throw httpError('Choose two different reviewers.', 400);
+        const secondary = validateHeadAssignment(email, owner.role, secondaryHeadEmail, accounts);
+        if (secondary.error) throw httpError(secondary.error, 400);
+      }
+      normalizedAssignments.push({ email, headEmail: assignment.headEmail, secondaryHeadEmail: secondaryHeadEmail || null });
     }
 
     let targetHrHead = null;
@@ -347,14 +406,14 @@ async function saveAccountChanges(req, changes) {
 
     for (const assignment of normalizedAssignments) {
       await connection.execute(
-        'UPDATE user_roles SET assigned_head_email = ? WHERE email = ?',
-        [assignment.headEmail, assignment.email]
+        'UPDATE user_roles SET assigned_head_email = ?, secondary_head_email = ? WHERE email = ?',
+        [assignment.headEmail, assignment.secondaryHeadEmail, assignment.email]
       );
       await logAudit(
         admin.email,
         'HEAD_ASSIGNED',
         '',
-        `${assignment.email} assigned to reviewer ${assignment.headEmail || 'none'}`,
+        `${assignment.email} assigned to reviewer ${[assignment.headEmail, assignment.secondaryHeadEmail].filter(Boolean).join(', ') || 'none'}`,
         connection
       );
     }
@@ -425,7 +484,7 @@ async function approveAccountRequest(req, requestId) {
     unlock = await acquireEmployeeIdentityLock(connection);
     await connection.beginTransaction();
     const [requests] = await connection.execute(
-      `SELECT id, full_name, email, assigned_role, assigned_head_email, password_hash
+      `SELECT id, full_name, email, assigned_role, assigned_head_email, secondary_head_email, password_hash
        FROM account_requests WHERE id = ? FOR UPDATE`,
       [requestId]
     );
@@ -462,18 +521,21 @@ async function approveAccountRequest(req, requestId) {
     }
     if (
       !['STAFF', 'SUPERVISOR'].includes(role) &&
-      accountRequest.assigned_head_email
+      (accountRequest.assigned_head_email || accountRequest.secondary_head_email)
     ) {
       throw httpError(
         'This request has an invalid reviewer assignment. Reject it and recreate it from Employee Registration.',
         400
       );
     }
-    if (accountRequest.assigned_head_email) {
+    if (accountRequest.secondary_head_email && accountRequest.secondary_head_email === accountRequest.assigned_head_email)
+      throw httpError('Choose two different reviewers.', 400);
+    for (const headEmail of [accountRequest.assigned_head_email, accountRequest.secondary_head_email].filter(Boolean)) {
+      if (headEmail === accountRequest.email) throw httpError('An account cannot be assigned to itself.', 400);
       const [heads] = await connection.execute(
         `SELECT email FROM user_roles WHERE email = ? AND role = ? AND active = 1`,
         [
-          accountRequest.assigned_head_email,
+          headEmail,
           role === 'STAFF' ? 'SUPERVISOR' : 'HEAD'
         ]
       );
@@ -486,15 +548,16 @@ async function approveAccountRequest(req, requestId) {
     }
     await connection.execute(
       `INSERT INTO user_roles
-         (email, full_name, role, assigned_head_email, active, extra_perms, password_hash)
-       VALUES (?, ?, ?, ?, 1, '', ?)
+         (email, full_name, role, assigned_head_email, secondary_head_email, active, extra_perms, password_hash)
+       VALUES (?, ?, ?, ?, ?, 1, '', ?)
        ON DUPLICATE KEY UPDATE full_name = VALUES(full_name), role = VALUES(role), active = 1,
-         assigned_head_email = VALUES(assigned_head_email), extra_perms = '', password_hash = VALUES(password_hash)`,
+         assigned_head_email = VALUES(assigned_head_email), secondary_head_email = VALUES(secondary_head_email), extra_perms = '', password_hash = VALUES(password_hash)`,
       [
         accountRequest.email,
         employee.name,
         role,
         accountRequest.assigned_head_email,
+        accountRequest.secondary_head_email || null,
         accountRequest.password_hash
       ]
     );
@@ -603,6 +666,7 @@ module.exports = {
   listAssignableHeads,
   createEmployeeAccountRequest,
   getAccountManagement,
+  addEmployeeLookupValue,
   approveAccountRequest,
   rejectAccountRequest,
   assignAccountHead,

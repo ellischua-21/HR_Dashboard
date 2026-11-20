@@ -616,6 +616,7 @@ async function loadOptions() {
   const o = await api('getFilterOptions');
   FILTER_KEYS.forEach((k) => {
     const s = $('f_' + k);
+    const selected = s.value;
     s.innerHTML = '';
     ['All'].concat(o[k]).forEach((v, i) => {
       const op = document.createElement('option');
@@ -623,8 +624,12 @@ async function loadOptions() {
       op.textContent = v;
       s.appendChild(op);
     });
+    s.value = Array.from(s.options).some((option) => option.value === selected)
+      ? selected
+      : '';
   });
 }
+window.addEventListener('employee-options-changed', guard(loadOptions));
 
 function getFilters() {
   const f = {};

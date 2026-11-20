@@ -20,14 +20,14 @@ function buildReviewScope(reviewer, requestedScope = null) {
   if (scope === 'ALL') {
     if (['SUPERVISOR', 'HEAD'].includes(reviewer.role)) {
       addBranch(
-        `f.template_key <> 'nexus-accountability' AND f.head_reviewer_email = ? AND f.user_email IN (SELECT email FROM user_roles WHERE role = '${reviewer.role === 'SUPERVISOR' ? 'STAFF' : 'SUPERVISOR'}')`,
-        [reviewer.email],
+        `f.template_key <> 'nexus-accountability' AND (f.head_reviewer_email = ? OR f.secondary_head_reviewer_email = ?) AND f.user_email IN (SELECT email FROM user_roles WHERE role = '${reviewer.role === 'SUPERVISOR' ? 'STAFF' : 'SUPERVISOR'}')`,
+        [reviewer.email, reviewer.email],
         'HEAD'
       );
     } else if (reviewer.role === 'HR' && reviewer.is_hr_head) {
       addBranch(
-        "f.template_key <> 'nexus-accountability' AND f.head_reviewer_email = ? AND f.user_email IN (SELECT email FROM user_roles WHERE role = 'HR')",
-        [reviewer.email],
+        "f.template_key <> 'nexus-accountability' AND (f.head_reviewer_email = ? OR f.secondary_head_reviewer_email = ?) AND f.user_email IN (SELECT email FROM user_roles WHERE role = 'HR')",
+        [reviewer.email, reviewer.email],
         'HEAD'
       );
     }
@@ -52,8 +52,8 @@ function buildReviewScope(reviewer, requestedScope = null) {
             ? 'SUPERVISOR'
             : 'HR';
       addBranch(
-        `f.template_key <> 'nexus-accountability' AND f.head_reviewer_email = ? AND f.user_email IN (SELECT email FROM user_roles WHERE role = '${submitterRole}')`,
-        [reviewer.email],
+        `f.template_key <> 'nexus-accountability' AND (f.head_reviewer_email = ? OR f.secondary_head_reviewer_email = ?) AND f.user_email IN (SELECT email FROM user_roles WHERE role = '${submitterRole}')`,
+        [reviewer.email, reviewer.email],
         'HEAD'
       );
     }

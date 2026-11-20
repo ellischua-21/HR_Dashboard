@@ -30,6 +30,21 @@
     return titleCase(normalized);
   }
 
+  function isAssignedReviewer(form, email) {
+    const normalized = String(email || '')
+      .trim()
+      .toLowerCase();
+    return (
+      Boolean(normalized) &&
+      [form.head_reviewer_email, form.secondary_head_reviewer_email].some(
+        (value) =>
+          String(value || '')
+            .trim()
+            .toLowerCase() === normalized
+      )
+    );
+  }
+
   function canEditForm(role, form) {
     return (
       ['STAFF', 'SUPERVISOR', 'HEAD', 'HR'].includes(role) &&
@@ -40,5 +55,11 @@
     );
   }
 
-  return { titleCase, reviewerLabel, formatFormStatus, canEditForm };
+  return {
+    titleCase,
+    reviewerLabel,
+    formatFormStatus,
+    canEditForm,
+    isAssignedReviewer
+  };
 });

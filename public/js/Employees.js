@@ -5,6 +5,7 @@ let META = null,
   IMP = null,
   HEAD_OPTIONS = [];
 let registrationReviewerSearch = null;
+window.addEventListener('employee-options-changed', () => { META = null; });
 const TABLES = {
   siblings: {
     title: 'Siblings',
@@ -264,7 +265,7 @@ VIEWS.employees = guard(async () => {
   $('e_import').hidden = !can('emp.write');
   $('e_add').hidden = !can('emp.write');
   $('e_export').hidden = !can('emp.export');
-  await ensureMeta();
+  META = await api('getFormMeta');
   const list = loadEmployees();
   [
     ['company', 'Company_List', 'All Companies'],
@@ -272,12 +273,14 @@ VIEWS.employees = guard(async () => {
     ['status', 'Employment_Status_List', 'All Statuses']
   ].forEach(([k, l, all]) => {
     const s = $('e_' + k);
-    if (s.options.length) return;
+    const selected = s.value;
+    s.replaceChildren();
     [all].concat(META.lists[l]).forEach((v, i) => {
       const o = el('option', v);
       o.value = i ? v : '';
       s.appendChild(o);
     });
+    s.value = Array.from(s.options).some(option => option.value === selected) ? selected : '';
   });
   await list;
 });
@@ -403,7 +406,7 @@ $('p_archive').onclick = guard(async () => {
 /* ---------- Registration / update form ---------- */
 VIEWS.register = guard(async () => {
   registrationReviewerSearch = null;
-  await ensureMeta();
+  META = await api('getFormMeta');
   const rec = PENDING;
   PENDING = null;
   CUR = rec;
@@ -412,10 +415,17 @@ VIEWS.register = guard(async () => {
     ? 'Editing ' + rec.name + ' (' + rec.record_id + ')'
     : '';
   $('r_mode').hidden = !rec;
-  $('r_account_access').hidden = Boolean(rec);
+  $('r_account_access').hidden = false;
   $('r_account_role').disabled = Boolean(rec);
+  $('r_secondary_head').disabled = Boolean(rec);
   $('r_account_password').disabled = Boolean(rec);
   $('r_account_password_confirm').disabled = Boolean(rec);
+  $('r_account_password').value = '';
+  $('r_account_password_confirm').value = '';
+  if (rec) {
+    $('r_secondary_head').replaceChildren();
+    $('r_head_assignment_note').textContent = '';
+  }
   $('r_preview').disabled = false;
   const sections = employeeFormSections();
   sections.forEach(({ group, fieldset }) => {
@@ -484,8 +494,10 @@ VIEWS.register = guard(async () => {
       }
       inp.id = 'ff_' + k;
       inp.required = Boolean(f.required);
-      if (k === 'personal_email' && !rec)
-        inp.dataset.requiredIndicator = 'true';
+      if (k === 'personal_email' && !rec) {
+        inp.placeholder = 'Leave blank for a record without a login account';
+        inp.addEventListener('input', updateRegistrationAccountAccess);
+      }
       if (k === 'birthday') inp.max = DateUtils.manilaDate();
       if (rec && rec[k] !== undefined)
         inp.value = f.readOnly ? DateUtils.formatField(rec[k], f.type) : rec[k];
@@ -543,10 +555,11 @@ VIEWS.register = guard(async () => {
     );
     fs.hidden = !group.childElementCount && !tables.childElementCount;
   });
-  $('r_account_role').value = 'STAFF';
+  $('r_account_role').value = rec ? '' : 'STAFF';
   $('r_account_role').onchange = updateRegistrationRoleHelp;
   if ($('ff_assigned_head_email')) $('ff_assigned_head_email').value = '';
-  updateRegistrationRoleHelp();
+  if (!rec) updateRegistrationRoleHelp();
+  updateRegistrationAccountAccess();
   const churchChoice = $('ff_church_has');
   const churchPosition = $('ff_church_position');
   if (churchChoice && churchPosition) {
@@ -594,22 +607,57 @@ VIEWS.register = guard(async () => {
     }
   }
 });
+function updateRegistrationAccountAccess() {
+  if (CUR && CUR.record_id) return;
+  const hasEmail = Boolean($('ff_personal_email').value.trim());
+  $('r_account_role').dataset.requiredIndicator = String(hasEmail);
+  for (const id of ['r_account_password', 'r_account_password_confirm'])
+    $(id).required = hasEmail;
+  const supportsReviewers = ['STAFF', 'SUPERVISOR'].includes(
+    $('r_account_role').value
+  );
+  $('r_secondary_head').disabled = !supportsReviewers;
+  $('ff_reports_to').disabled = hasEmail && !supportsReviewers;
+  $('ff_reports_to').dataset.requiredIndicator = String(
+    hasEmail && supportsReviewers
+  );
+}
 function updateRegistrationRoleHelp() {
+  if (CUR && CUR.record_id) return;
   const role = $('r_account_role').value;
+  const hasEmail = Boolean($('ff_personal_email').value.trim());
+  const secondary = $('r_secondary_head');
+  secondary.replaceChildren();
+  const none = el('option', 'None');
+  none.value = '';
+  secondary.appendChild(none);
+  const supportsReviewers = ['STAFF', 'SUPERVISOR'].includes(role);
+  secondary.disabled = !supportsReviewers;
+  if (supportsReviewers)
+    HEAD_OPTIONS.filter(
+      (head) => head.role === (role === 'STAFF' ? 'SUPERVISOR' : 'HEAD')
+    ).forEach((head) => {
+      const option = el(
+        'option',
+        `${head.full_name || head.email} (${head.email})`
+      );
+      option.value = head.email;
+      secondary.appendChild(option);
+    });
   if (registrationReviewerSearch) registrationReviewerSearch.reset();
   const search = $('ff_reports_to');
   if (search) {
     search.value = '';
-    search.disabled = !['STAFF', 'SUPERVISOR'].includes(role);
+    search.disabled = hasEmail && !['STAFF', 'SUPERVISOR'].includes(role);
     search.dataset.requiredIndicator = String(
-      ['STAFF', 'SUPERVISOR'].includes(role)
+      hasEmail && ['STAFF', 'SUPERVISOR'].includes(role)
     );
   }
   $('r_head_assignment_note').textContent =
     role === 'STAFF'
-      ? 'Assign a Supervisor to this STAFF account.'
+      ? 'Assign one or two Supervisors. Either may approve before HR review.'
       : role === 'SUPERVISOR'
-        ? 'Assign a Head to this SUPERVISOR account.'
+        ? 'Assign one or two Heads. Either may approve before HR review.'
         : 'This role does not need an assigned reviewer.';
 }
 const formData = () => {
@@ -622,14 +670,19 @@ const formData = () => {
     }
   });
   if (CUR && CUR.record_id) d.record_id = CUR.record_id;
-  else
+  else if (d.personal_email)
     d.accountAccess = {
       role: $('r_account_role').value,
       password: $('r_account_password').value,
       assignedHeadEmail: $('ff_assigned_head_email')
         ? $('ff_assigned_head_email').value
-        : ''
+        : '',
+      secondaryHeadEmail: $('r_secondary_head').disabled ? '' : $('r_secondary_head').value
     };
+  if (d.accountAccess?.secondaryHeadEmail) {
+    const second = HEAD_OPTIONS.find(head => head.email === d.accountAccess.secondaryHeadEmail);
+    d.reports_to = [d.reports_to, second?.full_name || second?.email].filter(Boolean).join(' / ');
+  }
   return d;
 };
 $('r_preview').onclick = () => {
@@ -637,8 +690,9 @@ $('r_preview').onclick = () => {
     miss = META.fields
       .filter((f) => f.required && !d[f.key])
       .map((f) => f.label);
-  if (!CUR || !CUR.record_id) {
-    if (!d.personal_email) miss.push('Email');
+  if (d.accountAccess) {
+    if (d.accountAccess.secondaryHeadEmail && d.accountAccess.secondaryHeadEmail === d.accountAccess.assignedHeadEmail)
+      miss.push('Two different reviewers');
     if (
       ['STAFF', 'SUPERVISOR'].includes(d.accountAccess.role) &&
       !d.accountAccess.assignedHeadEmail
@@ -680,11 +734,11 @@ $('r_preview').onclick = () => {
       );
     }
   });
-  if (!CUR || !CUR.record_id) {
+  if (d.accountAccess) {
     dl.appendChild(el('dt', 'Account role'));
     dl.appendChild(el('dd', d.accountAccess.role));
     dl.appendChild(el('dt', 'Assigned Head'));
-    dl.appendChild(el('dd', d.accountAccess.assignedHeadEmail || 'None'));
+    dl.appendChild(el('dd', [d.accountAccess.assignedHeadEmail, d.accountAccess.secondaryHeadEmail].filter(Boolean).join(' / ') || 'None'));
     dl.appendChild(el('dt', 'Account approval'));
     dl.appendChild(el('dd', 'Pending ADMIN approval'));
   }

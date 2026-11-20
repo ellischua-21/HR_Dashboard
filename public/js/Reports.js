@@ -12,9 +12,11 @@ const ALLF = [
 async function ensureOpts() {
   if (!OPTS) OPTS = await api('getFilterOptions');
 }
+window.addEventListener('employee-options-changed', () => { OPTS = null; });
 function buildFilters(id, keys) {
   const box = $(id);
-  if (box.childElementCount) return;
+  const selected = readF(id);
+  box.replaceChildren();
   keys.forEach(([k, all]) => {
     const s = el('select');
     s.dataset.k = k;
@@ -36,6 +38,9 @@ function buildFilters(id, keys) {
     i.dataset.k = k;
     l.appendChild(i);
     box.appendChild(l);
+  });
+  box.querySelectorAll('[data-k]').forEach((input) => {
+    if (selected[input.dataset.k]) input.value = selected[input.dataset.k];
   });
 }
 const readF = (id) => {

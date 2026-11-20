@@ -606,6 +606,12 @@ button.ghost {
 .toolbar .sp {
   flex: 1;
 }
+#view-accounts [data-account-panel][hidden] {
+  display: none;
+}
+#view-accounts .account-lists {
+  grid-template-columns: minmax(0, 1fr);
+}
 .tablewrap {
   isolation: isolate;
   overflow-x: auto;

@@ -1,20 +1,6 @@
 const A = require('./WorkflowAccess');
 const { requirePerm } = require('../../middleware/Auth');
 const { logAudit } = require('../AuditService');
-const DEFAULT_DEPARTMENTS = [
-  'Paso Warehouse',
-  'Dalisay/E-commerce',
-  'Marketing',
-  'Procurement',
-  'Heads',
-  'Accounting',
-  'HR',
-  'Human Resources',
-  'Printing',
-  'Sales',
-  'Stores'
-];
-const HIDDEN_DEPARTMENTS = new Set(['it', 'finance', 'operations']);
 async function get(req) {
   const user = await requirePerm(req, 'admin.manage');
   A.assert(user.role === 'ADMIN');
@@ -32,7 +18,7 @@ async function get(req) {
       WHERE role = 'ADMIN' AND active = 1 AND EXISTS
       (SELECT 1 FROM employees e WHERE LOWER(e.personal_email) = LOWER(user_roles.email) AND e.record_status <> 'Archived') ORDER BY full_name, email`),
       A.pool.execute(
-        "SELECT DISTINCT department FROM employees WHERE record_status <> 'Archived' AND department <> '' ORDER BY department"
+        "SELECT `value` AS department FROM lookup_values WHERE list_name = 'Department_List' AND active = 1 UNION SELECT DISTINCT department FROM employees WHERE record_status <> 'Archived' AND department <> '' ORDER BY department"
       ),
       A.pool.execute(
         'SELECT management_email AS managementEmail FROM incident_workflow_settings WHERE id = 1'
@@ -43,21 +29,22 @@ async function get(req) {
     accounts,
     approvers,
     departments: [
-      ...new Set([
-        ...DEFAULT_DEPARTMENTS,
-        ...departments.map((row) => row.department),
-        ...assignments.map((row) => row.department)
-      ])
-    ]
-      .filter(
-        (department) => !HIDDEN_DEPARTMENTS.has(department.trim().toLowerCase())
-      )
-      .sort((first, second) => {
-        const firstIsHeads = first.trim().toLowerCase() === 'heads';
-        const secondIsHeads = second.trim().toLowerCase() === 'heads';
-        if (firstIsHeads !== secondIsHeads) return firstIsHeads ? 1 : -1;
-        return first.localeCompare(second);
-      }),
+      ...new Map(
+        [
+          'Heads',
+          ...departments.map((row) => row.department),
+          ...assignments.map((row) => row.department)
+        ].map((department) => {
+          const key = department.trim().toLowerCase();
+          return [key, key === 'heads' ? 'Heads' : department.trim()];
+        })
+      ).values()
+    ].sort((first, second) => {
+      const firstIsHeads = first.trim().toLowerCase() === 'heads';
+      const secondIsHeads = second.trim().toLowerCase() === 'heads';
+      if (firstIsHeads !== secondIsHeads) return firstIsHeads ? 1 : -1;
+      return first.localeCompare(second);
+    }),
     managementEmail: settings.managementEmail || ''
   };
 }

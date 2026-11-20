@@ -8,7 +8,7 @@
         <thead>
           <tr>
             <th>Name</th>
-            <th>Email</th>
+            <th>Primary Email</th>
             <th>Assigned Role</th>
             <th>Reports To</th>
             <th>Requested</th>
@@ -24,22 +24,174 @@
   <div class="account-heading account-list-heading">
     <button id="am_save_changes" type="button" disabled>Save Changes</button>
   </div>
+  <div class="toolbar account-tabs" role="tablist" aria-label="Manage Accounts">
+    <button
+      type="button"
+      id="am_tab_staff"
+      role="tab"
+      data-account-tab="staff"
+      aria-controls="am_panel_staff"
+      aria-selected="true"
+      tabindex="0"
+    >
+      STAFF
+    </button>
+    <button
+      type="button"
+      id="am_tab_supervisor"
+      role="tab"
+      data-account-tab="supervisor"
+      aria-controls="am_panel_supervisor"
+      aria-selected="false"
+      tabindex="-1"
+      class="ghost"
+    >
+      SUPERVISOR
+    </button>
+    <button
+      type="button"
+      id="am_tab_head"
+      role="tab"
+      data-account-tab="head"
+      aria-controls="am_panel_head"
+      aria-selected="false"
+      tabindex="-1"
+      class="ghost"
+    >
+      HEAD
+    </button>
+    <button
+      type="button"
+      id="am_tab_hr"
+      role="tab"
+      data-account-tab="hr"
+      aria-controls="am_panel_hr"
+      aria-selected="false"
+      tabindex="-1"
+      class="ghost"
+    >
+      HR
+    </button>
+    <button
+      type="button"
+      id="am_tab_admins"
+      role="tab"
+      data-account-tab="admins"
+      aria-controls="am_panel_admins"
+      aria-selected="false"
+      tabindex="-1"
+      class="ghost"
+    >
+      ADMINS
+    </button>
+    <button
+      type="button"
+      id="am_tab_settings"
+      role="tab"
+      data-account-tab="settings"
+      aria-controls="am_panel_settings"
+      aria-selected="false"
+      tabindex="-1"
+      class="ghost"
+    >
+      Organization Settings
+    </button>
+  </div>
   <div class="account-lists">
-    <section id="incident-assignment-settings" class="panel">
-      <h2>Incident Reviewer Assignments</h2>
-      <div id="incident-department-assignments" class="fgrid"></div>
-      <label>Management Approver<select id="incident-management-approver"><option value="">Select An Approver</option></select></label>
+    <section
+      id="am_panel_settings"
+      class="panel"
+      role="tabpanel"
+      aria-labelledby="am_tab_settings"
+      data-account-panel="settings"
+      hidden
+    >
+      <h2>Organization Settings</h2>
+      <p class="note">
+        Add names to make them available in employee dropdowns. Names are saved
+        when you select Add. Use Save Changes to save department Heads and the
+        Management Approver.
+      </p>
+      <div class="toolbar">
+        <label for="am_company_name"
+          >New Company Name<input
+            id="am_company_name"
+            type="text"
+            maxlength="191"
+            autocomplete="off"
+        /></label>
+        <button
+          id="am_add_company"
+          type="button"
+          data-lookup-list="Company_List"
+          data-lookup-input="am_company_name"
+        >
+          Add Company Name
+        </button>
+      </div>
+      <p id="am_company_values" class="note"></p>
+      <div class="toolbar">
+        <label for="am_location_name"
+          >New Work Location<input
+            id="am_location_name"
+            type="text"
+            maxlength="191"
+            autocomplete="off"
+        /></label>
+        <button
+          id="am_add_location"
+          type="button"
+          data-lookup-list="Location_List"
+          data-lookup-input="am_location_name"
+        >
+          Add Work Location
+        </button>
+      </div>
+      <p id="am_location_values" class="note"></p>
+      <div class="toolbar">
+        <label for="am_department_name"
+          >New Department<input
+            id="am_department_name"
+            type="text"
+            maxlength="191"
+            autocomplete="off"
+        /></label>
+        <button
+          id="am_add_department"
+          type="button"
+          data-lookup-list="Department_List"
+          data-lookup-input="am_department_name"
+        >
+          Add Department
+        </button>
+      </div>
+      <p id="am_department_values" class="note"></p>
+      <section id="incident-assignment-settings">
+        <h3>Department Heads</h3>
+        <div id="incident-department-assignments" class="fgrid"></div>
+        <label
+          >Management Approver<select id="incident-management-approver">
+            <option value="">Select An Approver</option>
+          </select></label
+        >
+      </section>
     </section>
-    <section class="panel">
+    <section
+      id="am_panel_staff"
+      class="panel"
+      role="tabpanel"
+      aria-labelledby="am_tab_staff"
+      data-account-panel="staff"
+    >
       <h2>STAFF</h2>
       <div class="tablewrap">
         <table>
           <thead>
             <tr>
               <th>Name</th>
-              <th>Email</th>
+              <th>Primary Email</th>
               <th>Role</th>
-              <th>Assigned Supervisor</th>
+              <th>Assigned Supervisors</th>
               <th>Status</th>
               <th>Created</th>
               <th>Assignment</th>
@@ -49,16 +201,23 @@
         </table>
       </div>
     </section>
-    <section class="panel">
+    <section
+      id="am_panel_supervisor"
+      class="panel"
+      role="tabpanel"
+      aria-labelledby="am_tab_supervisor"
+      data-account-panel="supervisor"
+      hidden
+    >
       <h2>SUPERVISOR</h2>
       <div class="tablewrap">
         <table>
           <thead>
             <tr>
               <th>Name</th>
-              <th>Email</th>
+              <th>Primary Email</th>
               <th>Role</th>
-              <th>Assigned Head</th>
+              <th>Assigned Heads</th>
               <th>Status</th>
               <th>Created</th>
               <th>Assignment</th>
@@ -68,14 +227,21 @@
         </table>
       </div>
     </section>
-    <section class="panel">
+    <section
+      id="am_panel_head"
+      class="panel"
+      role="tabpanel"
+      aria-labelledby="am_tab_head"
+      data-account-panel="head"
+      hidden
+    >
       <h2>HEAD</h2>
       <div class="tablewrap">
         <table>
           <thead>
             <tr>
               <th>Name</th>
-              <th>Email</th>
+              <th>Primary Email</th>
               <th>Role</th>
               <th>Status</th>
               <th>Created</th>
@@ -85,14 +251,21 @@
         </table>
       </div>
     </section>
-    <section class="panel">
+    <section
+      id="am_panel_hr"
+      class="panel"
+      role="tabpanel"
+      aria-labelledby="am_tab_hr"
+      data-account-panel="hr"
+      hidden
+    >
       <h2>HR</h2>
       <div class="tablewrap">
         <table>
           <thead>
             <tr>
               <th>Name</th>
-              <th>Email</th>
+              <th>Primary Email</th>
               <th>Role</th>
               <th>Head HR</th>
               <th>Status</th>
@@ -103,14 +276,21 @@
         </table>
       </div>
     </section>
-    <section class="panel">
-      <h2>Admins</h2>
+    <section
+      id="am_panel_admins"
+      class="panel"
+      role="tabpanel"
+      aria-labelledby="am_tab_admins"
+      data-account-panel="admins"
+      hidden
+    >
+      <h2>ADMINS</h2>
       <div class="tablewrap">
         <table>
           <thead>
             <tr>
               <th>Name</th>
-              <th>Email</th>
+              <th>Primary Email</th>
               <th>Role</th>
               <th>Status</th>
               <th>Created</th>

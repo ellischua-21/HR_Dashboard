@@ -110,10 +110,12 @@ async function getMyEmployeeProfile(req) {
   const profile = withCalc(normalizeEmployee(rows[0]));
   const [managers] = await pool.execute(
     `SELECT COALESCE(NULLIF(e.name, ''), NULLIF(manager.full_name, ''), manager.email) AS name
-     FROM user_roles account JOIN user_roles manager ON manager.email = account.assigned_head_email
+     FROM user_roles account JOIN user_roles manager
+       ON manager.email IN (account.assigned_head_email, account.secondary_head_email)
      LEFT JOIN employees e ON LOWER(TRIM(e.personal_email)) = LOWER(TRIM(manager.email))
        AND COALESCE(e.record_status, 'Active') <> 'Archived'
-     WHERE account.email = ? LIMIT 1`,
+     WHERE account.email = ?
+     ORDER BY manager.email = account.assigned_head_email DESC`,
     [user.email]
   );
   return {
@@ -123,7 +125,7 @@ async function getMyEmployeeProfile(req) {
     fields: fields
       .filter(([key]) => key !== 'name')
       .map(([key, label, type]) => ({ key, label, type })),
-    directManager: managers[0]?.name || profile.reports_to || ''
+    directManager: managers.map(manager => manager.name).filter(Boolean).join(' / ') || profile.reports_to || ''
   };
 }
 
@@ -162,7 +164,7 @@ async function saveEmployee(req, data = {}) {
   const clean = cleanEmployee(data);
   const errors = validateEmployee(clean, await getLists());
   if (errors.length) return { ok: false, errors };
-  if (!data.record_id && !data.accountAccess) {
+  if (!data.record_id && clean.personal_email && !data.accountAccess) {
     return {
       ok: false,
       errors: [
@@ -290,18 +292,19 @@ async function saveEmployee(req, data = {}) {
       'Employee created',
       connection
     );
-    await createEmployeeAccountRequest(
-      req,
-      clean,
-      data.accountAccess,
-      connection
-    );
+    if (clean.personal_email)
+      await createEmployeeAccountRequest(
+        req,
+        clean,
+        data.accountAccess,
+        connection
+      );
     await connection.commit();
     return {
       ok: true,
       record_id: recordId,
-      accountRequestSubmitted: true,
-      accountEmail: clean.personal_email
+      accountRequestSubmitted: Boolean(clean.personal_email),
+      accountEmail: clean.personal_email || null
     };
   } catch (error) {
     if (unlock) await connection.rollback();

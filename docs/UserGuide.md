@@ -20,8 +20,8 @@ Updated: 11/06/2026
 
 1. Open the dashboard link provided by your company.
 2. Enter your account email and password, then select **Sign in**. Your account
-   email is the **Email** recorded when your account was requested. **Corporate Email**
-   is a separate optional address and does not change your login.
+   email is the **Primary Email** recorded when your account was requested. **Corporate Email**
+   and **Secondary Email** are optional contact addresses and do not change your login.
 3. Use the menu on the left to open a page. Select a group name to show its pages.
    On a small screen, select **Menu** to open the menu.
 4. Check your **Inbox** for announcements and requests that need your attention.
@@ -135,8 +135,8 @@ are checked again at final approval.
 
 ### Understand where a form goes
 
-- STAFF forms go to the assigned Supervisor, then to HR for final review.
-- SUPERVISOR forms go to the assigned Head, then to HR.
+- STAFF forms go to their assigned Supervisor(s); either may approve, then HR reviews.
+- SUPERVISOR forms go to their assigned Head(s); either may approve, then HR reviews.
 - HEAD forms go directly to HR.
 - HR forms go to the designated Head HR. The Head HR's own forms go to another
   eligible HR reviewer.
@@ -181,15 +181,29 @@ it. Read the confirmation before archiving an employee.
 ### Register an employee and request account access
 
 1. Open **Employees → Employee Registration**.
-2. Complete the employee details, including their employee number and Personal
-   Email.
-3. Select the correct **Reports To** suggestion: a Supervisor for STAFF or a Head for SUPERVISOR.
-4. In **Account access request**, choose STAFF, SUPERVISOR, HEAD, or HR. Enter and confirm the
-   initial password.
+2. Complete the employee details and employee number. Primary Email is optional;
+   leave it blank to save a record without a login account. Secondary Email and
+   Corporate Email do not create accounts.
+3. If Primary Email is entered, select the correct **Reports To** suggestion:
+   a Supervisor for STAFF or a Head for SUPERVISOR. Optionally select a second
+   Supervisor/Head under Account Access Request. Without Primary Email,
+   Reports To can be recorded as optional text.
+4. **Account access request** stays visible and can be filled in any order. Choose STAFF,
+   SUPERVISOR, HEAD, or HR, then enter and confirm the initial password.
 5. Select **Review and save**, check the preview, and save.
-6. Ask an ADMIN to approve the request in **Manage Accounts → Account Requests**.
+6. If an account was requested, ask an ADMIN to approve it in **Manage Accounts → Account Requests**.
 
-A STAFF account needs an assigned Supervisor, and a SUPERVISOR needs an assigned Head. If the reviewer has a pending account request, approve it first.
+A STAFF account needs one or two assigned Supervisors; a SUPERVISOR needs one or
+two assigned Heads. The second reviewer is optional and must be a different account
+with the same required role. Either reviewer can approve or reject a submitted form.
+The first approval forwards it to HR; the other reviewer cannot approve that stage
+again. Both assigned reviewers see it in their review queue and inbox. Approve any
+pending reviewer accounts before approving the employee account request.
+
+In Manage Accounts, open the STAFF or SUPERVISOR role tab and choose the first reviewer and optional second reviewer in the
+Assignment column, then select Save Changes. New submissions capture these
+assignments; forms already submitted keep their original reviewers. Imported
+Reports To text does not automatically assign reviewer accounts.
 
 ### Import employees from a spreadsheet
 
@@ -199,6 +213,10 @@ A STAFF account needs an assigned Supervisor, and a SUPERVISOR needs an assigned
 4. Run validation and review the valid-row count and errors.
 5. Correct the spreadsheet where necessary, then import the valid records.
 6. Check the **number of employees imported** in the result.
+
+Primary Email is the login/account-linking address. Secondary Email is optional
+and accepts one valid email address. Corporate Email remains separate. Landline
+Number is no longer available. Mobile Number accepts multiple numbers as text.
 
 FTE Allocation is required in Employee Registration but optional during import.
 Leave it blank if unavailable; supplied values must be numbers between 0 and 1.
@@ -248,8 +266,8 @@ case reaches Closed only after every report in that case has been closed.
 
 ### ADMIN: set up reviewers
 
-1. Open **Manage Accounts > Accounts**.
-2. Under **Incident Reviewer Assignments**, choose a HEAD or ADMIN for each
+1. Open **Manage Accounts > Organization Settings**.
+2. Under **Department Heads**, choose a HEAD or ADMIN for each
    department. One reviewer may cover several departments. The **Heads** department
    has two ADMIN reviewer slots.
 3. Select any active ADMIN as the **Management Approver**.
@@ -410,7 +428,7 @@ matrix changes do not rewrite previously approved findings.
 ### Approve or reject a new account
 
 1. Open **Manage Accounts → Account Requests**.
-2. Check the name, Email, assigned role, and assigned reviewer.
+2. Check the name, Primary Email, assigned role, and assigned reviewer.
 3. Select **Approve** or **Reject** and confirm the action.
 4. Use **Refresh** to update the request list.
 
@@ -518,3 +536,18 @@ are excluded from their task-related notification counts.
 
 When requesting help, provide the page name, serial or IR number if applicable,
 the action you selected, and the error message. Never include your password.
+
+### Manage organization choices and department Heads
+
+1. Open **Manage Accounts > Organization Settings** as ADMIN.
+2. Enter a company name, work location, or department, then select its **Add**
+   button. The name is saved immediately and appears in employee dropdowns.
+3. Under **Department Heads**, select a Head for each department. The existing
+   HEAD/ADMIN eligibility rules apply; the Heads group uses ADMIN reviewers.
+4. Retain or choose the **Management Approver**, then select **Save Changes**
+   to save department Heads and the approver.
+
+STAFF, SUPERVISOR, HEAD, HR, and ADMINS each have a role tab showing one account
+list. Switching tabs keeps unsaved assignments. Adding a name also preserves
+unsaved department Head and Management Approver choices. New departments can be
+assigned a Head immediately; older case assignments remain unchanged.

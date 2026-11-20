@@ -4,6 +4,41 @@ const pendingHeadAssignments = new Map();
 let pendingHrHeadEmail;
 let hrHeadChanged = false;
 let accountSaveBusy = false;
+let lookupSaveBusy = false;
+let accountTab = 'staff';
+
+function selectAccountTab(key) {
+  accountTab = key;
+  document.querySelectorAll('[data-account-tab]').forEach((button) => {
+    const selected = button.dataset.accountTab === key;
+    button.setAttribute('aria-selected', String(selected));
+    button.tabIndex = selected ? 0 : -1;
+    button.classList.toggle('ghost', !selected);
+  });
+  document.querySelectorAll('[data-account-panel]').forEach((panel) => {
+    panel.hidden = panel.dataset.accountPanel !== key;
+  });
+}
+const accountTabs = Array.from(document.querySelectorAll('[data-account-tab]'));
+accountTabs.forEach((button, index) => {
+  button.onclick = () => selectAccountTab(button.dataset.accountTab);
+  button.onkeydown = (event) => {
+    const next =
+      event.key === 'ArrowRight'
+        ? (index + 1) % accountTabs.length
+        : event.key === 'ArrowLeft'
+          ? (index + accountTabs.length - 1) % accountTabs.length
+          : event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? accountTabs.length - 1
+              : -1;
+    if (next < 0) return;
+    event.preventDefault();
+    accountTabs[next].click();
+    accountTabs[next].focus();
+  };
+});
 
 function hasAccountChanges() {
   return (
@@ -15,7 +50,7 @@ function hasAccountChanges() {
 
 function updateAccountSaveButton() {
   const button = $('am_save_changes');
-  button.disabled = accountSaveBusy || !hasAccountChanges();
+  button.disabled = accountSaveBusy || lookupSaveBusy || !hasAccountChanges();
   button.textContent = 'Save Changes';
   document.querySelectorAll('.hr-head-toggle').forEach((toggle) => {
     toggle.disabled = accountSaveBusy || toggle.dataset.inactive === 'true';
@@ -27,6 +62,11 @@ function updateAccountSaveButton() {
     .forEach((select) => {
       select.disabled = accountSaveBusy;
     });
+  document
+    .querySelectorAll('[data-lookup-list], #am_panel_settings input')
+    .forEach((control) => {
+      control.disabled = accountSaveBusy || lookupSaveBusy;
+    });
 }
 
 function stagedHrHeadEmail(accounts) {
@@ -36,7 +76,7 @@ function stagedHrHeadEmail(accounts) {
 }
 
 async function saveAccountChanges() {
-  if (accountSaveBusy || !hasAccountChanges()) return;
+  if (accountSaveBusy || lookupSaveBusy || !hasAccountChanges()) return;
   accountSaveBusy = true;
   const button = $('am_save_changes');
   button.textContent = 'Save Changes';
@@ -47,7 +87,7 @@ async function saveAccountChanges() {
     await api('saveAccountChanges', {
       headAssignments: Array.from(
         pendingHeadAssignments,
-        ([email, headEmail]) => ({ email, headEmail })
+        ([email, assignment]) => ({ email, ...assignment })
       ),
       hrHeadChanged,
       hrHeadEmail: pendingHrHeadEmail || null,
@@ -86,9 +126,12 @@ function renderAccountRequests(requestList) {
       accountCell(request.email),
       accountCell(request.assigned_role),
       accountCell(
-        request.assigned_head_name
-          ? `${request.assigned_head_name}${request.assigned_head_email ? ` (${request.assigned_head_email})` : ''}`
-          : request.assigned_head_email || '—'
+        [
+          request.assigned_head_name || request.assigned_head_email,
+          request.secondary_head_name || request.secondary_head_email
+        ]
+          .filter(Boolean)
+          .join(' / ') || 'None'
       ),
       accountCell(formatAccountDate(request.requested_at))
     );
@@ -160,6 +203,16 @@ async function loadAccountManagement() {
 }
 
 function renderAccountManagement(result) {
+  if (result.lookupLists) {
+    for (const [key, list] of [
+      ['company', 'Company_List'],
+      ['location', 'Location_List'],
+      ['department', 'Department_List']
+    ])
+      $('am_' + key + '_values').textContent = (
+        result.lookupLists[list] || []
+      ).join(', ');
+  }
   [
     ['users', 'am_users', true],
     ['supervisors', 'am_supervisors', true],
@@ -188,49 +241,70 @@ function renderAccountManagement(result) {
       if (canAssignHead === true) {
         row.appendChild(
           accountCell(
-            account.assigned_head_name ||
-              account.assigned_head_email ||
-              'Unassigned'
+            [
+              account.assigned_head_name || account.assigned_head_email,
+              account.secondary_head_name || account.secondary_head_email
+            ]
+              .filter(Boolean)
+              .join(' / ') || 'Unassigned'
           )
         );
         const assignmentCell = document.createElement('td');
-        const head = document.createElement('select');
-        head.className = 'account-head-assignment';
         const reviewerRole = account.role === 'STAFF' ? 'Supervisor' : 'Head';
-        head.setAttribute(
-          'aria-label',
-          `Assigned ${reviewerRole} for ${account.email}`
-        );
-        const none = document.createElement('option');
-        none.value = '';
-        none.textContent = `Select a ${reviewerRole}`;
-        head.appendChild(none);
-        (account.role === 'STAFF'
-          ? result.availableSupervisors || []
-          : result.availableHeads || []
-        )
-          .filter((optionAccount) => optionAccount.email !== account.email)
-          .forEach((optionAccount) => {
-            const option = document.createElement('option');
-            option.value = optionAccount.email;
-            option.textContent = `${optionAccount.full_name || optionAccount.email} (${optionAccount.email})`;
-            head.appendChild(option);
-          });
-        head.value = pendingHeadAssignments.has(account.email)
-          ? pendingHeadAssignments.get(account.email)
-          : account.assigned_head_email || '';
-        head.onchange = () => {
-          if (accountSaveBusy) return;
-          if (head.value === (account.assigned_head_email || ''))
-            pendingHeadAssignments.delete(account.email);
-          else pendingHeadAssignments.set(account.email, head.value);
-          updateAccountSaveButton();
+        const saved = {
+          headEmail: account.assigned_head_email || '',
+          secondaryHeadEmail: account.secondary_head_email || ''
         };
+        const staged = pendingHeadAssignments.get(account.email) || saved;
+        const selections = {};
+        for (const [key, label] of [
+          ['headEmail', reviewerRole],
+          ['secondaryHeadEmail', `Second ${reviewerRole} (optional)`]
+        ]) {
+          const wrapper = document.createElement('label');
+          wrapper.textContent = label;
+          const select = document.createElement('select');
+          select.className = 'account-head-assignment';
+          select.setAttribute('aria-label', `${label} for ${account.email}`);
+          const none = document.createElement('option');
+          none.value = '';
+          none.textContent =
+            key === 'headEmail' ? `Select a ${reviewerRole}` : 'None';
+          select.appendChild(none);
+          (account.role === 'STAFF'
+            ? result.availableSupervisors || []
+            : result.availableHeads || []
+          )
+            .filter((optionAccount) => optionAccount.email !== account.email)
+            .forEach((optionAccount) => {
+              const option = document.createElement('option');
+              option.value = optionAccount.email;
+              option.textContent = `${optionAccount.full_name || optionAccount.email} (${optionAccount.email})`;
+              select.appendChild(option);
+            });
+          select.value = staged[key];
+          selections[key] = select;
+          select.onchange = () => {
+            if (accountSaveBusy) return;
+            const next = {
+              headEmail: selections.headEmail.value,
+              secondaryHeadEmail: selections.secondaryHeadEmail.value
+            };
+            if (
+              next.headEmail === saved.headEmail &&
+              next.secondaryHeadEmail === saved.secondaryHeadEmail
+            )
+              pendingHeadAssignments.delete(account.email);
+            else pendingHeadAssignments.set(account.email, next);
+            updateAccountSaveButton();
+          };
+          wrapper.appendChild(select);
+          assignmentCell.appendChild(wrapper);
+        }
         row.append(
           accountCell(account.active ? 'Active' : 'Inactive'),
           accountCell(formatAccountDate(account.created_at))
         );
-        assignmentCell.append(head);
         row.appendChild(assignmentCell);
       } else if (canAssignHead === 'hr') {
         const toggleCell = document.createElement('td');
@@ -282,6 +356,7 @@ VIEWS.accounts = guard(async () => {
   pendingHeadAssignments.clear();
   pendingHrHeadEmail = undefined;
   hrHeadChanged = false;
+  selectAccountTab(accountTab);
   updateAccountSaveButton();
   await loadAccountManagement();
   await window.IncidentAssignments?.load();
@@ -291,3 +366,32 @@ $('am_refresh').onclick = async () => {
   await guard(loadAccountRequests)();
 };
 $('am_save_changes').onclick = saveAccountChanges;
+document.querySelectorAll('[data-lookup-list]').forEach((button) => {
+  button.onclick = guard(async () => {
+    if (accountSaveBusy || lookupSaveBusy) return;
+    const input = $(button.dataset.lookupInput);
+    const value = input.value.trim();
+    if (!value) {
+      showErr('Enter a name before selecting Add.');
+      input.focus();
+      return;
+    }
+    lookupSaveBusy = true;
+    updateAccountSaveButton();
+    try {
+      const result = await api(
+        'addEmployeeLookupValue',
+        button.dataset.lookupList,
+        value
+      );
+      input.value = '';
+      window.dispatchEvent(new Event('employee-options-changed'));
+      await loadAccountManagement();
+      await window.IncidentAssignments?.load(true);
+      AppFeedback.success(result.value + ' is available in dropdowns.');
+    } finally {
+      lookupSaveBusy = false;
+      updateAccountSaveButton();
+    }
+  });
+});

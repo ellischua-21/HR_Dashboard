@@ -2,11 +2,12 @@
 
 ## Rules
 
-Nonblank Emails must be unique across current and archived employee
+Nonblank Primary Emails (`personal_email`) must be unique across current and archived employee
 records. Comparisons normalize surrounding whitespace and case; stored email
 values are not automatically rewritten. Blank/null values remain allowed where
-the existing workflow permits them. New registration still requires an account
-request and a valid email.
+registration and import. A new registration with Primary Email requires an account
+request and ADMIN approval. Without Primary Email, registration saves only the
+employee record; Secondary Email and Corporate Email never create accounts.
 
 Employee edits cannot change or clear an email referenced by any account, active
 or inactive, or by a pending account request. Equivalent edits preserve the
@@ -17,6 +18,10 @@ ADMIN exception remains unchanged. Historical ownership, signatures, decisions,
 notifications and audit records are not rewritten.
 Account approval and CLI provisioning also reject employee-email collisions with
 archived records instead of attaching an account to an unresolved identity.
+
+Secondary Email (`secondary_email`) is optional and email-validated when supplied.
+It has no identity uniqueness requirement and never links an account or replaces
+Primary Email. Corporate Email remains an independent contact address.
 
 ## Transactions and limits
 

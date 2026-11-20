@@ -14,7 +14,13 @@
       managementEmail: manager.value
     };
   }
-  async function load() {
+  async function load(preserveDraft = false) {
+    const draft = preserveDraft && loaded ? value() : null;
+    const draftDepartments = new Set(
+      [...container.querySelectorAll('select')].map((select) =>
+        select.dataset.department.toLowerCase()
+      )
+    );
     const data = await api('getIncidentWorkflowConfiguration');
     container.replaceChildren();
     for (const department of data.departments) {
@@ -33,7 +39,8 @@
         const label = isHeads ? null : el('label', department),
           select = el('select');
         select.dataset.department = department;
-        if (isHeads) select.setAttribute('aria-label', `Heads reviewer ${slot + 1}`);
+        if (isHeads)
+          select.setAttribute('aria-label', `Heads reviewer ${slot + 1}`);
         select.add(new Option('Unassigned', ''));
         data.accounts
           .filter((account) => !isHeads || account.role === 'ADMIN')
@@ -91,6 +98,22 @@
     manager.onchange = updateAccountSaveButton;
     loaded = true;
     original = JSON.stringify(value());
+    if (draft) {
+      const slots = new Map();
+      for (const select of container.querySelectorAll('select')) {
+        const key = select.dataset.department.toLowerCase();
+        if (!draftDepartments.has(key)) continue;
+        const slot = slots.get(key) || 0;
+        select.value =
+          draft.assignments.filter(
+            (row) => row.department.toLowerCase() === key
+          )[slot]?.reviewerEmail || '';
+        slots.set(key, slot + 1);
+      }
+      manager.value = draft.managementEmail;
+      updateHeadReviewerChoices();
+      updateManagers();
+    }
     updateAccountSaveButton();
   }
   window.IncidentAssignments = {

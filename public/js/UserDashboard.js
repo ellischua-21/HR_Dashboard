@@ -362,7 +362,7 @@ async function loadMyForms() {
   mySubmittedForms = result.forms;
   const assignedHeadLabel = $('uf_assigned_head');
   if (result.assignedHead) {
-    assignedHeadLabel.textContent = `Your ${session.role === 'STAFF' ? 'Supervisor' : session.role === 'HR' ? 'Head HR' : 'Head'}: ${result.assignedHead.full_name} (${result.assignedHead.email})${result.assignedHead.active ? '' : ' — inactive'}`;
+    assignedHeadLabel.textContent = `Your ${session.role === 'STAFF' ? 'Supervisor' : session.role === 'HR' ? 'Head HR' : 'Head'}: ${(result.assignedHead.reviewers || [result.assignedHead]).map(head => `${head.full_name} (${head.email})${head.active ? '' : ' - inactive'}`).join(' / ')}`;
     assignedHeadLabel.hidden = false;
   } else if (session.role === 'HR' && session.is_hr_head) {
     assignedHeadLabel.textContent =
@@ -1132,7 +1132,7 @@ function reviewRow(form) {
   } else if (
     form.status === 'PENDING' &&
     form.review_stage === 'HR' &&
-    form.head_reviewer_email === session.email &&
+    FormStatus.isAssignedReviewer(form, session.email) &&
     ['SUPERVISOR', 'HEAD'].includes(session.role)
   ) {
     actions.appendChild(

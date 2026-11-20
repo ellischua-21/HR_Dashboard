@@ -162,6 +162,8 @@ const methods = {
   markInboxSeen: (req) => inbox.markInboxSeen(req),
   listAssignableHeads: (req) => accounts.listAssignableHeads(req),
   getAccountManagement: (req) => accounts.getAccountManagement(req),
+  addEmployeeLookupValue: (req, listName, value) =>
+    accounts.addEmployeeLookupValue(req, listName, value),
   assignAccountHead: (req, email, headEmail) =>
     accounts.assignAccountHead(req, email, headEmail),
   saveAccountChanges: (req, changes) =>

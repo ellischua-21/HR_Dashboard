@@ -74,16 +74,20 @@ async function getInbox(req) {
       [user.email, ...reviewScope.whereValues, user.email]
     );
     forms.forEach((form) => {
+      const actionable = form.status === 'PENDING' &&
+        (form.review_stage === stage ||
+          (stage === 'HR' && form.template_key === 'nexus-accountability'));
       items.push({
         id: `form-${form.id}`,
         type: 'FORM',
-        status: form.status === 'PENDING' ? 'ACTION_REQUIRED' : form.status,
+        status: actionable ? 'ACTION_REQUIRED' :
+          form.status === 'PENDING' ? 'FORWARDED' : form.status,
         unseen:
           Boolean(form.unseen) &&
           (user.role !== 'HR' ||
             !form.task_owner ||
             form.task_owner.toLowerCase() === user.email.toLowerCase()),
-        title: `${formTitle(form.template_key)}${form.status === 'PENDING' ? ' requires review' : ' reviewed'}`,
+        title: `${formTitle(form.template_key)}${actionable ? ' requires review' : form.status === 'PENDING' ? ' forwarded to HR' : ' reviewed'}`,
         message: `${form.applicant_name} submitted Serial Number ${form.control_no}.${form.status === 'PENDING' ? '' : ` Status: ${FormStatus.titleCase(form.status)}.`}`,
         createdAt: form.submitted_at,
         formId: form.id,
