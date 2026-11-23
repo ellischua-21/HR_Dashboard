@@ -1,3 +1,5 @@
+const { responseCalendarDays } = require('../../shared/IncidentWorkflow');
+
 // Version 1 records remain intact. Version 2 uses the section-based workflow.
 async function initializeIncidentWorkflowSchema(pool) {
   for (const [table, column, definition] of [
@@ -110,6 +112,16 @@ async function initializeIncidentWorkflowSchema(pool) {
         `ALTER TABLE incident_workflows ADD COLUMN ${column} ${definition}`
       );
   }
+  // Fill missing issued deadlines without shortening existing periods or extensions.
+  await pool.execute(
+    `UPDATE incident_workflows w JOIN incident_reports r ON r.id=w.incident_id
+    SET w.deadline_date=DATE_ADD(COALESCE(
+      STR_TO_DATE(JSON_UNQUOTE(JSON_EXTRACT(w.nte,'$.dateIssued')),'%Y-%m-%d'),
+      DATE(w.nte_issued_at)),INTERVAL ? DAY)
+    WHERE r.workflow_version=2 AND r.status<>'CLOSED' AND w.phase='EMPLOYEE'
+      AND w.nte_issued_at IS NOT NULL AND w.deadline_date IS NULL`,
+    [responseCalendarDays]
+  );
   await pool.query(`CREATE TABLE IF NOT EXISTS incident_extension_requests (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     incident_id BIGINT UNSIGNED NOT NULL,

@@ -2,9 +2,9 @@
 
 **Execute one case, record the result, then continue.** See the [main plan](FinalPreDeploymentManualTestingPlan.md) for roster aliases, fixtures, permissions, API replay instructions and release gates. Use the [results CSV](FinalPreDeploymentManualTestResults.csv) to track execution.
 
-Prepared 11/13/2026 against commit `66a1184`. 179 cases; no manual case has been executed by this investigation. All writes described here are future QA actions on synthetic data in an isolated environment. Operator-assisted cases remain Blocked until their prerequisites are available.
+Prepared 11/13/2026; reviewed 11/23/2026 against application commit `5056004`. 190 cases. This revision updates procedures only; no manual case was executed or marked Pass. Previously recorded results/evidence are preserved; retest changed requirements. QA-only actions must not mutate imported real employee records.
 
-Every listed value, account or browser variant is required. Preserve per-variant results in Notes / Evidence. “Reopen” means close the view and reload it through the named menu or Refresh; use a full page reload if necessary. “QA replay” means the credential-isolated API recipe in the main plan; never carry a privileged session cookie into an unauthorized-role test.
+Execution Scope separates live observation of business records from QA-only work. In mixed cases, perform only observational steps that fit existing data on the imported database; execute mutations, fixture creation and fault/security variants in QA. A live subset is not a full-case Pass. Every listed variant is required for complete sign-off. Preserve per-variant results in Notes / Evidence. “Reopen” means close the view and reload it through the named menu or Refresh; use a full page reload if necessary. “QA replay” means the credential-isolated API recipe in the main plan; never carry a privileged session cookie into an unauthorized-role test.
 
 ## Module index
 
@@ -12,13 +12,13 @@ Every listed value, account or browser variant is required. Preserve per-variant
 | --- | --- | --- |
 | BOOT | 8 | [Startup, navigation and shared controls](#boot-cases) |
 | AUTH | 10 | [Login, identity, sessions and password](#auth-cases) |
-| EMP | 13 | [Employee management](#emp-cases) |
-| IMP | 8 | [Spreadsheet import](#imp-cases) |
-| ACC | 11 | [Account and reviewer configuration](#acc-cases) |
+| EMP | 15 | [Employee management](#emp-cases) |
+| IMP | 9 | [Spreadsheet import](#imp-cases) |
+| ACC | 13 | [Account and reviewer configuration](#acc-cases) |
 | SELF | 4 | [Personal dashboard](#self-cases) |
-| FORM | 21 | [Seven forms, routing and printing](#form-cases) |
+| FORM | 22 | [Seven forms, routing and printing](#form-cases) |
 | LEAVE | 10 | [Leave ledger and regularization](#leave-cases) |
-| ATT | 10 | [Attendance and scanner integration](#att-cases) |
+| ATT | 14 | [Attendance and scanner integration](#att-cases) |
 | REPORT | 8 | [Analytics, reports, exports and audit](#report-cases) |
 | NOTIFY | 7 | [Announcements, Inbox and badges](#notify-cases) |
 | INC | 35 | [Incident workflow and confidentiality](#inc-cases) |
@@ -26,9 +26,9 @@ Every listed value, account or browser variant is required. Preserve per-variant
 | TASK | 10 | [Ownership, timing and HR Performance](#task-cases) |
 | SEC | 8 | [Authorization, privacy and deployment boundary](#sec-cases) |
 | OPS | 5 | [Operator-assisted integration and recovery](#ops-cases) |
-| E2E | 6 | [Cross-module workflows](#e2e-cases) |
+| E2E | 7 | [Cross-module workflows](#e2e-cases) |
 
-**Total:** 179 cases — 94 Critical, 74 High, 11 Medium. All results are initially Not Tested.
+**Total:** 190 cases — 102 Critical, 77 High, 11 Medium. New cases start Not Tested; prior execution/evidence entries are preserved.
 
 ## BOOT cases
 
@@ -39,6 +39,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Functional  
 **Required Role:** All roles  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Apache and API already running in the isolated QA environment.
 
 **Test Steps:**
@@ -62,6 +63,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Negative  
 **Required Role:** Any  
+**Execution Scope:** QA only
 **Preconditions:** Browser DevTools Network request blocking available.
 
 **Test Steps:**
@@ -85,6 +87,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Regression  
 **Required Role:** Every role; Head HR separately  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Approved linked accounts from the fixture roster.
 
 **Test Steps:**
@@ -108,6 +111,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Medium  
 **Test Type:** Functional  
 **Required Role:** HR and STAFF  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Desktop browser with device emulation at 375 and 768 CSS pixels.
 
 **Test Steps:**
@@ -131,6 +135,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Functional  
 **Required Role:** STAFF and HR  
+**Execution Scope:** QA only
 **Preconditions:** Form requiring a signature; keyboard and touch or mouse available.
 
 **Test Steps:**
@@ -154,6 +159,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Regression  
 **Required Role:** HR and STAFF  
+**Execution Scope:** QA only
 **Preconditions:** An employee profile and an unsaved form dialog.
 
 **Test Steps:**
@@ -177,6 +183,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Medium  
 **Test Type:** Boundary  
 **Required Role:** Any  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** A long page and date/time inputs.
 
 **Test Steps:**
@@ -200,6 +207,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Negative  
 **Required Role:** HR  
+**Execution Scope:** QA only
 **Preconditions:** DevTools Offline and slow-network controls available.
 
 **Test Steps:**
@@ -225,13 +233,14 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Functional  
 **Required Role:** Every role  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Approved active account linked to exactly one unarchived employee.
 
 **Test Steps:**
 
-1. Sign in with the assigned Personal Email and password.
-2. Repeat using surrounding spaces and changed email capitalization.
-3. Reload and open Inbox.
+1. Sign in with the assigned Primary Email and password.
+2. Repeat with surrounding spaces and changed email capitalization.
+3. Reload and open Inbox. Verify Secondary Email and Corporate Email do not replace the Primary Email login.
 
 **Expected Result:** Both email spellings resolve to the same account; role and employee name are correct; authenticated refresh works.
 
@@ -248,6 +257,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Negative  
 **Required Role:** Signed out  
+**Execution Scope:** QA only
 **Preconditions:** One pending request, one rejected request and one approved account.
 
 **Test Steps:**
@@ -271,6 +281,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** Ordinary HR/ADMIN and STAFF  
+**Execution Scope:** QA only
 **Preconditions:** Isolated fixtures with no matching employee, two active email matches, and an archived-only match; no real-data editing.
 
 **Test Steps:**
@@ -294,6 +305,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** First setup ADMIN; second ADMIN  
+**Execution Scope:** QA only
 **Preconditions:** Separate disposable first-install QA database; operator-provisioned accounts only.
 
 **Test Steps:**
@@ -317,6 +329,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** Any  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Authenticated session with a profile/form/case open.
 
 **Test Steps:**
@@ -340,6 +353,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Security  
 **Required Role:** Any  
+**Execution Scope:** QA only
 **Preconditions:** Dedicated QA session allowed to age for the configured eight-hour cookie lifetime.
 
 **Test Steps:**
@@ -363,6 +377,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** STAFF plus QA operator  
+**Execution Scope:** QA only
 **Preconditions:** Isolated account whose active flag/role may be changed by an authorized QA operator; no browser account-disable feature assumed.
 
 **Test Steps:**
@@ -386,6 +401,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Functional  
 **Required Role:** Any  
+**Execution Scope:** QA only
 **Preconditions:** Known current password and a different 12–128 character test password.
 
 **Test Steps:**
@@ -409,6 +425,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Boundary  
 **Required Role:** Any  
+**Execution Scope:** QA only
 **Preconditions:** Authenticated synthetic account.
 
 **Test Steps:**
@@ -432,6 +449,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Security  
 **Required Role:** Same account in two separate browser profiles  
+**Execution Scope:** QA only
 **Preconditions:** Profile A and B authenticated; captured changeMyPassword request.
 
 **Test Steps:**
@@ -457,15 +475,17 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Functional  
 **Required Role:** HR or ADMIN  
-**Preconditions:** SUP-A assigned to an active SUPERVISOR or ADMIN and already approved; unused employee number and email.
+**Execution Scope:** QA only
+**Preconditions:** QA employee only; active SUP-A with an eligible active reviewer; unused employee number and Primary Email. Repeat separately as HR and ADMIN.
 
 **Test Steps:**
 
-1. Open Employee Registration and complete required fields using allowed dropdowns.
-2. Choose STAFF access, select SUP-A from Reports To, enter matching initial passwords.
-3. Review the preview and select Save employee; reopen the saved profile.
+1. Open Employees → Employee Registration and complete required fields using current choices.
+2. Choose STAFF, search Reports To and select SUP-A; enter matching initial passwords.
+3. Review the preview and select Save Employee. Find the saved employee in the master list.
+4. Check new-registration success leaves a blank form ready for the next employee.
 
-**Expected Result:** HR saves one employee and one pending account request; ADMIN saves one employee and a usable account immediately, with no pending request. Preview reflects the correct outcome; calculated name uses Last, First Middle.
+**Expected Result:** HR creates one employee plus a pending account request; ADMIN creates one employee plus usable access immediately, without a pending request. Preview reflects the actor-specific outcome. Name is calculated as Last, First Middle; successful registration resets the form, record ID, passwords and reviewer selections.
 
 **Data Integrity Check:** One employee identity; HR leaves one account_requests row and no login; ADMIN leaves one user_roles row and no pending request. Employee and account audit events commit together. An account/audit failure rolls back all related writes.
 
@@ -480,15 +500,16 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Boundary  
 **Required Role:** HR  
+**Execution Scope:** QA only
 **Preconditions:** Unsaved registration with otherwise valid values.
 
 **Test Steps:**
 
-1. Leave each required name, company/location/department/rank/status, employment date and birthday blank in turn.
+1. Leave each required field blank in turn: Last Name, First Name, Company Name, Work Location, Current Position, Department, Employee Rank, Date of Employment, Employment Status, and Birthday.
 2. Try FTE -0.01, 0, 1 and 1.01; try a future birthday.
-3. Register and edit with Employee Number and FTE blank; review/save after each correction.
+3. Register/edit with Employee Number, Middle Name, Primary Email and FTE blank; then supply Primary Email and valid account details.
 
-**Expected Result:** Missing required fields, future birthday and supplied FTE outside 0–1 are rejected; blank Employee Number/FTE and FTE values 0 and 1 are valid in registration and editing. Invalid lookup selections sent through DevTools are rejected server-side.
+**Expected Result:** Required blanks, future birthday and supplied FTE outside 0–1 reject. Employee Number, Middle Name, Primary Email, Secondary Email and FTE are optional employee fields. Blank Primary Email creates an employee-only record. A nonblank Primary Email on new registration requires valid account details. Invalid dropdown choices reject server-side.
 
 **Data Integrity Check:** Invalid requests save neither employee nor pending account.
 
@@ -503,6 +524,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Medium  
 **Test Type:** Functional  
 **Required Role:** HR  
+**Execution Scope:** QA only
 **Preconditions:** Synthetic family/emergency/social information only.
 
 **Test Steps:**
@@ -526,15 +548,18 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Functional  
 **Required Role:** HR and ADMIN  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** At least 30 employees across two companies, departments, ranks, locations and statuses.
 
 **Test Steps:**
 
-1. Search by partial name and employee number; press Enter and use Apply/Search.
-2. Change company/department/location/rank/status filters; clear them.
-3. Click each sortable master-list header twice, then search an absent term.
+1. Open the master list and verify No. ascending, including 1, 2, 10 and a three-digit value. Search a partial name/employee number with Enter and Search.
+2. Change the visible Company, Department and Status filters, then clear them. Location/Rank are report/API filters, not additional list controls.
+3. Click sortable headers twice, then search an absent term.
+4. Scroll horizontally/vertically at desktop and narrow widths. Check Account Status, No., Name of Employee and Employee Number stay frozen and header/body edges align.
+5. Sort/filter again and resize. Inspect centered text, two-line Account Status, light green Active/light red Inactive, and unclipped three-digit No. values.
 
-**Expected Result:** Matching list and total are correct; initial order is No. ascending; ascending/descending order changes; zero results show an empty state; current UI loads all rows and has no page-next requirement. A separate narrow strip to the left of No. shows Active for an active linked account and Inactive for disabled/missing accounts, including blank-email employees. Status stays aligned with the employee after sorting, filtering, scrolling, and resizing; the strip is outside the employee data table.
+**Expected Result:** Rows/count and sort directions agree; default No. order is numeric ascending and all rows load without pagination. The separate account-status strip shows Active only for an active linked account; missing, inactive-account, pending-only and blank-email records show Inactive. Status follows the correct employee through sort/filter/resize. Four identity columns stay frozen/aligned; scrolling fields do not cover frozen headers. Record any mobile overlap/clipping as a defect.
 
 **Data Integrity Check:** Read-only operations preserve employee count and values.
 
@@ -549,6 +574,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Regression  
 **Required Role:** HR  
+**Execution Scope:** QA only
 **Preconditions:** Saved profile with populated optional and sensitive fields.
 
 **Test Steps:**
@@ -557,7 +583,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Edit its address and department, review the preview, then go Back and cancel.
 3. Repeat and save; reopen from master list and HR Reports.
 
-**Expected Result:** Cancelled values do not persist; successful edit is visible in both readers; untouched fields remain present; print/profile controls remain available.
+**Expected Result:** Cancel does not persist values. Successful employee editing closes the preview and returns to Employee Master List, rather than reopening the editing sections. Reopen from both master list and HR Reports to verify saved changes, untouched fields and existing profile/print controls.
 
 **Data Integrity Check:** Same record_id and created metadata; modified metadata and UPDATE field list change once.
 
@@ -572,6 +598,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Negative  
 **Required Role:** HR  
+**Execution Scope:** QA only
 **Preconditions:** Existing current and archived employee numbers.
 
 **Test Steps:**
@@ -595,6 +622,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** HR  
+**Execution Scope:** QA only
 **Preconditions:** Unused email plus current and archived email owners.
 
 **Test Steps:**
@@ -618,13 +646,14 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** HR  
+**Execution Scope:** QA only
 **Preconditions:** Employee linked to active account, inactive account or pending request; one imported unlinked employee.
 
 **Test Steps:**
 
-1. Attempt to change and clear each linked Personal Email.
+1. Attempt to change and clear each linked Primary Email.
 2. Make an equivalent case/space-only edit and reopen.
-3. Change the unlinked employee to an unused email.
+3. Change an unlinked employee to an unused Primary Email; confirm Secondary/Corporate Email edits do not alter login identity.
 
 **Expected Result:** Linked changes/clears are rejected; equivalent edit keeps stored spelling; unlinked change succeeds.
 
@@ -641,6 +670,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** HR and the synthetic STAFF owner  
+**Execution Scope:** QA only
 **Preconditions:** Disposable employee with historical form/case and its own session open; separate backup QA admin.
 
 **Test Steps:**
@@ -664,6 +694,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Security  
 **Required Role:** HR  
+**Execution Scope:** QA only
 **Preconditions:** Synthetic Unicode name, apostrophe, ampersand, formula-like and markup-like values.
 
 **Test Steps:**
@@ -687,6 +718,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Integration  
 **Required Role:** HR then STAFF  
+**Execution Scope:** QA only
 **Preconditions:** STAFF-A linked employee; known previous job/contact fields.
 
 **Test Steps:**
@@ -710,6 +742,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Negative  
 **Required Role:** HR  
+**Execution Scope:** QA only
 **Preconditions:** Valid employee form with invalid role/password/reviewer account request.
 
 **Test Steps:**
@@ -733,6 +766,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** HR and synthetic STAFF  
+**Execution Scope:** QA only
 **Preconditions:** Active account linked to one unarchived employee; reversible QA employment-status edits.
 
 **Test Steps:**
@@ -749,6 +783,62 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Notes / Evidence:** ____________________  
 **Variant / tester / execution date / defect reference:** ____________________
 
+
+### EMP-14 — Current headers, optional contacts and generated fields
+
+**Test ID:** EMP-14
+**Module and Feature:** Employees — Current headers, optional contacts and generated fields
+**Priority:** High
+**Test Type:** Regression
+**Required Role:** HR and ADMIN
+**Execution Scope:** QA only
+**Preconditions:** QA profile with no login; current template and allowed choices.
+
+**Test Steps:**
+
+1. Compare registration, Edit, profile, master list and HR master-report labels with the current import template.
+2. Check Primary Email, optional Secondary Email/Corporate Email, Mobile Number, HMO Provider and adjacent HMO Details. Verify Landline Number is absent.
+3. Save comma/slash-separated mobile numbers as text, separate Primary/Secondary Emails and ordinary free text in HMO Details.
+4. Repeat with Primary Email blank and no account details; verify the account-role card remains visible and permitted controls are interactive.
+5. Verify generated name, No., tenure, record status and audit fields are outside registration but remain available in relevant records/reports.
+
+**Expected Result:** Current labels/field order persist. Primary Email alone identifies login; Secondary/Corporate Email do not become login addresses. Mobile is text; each supplied email must be one valid email. HMO Provider uses configured choices; HMO Details is text without a provider allowlist, subject to ordinary sanitization/length limits. Blank Primary Email saves an employee-only record.
+
+**Data Integrity Check:** No landline_no or duplicate account; optional values persist without changing unrelated fields.
+
+**Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.
+**Notes / Evidence:** ____________________
+**Variant / tester / execution date / defect reference:** ____________________
+
+
+
+### EMP-15 — Successful edit versus new-registration reset
+
+**Test ID:** EMP-15
+**Module and Feature:** Employees — Successful edit versus new-registration reset
+**Priority:** High
+**Test Type:** Regression
+**Required Role:** HR and ADMIN
+**Execution Scope:** QA only
+**Preconditions:** Disposable QA editing record, unused new-registration identities and invalid-save control.
+
+**Test Steps:**
+
+1. Edit one field, preview and save an existing employee; observe the destination.
+2. Reopen the same employee from Employee Master List and compare saved fields/account state.
+3. Register a new employee successfully; check personal fields, reviewer searches, passwords and second reviewer reset to blank/defaults.
+4. Enter a second new employee without leaving the screen and save once.
+5. Trigger a separate validation/server failure; check values remain for correction.
+
+**Expected Result:** Edit success closes preview and returns to master list. New-registration success clears the form and saved record ID, restoring enabled preview/defaults. The next registration creates another identity. Failed saves do not clear values or navigate away.
+
+**Data Integrity Check:** Edits retain record_id; new entries do not overwrite the previous employee or leak previous passwords/reviewers.
+
+**Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.
+**Notes / Evidence:** ____________________
+**Variant / tester / execution date / defect reference:** ____________________
+
+
 ## IMP cases
 
 ### IMP-01 — Template, mapping and preview
@@ -758,15 +848,17 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Functional  
 **Required Role:** HR or ADMIN  
+**Execution Scope:** QA only
 **Preconditions:** Synthetic CSV/XLSX with three valid rows and one deliberate invalid row.
 
 **Test Steps:**
 
-1. Download the import template; choose the file.
-2. Map headers, skip one optional column, and run Validate.
-3. Review valid count and original spreadsheet row errors without importing.
+1. On QA, download the current template and select a synthetic CSV/XLSX. Distinguish File column (uploaded header) from Import into (current destination).
+2. Check Primary Email, Secondary Email and HMO Provider/HMO Details mappings; skip an optional column and Validate.
+3. Skip optional Employee Number and verify validation can continue; skip required First Name separately.
+4. Review original spreadsheet row errors and generated-field destinations without importing.
 
-**Expected Result:** Template uses supported non-JSON fields; first worksheet is read; missing Employee Number mapping prevents validation; preview reports row-specific errors and saves nothing.
+**Expected Result:** Template and destination choices use current master-list labels. Generated No./Name/Age/Tenure/audit fields cannot be written from the import. First worksheet only. Employee Number mapping is optional; skipping First Name or another required mapping blocks validation. Preview saves no employees.
 
 **Data Integrity Check:** Employee count and counter are unchanged by preview.
 
@@ -781,6 +873,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** HR  
+**Execution Scope:** QA only
 **Preconditions:** Validated mixed file and a previously approved account to compare.
 
 **Test Steps:**
@@ -804,7 +897,8 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Negative  
 **Required Role:** HR  
-**Preconditions:** File with duplicate employee numbers, current/archived email collisions, file-local case variants, and two blank emails.
+**Execution Scope:** QA only
+**Preconditions:** QA file with duplicate nonblank employee numbers, current/archived Primary Emails, two valid blank-number/blank-email rows and optional Secondary Emails.
 
 **Test Steps:**
 
@@ -812,7 +906,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Commit valid rows.
 3. Revalidate the same file.
 
-**Expected Result:** Number/email duplicates are reported; blank emails remain permitted for imports; repeat import rejects already imported identities.
+**Expected Result:** Duplicate nonblank numbers and Primary Emails reject, including current/archived conflicts. Blank numbers and Primary Emails are allowed with separate generated identities; Secondary Email is contact data. Reimport rejects already claimed nonblank identities. Rows with both identifiers blank cannot be recognized as the same employee: another import may create duplicates. Reconcile before any retry; never reimport the real workbook as a test.
 
 **Data Integrity Check:** No duplicate nonblank email or employee number; two valid blank-email employees may exist.
 
@@ -827,6 +921,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Boundary  
 **Required Role:** HR  
+**Execution Scope:** QA only
 **Preconditions:** Disposable 301+ row file; row 301 duplicates a valid row 1 email/number.
 
 **Test Steps:**
@@ -850,6 +945,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Boundary  
 **Required Role:** HR  
+**Execution Scope:** QA only
 **Preconditions:** CSV and XLSX copies with text employee number 000123, leap dates, mixed-case allowed lookup values and unknown department.
 
 **Test Steps:**
@@ -873,15 +969,16 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Medium  
 **Test Type:** Negative  
 **Required Role:** HR  
+**Execution Scope:** QA only
 **Preconditions:** Header-only, unreadable and missing-required-column test files.
 
 **Test Steps:**
 
-1. Choose each file and attempt validation.
-2. Skip Employee Number mapping, then restore it.
-3. Select a valid file and retry.
+1. Choose header-only, corrupt and invalid QA files and attempt validation.
+2. Skip required First Name mapping, confirm the error and restore it. Skip optional Employee Number separately.
+3. Select a valid file and retry without committing prior invalid data.
 
-**Expected Result:** Header-only/corrupt input and missing required mapping/fields show actionable errors; no old file is accidentally committed.
+**Expected Result:** Header-only/corrupt input and missing required mappings/values show actionable errors. Optional Employee Number mapping is allowed to remain skipped. No stale file is accidentally committed.
 
 **Data Integrity Check:** No changes from invalid inputs; successful retry imports only the selected file.
 
@@ -896,6 +993,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Negative  
 **Required Role:** HR  
+**Execution Scope:** QA only
 **Preconditions:** Fresh browser profile; DevTools can block the SheetJS CDN request.
 
 **Test Steps:**
@@ -919,6 +1017,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** Two HR accounts  
+**Execution Scope:** QA only
 **Preconditions:** Isolated database; two new records targeting the same unused email.
 
 **Test Steps:**
@@ -935,6 +1034,34 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Notes / Evidence:** ____________________  
 **Variant / tester / execution date / defect reference:** ____________________
 
+
+### IMP-09 — Blank identifiers, hyphens and repeat-import reconciliation
+
+**Test ID:** IMP-09
+**Module and Feature:** Import — Blank identifiers, hyphens and repeat-import reconciliation
+**Priority:** Critical
+**Test Type:** Boundary
+**Required Role:** HR and ADMIN
+**Execution Scope:** QA only
+**Preconditions:** QA workbook with blank identifiers, sole hyphens in optional fields, hyphenated names and required-field hyphens.
+
+**Test Steps:**
+
+1. Validate optional blanks/hyphens without Employee Number mapping.
+2. Use a sole hyphen in required Company/First Name/Birthday and check rejection.
+3. Import valid rows once; compare generated No./record IDs, leading-zero supplied numbers and retained internal hyphens.
+4. Revalidate rows with both Employee Number and Primary Email blank; do not commit again.
+5. Reconcile source rows and valid/imported counts before considering any partial-import retry.
+
+**Expected Result:** A sole trimmed hyphen becomes empty on import. Optional blanks are accepted; required blanks reject. Hyphens inside normal names/numbers survive. Missing numbers remain blank; generated No./record ID identifies the employee. Blank-number/blank-email rows may validate again because repeat-import deduplication cannot identify them.
+
+**Data Integrity Check:** Commit only the intended first import. Keep the source-to-generated-ID manifest in protected QA evidence; do not reimport the completed real workbook to test this.
+
+**Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.
+**Notes / Evidence:** ____________________
+**Variant / tester / execution date / defect reference:** ____________________
+
+
 ## ACC cases
 
 ### ACC-01 — Approve reviewer chain in order
@@ -944,7 +1071,8 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** ADMIN  
-**Preconditions:** Pending HEAD-B assigned to an active HEAD/ADMIN, SUP-B assigned to an active SUPERVISOR/ADMIN, and STAFF-B assigned to pending SUP-B.
+**Execution Scope:** QA only
+**Preconditions:** HR-created QA requests: HEAD-B→active ADMIN-A; SUP-B→pending HEAD-B; STAFF-B→pending SUP-B. Do not create this pending chain as ADMIN, whose saves apply immediately.
 
 **Test Steps:**
 
@@ -967,6 +1095,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Negative  
 **Required Role:** ADMIN  
+**Execution Scope:** QA only
 **Preconditions:** Disposable pending request; employee already saved.
 
 **Test Steps:**
@@ -990,17 +1119,18 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Functional  
 **Required Role:** ADMIN  
+**Execution Scope:** QA only
 **Preconditions:** STAFF-A→SUP-A and SUP-A→HEAD-A; alternate active reviewers.
 
 **Test Steps:**
 
-1. Change both reviewer dropdowns without saving.
-2. Refresh or leave/reopen and verify persisted assignments.
-3. Change again, select Save Changes, then refresh.
-4. In ADMINS, assign another active ADMIN as head and optionally a second ADMIN; save, reopen, then clear both and save. Repeat the assignment during registration and employee editing.
-5. Repeat for HR using another HR or ADMIN in either slot. Verify the Head HR toggle stays separate and new HR forms still route through the designated Head HR workflow.
+1. In Manage Accounts → Accounts, open STAFF/SUPERVISOR tabs and search/select primary and second reviewers without saving.
+2. Leave/reopen or Refresh and confirm those unsaved choices were not persisted.
+3. Select again, Save Changes and reopen; verify both reviewer identities and single-list role tabs.
+4. In ADMINS, assign another active ADMIN and optional second ADMIN; save/reopen, then clear both. Repeat in QA registration/Edit.
+5. Repeat for HR with another HR/ADMIN; verify its separate Head HR toggle and unchanged designated Head HR form routing.
 
-**Expected Result:** Dropdown edits are staged locally; Save Changes persists both together; unsaved edits are not represented as saved. ADMIN Reports To is optional; its selectors offer only other active ADMIN accounts in Manage Accounts, with eligible pending ADMIN suggestions during registration/editing. HR Reports To is optional and permits other HR/ADMIN accounts. These HR reporting assignments do not replace the designated Head HR form routing or grant HR form-review authority. A second head needs a primary head first.
+**Expected Result:** Search selections stage changes locally; typing without selection clears the hidden selected identity. Save Changes persists both slots together. Selected fields show names without appended email; suggestions retain email for disambiguation, with email fallback when a name is unavailable. HR/ADMIN reporting assignments are optional. A distinct second reviewer requires a primary. HR reporting assignments do not replace designated Head HR form routing.
 
 **Data Integrity Check:** Only saved assignments change; HEAD_ASSIGNED audit for each saved assignment.
 
@@ -1015,6 +1145,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** ADMIN; unauthorized HR for replay  
+**Execution Scope:** QA only
 **Preconditions:** Captured saveAccountChanges request and disposable synthetic accounts.
 
 **Test Steps:**
@@ -1023,7 +1154,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Attempt the same save as HR.
 3. Reload Manage Accounts.
 
-**Expected Result:** STAFF requires an active SUPERVISOR/HEAD/ADMIN; SUPERVISOR requires another SUPERVISOR, HEAD, or ADMIN; HEAD requires another active HEAD or ADMIN. ADMIN may have no head or another active ADMIN, with an optional different second ADMIN. Self-assignment, wrong-role ADMIN heads, second-only assignments, and malformed/unauthorized batches are rejected.
+**Expected Result:** STAFF/SUPERVISOR need an active eligible SUPERVISOR, HEAD or ADMIN primary; HEAD needs another active HEAD or ADMIN. HR may leave both blank or use other HR/ADMIN; ADMIN may leave both blank or use other ADMINs. Self/inactive/wrong-role, duplicate-slot and second-only assignments reject. Invalid batches roll back; HR cannot save Manage Accounts assignments or grant ADMIN.
 
 **Data Integrity Check:** All assignments in a failed batch retain their previous values; no success audit committed.
 
@@ -1038,6 +1169,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** ADMIN and two HR accounts  
+**Execution Scope:** QA only
 **Preconditions:** HR-A is Head HR; pending HR-B form assigned to HR-A; owned HEAD-stage task exists.
 
 **Test Steps:**
@@ -1061,6 +1193,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Negative  
 **Required Role:** ADMIN  
+**Execution Scope:** QA only
 **Preconditions:** Pending HR form assigned to current Head HR.
 
 **Test Steps:**
@@ -1084,13 +1217,16 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Functional  
 **Required Role:** ADMIN  
+**Execution Scope:** QA only
 **Preconditions:** Linked active HEAD/ADMIN accounts; Sales and HR labels available.
 
 **Test Steps:**
 
-1. Open Accounts → Incident Reviewer Assignments.
-2. Select one reviewer per ordinary department, two distinct ADMINs for Heads and an active ADMIN Management Approver.
-3. Save Changes, refresh, then file a new Sales report.
+1. Open Manage Accounts → Accounts → Organization Settings → Incident Reviewers.
+2. Choose one reviewer per ordinary department, up to two distinct ADMINs for Heads, and an active ADMIN Management Approver.
+3. Save Changes, refresh and file a QA Sales report.
+4. For HR/Human Resources choose the active linked designated Head HR; file an uninvolved QA report and complete its HEAD-stage action.
+5. Check own-department Head HR filing against STAFF and reports against Head HR use the Heads ADMIN pool; compare a saved HR HEAD-stage assignment after a designation change.
 
 **Expected Result:** Saved map reappears; new report routes by filer department; Heads slots allow only ADMIN; one reviewer may cover multiple departments. HR/Human Resources also offers the active, employee-linked designated Head HR. That account can be saved for HR, receives the assigned incident in Review before NTE issuance, and can perform the HEAD stage when uninvolved. Ordinary HR and Head HR assigned to unrelated departments are rejected. Reports involving Head HR or their own-department filing use the Heads queue, preserving involvement restrictions. Existing saved case assignments remain actionable after the designation changes.
 
@@ -1100,24 +1236,26 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Notes / Evidence:** ____________________  
 **Variant / tester / execution date / defect reference:** ____________________
 
-### ACC-08 — Invalid maps and unavailable departments
+### ACC-08 — Invalid maps and dynamic departments
 
 **Test ID:** ACC-08  
-**Module and Feature:** Incident configuration — Invalid maps and unavailable departments  
+**Module and Feature:** Incident configuration — Invalid maps and dynamic departments
 **Priority:** High  
 **Test Type:** Boundary  
 **Required Role:** ADMIN  
-**Preconditions:** Captured QA configuration request; original map recorded.
+**Execution Scope:** QA only
+**Preconditions:** QA configuration payload, active department choices, nonarchived employees and a new department added through Organization Settings.
 
 **Test Steps:**
 
-1. Try duplicate reviewer/department pairs, two reviewers for Sales, three Heads reviewers and a HEAD in a Heads slot.
-2. Try inactive/unlinked reviewers and a non-ADMIN manager.
-3. Compare visible departments with actual employee departments.
+1. Try duplicate reviewer/department pairs, two Sales reviewers, three Heads reviewers and a HEAD in a Heads slot.
+2. Try inactive/unlinked reviewers, ordinary HR, Head HR for an unrelated department and a non-ADMIN manager.
+3. Compare department choices with active lookups, nonarchived employee departments and saved mappings; verify IT/new QA department are present.
+4. Save a valid map and reopen; attempt unauthorized HR save.
 
-**Expected Result:** Invalid saves reject atomically. IT, Finance and Operations are currently hidden by the configuration reader; record unavailable routing as a blocker for departments that need incidents.
+**Expected Result:** Invalid maps reject atomically. Departments are populated dynamically from active choices, nonarchived employees and saved mappings, plus Heads; IT/Finance/Operations are not intentionally hidden. A new department has no invented reviewer. Configure an eligible reviewer before filing. Unauthorized HR writes reject.
 
-**Data Integrity Check:** Existing map and manager remain unchanged after failure; do not assume hidden departments were configured.
+**Data Integrity Check:** Existing map and manager remain unchanged after failure; verify the intended departments and eligible reviewers were actually configured.
 
 **Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.  
 **Notes / Evidence:** ____________________  
@@ -1130,6 +1268,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Integration  
 **Required Role:** ADMIN then old/new assigned reviewer  
+**Execution Scope:** QA only
 **Preconditions:** Existing pending report and new filing prepared.
 
 **Test Steps:**
@@ -1153,6 +1292,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Medium  
 **Test Type:** Regression  
 **Required Role:** ADMIN  
+**Execution Scope:** QA only
 **Preconditions:** Manage Accounts open.
 
 **Test Steps:**
@@ -1177,6 +1317,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Integration  
 **Required Role:** HR/ADMIN requests; ADMIN approves
+**Execution Scope:** QA only
 **Preconditions:** Imported employee with no account; do not create a second employee.
 
 **Test Steps:**
@@ -1185,13 +1326,69 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Reopen Edit, provide a unique Primary Email, choose a role/reviewer where applicable, enter and confirm a valid password, and save.
 3. When saved by HR, verify login is unavailable until ADMIN approves; when saved by ADMIN, verify immediate login and no pending request.
 
-**Expected Result:** Existing imported employees can request account access from Edit without duplicate registration. A first account requires Primary Email and a valid password; STAFF/SUPERVISOR require an eligible reviewer. Import and profile-only edits do not grant access; HR requests need approval and ADMIN account saves apply immediately.
+**Expected Result:** Imported employees can obtain access through Edit without duplicate registration. First access needs Primary Email, valid matching passwords and a primary reviewer for STAFF/SUPERVISOR/HEAD; HR/ADMIN reporting reviewers are optional. HR requests need ADMIN approval; ADMIN saves apply immediately. Blank password retains an existing password; profile-only edits create no request.
 
 **Data Integrity Check:** Exactly one employee identity remains; the request and approval are audited. Failed account requests roll back the accompanying employee edit.
 
 **Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.  
 **Notes / Evidence:** ____________________  
 **Variant / tester / execution date / defect reference:** ____________________
+
+
+### ACC-12 — Organization choices and current incident settings
+
+**Test ID:** ACC-12
+**Module and Feature:** Accounts — Organization choices and current incident settings
+**Priority:** High
+**Test Type:** Integration
+**Required Role:** ADMIN; HR negative replay
+**Execution Scope:** QA only
+**Preconditions:** Temporary QA company/location/department names; current allowed lists recorded.
+
+**Test Steps:**
+
+1. Open Manage Accounts → Accounts → Organization Settings. Add Company Name, Work Location and Department using their Add buttons.
+2. Leave without Save Changes and reopen: the added choices should already be saved.
+3. Open fresh registration/Edit and import validation; use the new values. Check Sales, None and correctly spelled Logistics department choices.
+4. Return to Incident Reviewers; find the new department, select an eligible reviewer and Management Approver, Save Changes and reopen.
+5. Try equivalent duplicate/whitespace/case values, blank/over-191-character input and unauthorized HR API writes.
+
+**Expected Result:** Add saves choices immediately; Save Changes separately saves reviewer/Management assignments. New choices propagate to employee selectors/import validation, without duplicate equivalent options. Company casing remains configured. New department existence alone does not assign a reviewer; invalid/non-ADMIN writes reject.
+
+**Data Integrity Check:** lookup_values and LOOKUP_ADDED audit match successful changes. Use QA-only names because no general delete-choice UI exists.
+
+**Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.
+**Notes / Evidence:** ____________________
+**Variant / tester / execution date / defect reference:** ____________________
+
+
+
+### ACC-13 — Reviewer search, role eligibility and second head
+
+**Test ID:** ACC-13
+**Module and Feature:** Accounts — Reviewer search, role eligibility and second head
+**Priority:** Critical
+**Test Type:** Regression
+**Required Role:** ADMIN; HR employee editor
+**Execution Scope:** QA only
+**Preconditions:** QA employees in every role, two eligible reviewers, inactive/self/wrong-role identities.
+
+**Test Steps:**
+
+1. In registration/Edit test STAFF/SUPERVISOR→SUPERVISOR/HEAD/ADMIN, HEAD→HEAD/ADMIN, HR→HR/ADMIN and ADMIN→ADMIN in primary/second searches.
+2. Search name/email and select with keyboard/click; check emails in suggestions and names in selected fields. Clear/retype and change roles.
+3. Repeat both slots in STAFF, SUPERVISOR, HEAD, HR and ADMINS tabs; Save Changes and reopen.
+4. Try duplicate slots, second-only, self, inactive/wrong-role and unselected free text; verify server rejection of invalid identities.
+5. As HR verify allowed account-card edits remain interactive, but forced ADMIN grant/change rejects.
+
+**Expected Result:** Search display and hidden account identities remain synchronized. STAFF/SUPERVISOR/HEAD require primary; HR/ADMIN reviewers are optional. Second is optional, distinct and requires primary. Selected names omit appended emails, except fallback when no name exists. Only ADMIN grants ADMIN. HR reporting choices preserve designated Head HR form routing.
+
+**Data Integrity Check:** Only valid selected identities save. Passwords stay out of previews/logs; failed combined updates roll back; repeated entry creates no duplicate search handlers.
+
+**Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.
+**Notes / Evidence:** ____________________
+**Variant / tester / execution date / defect reference:** ____________________
+
 
 ## SELF cases
 
@@ -1202,6 +1399,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** STAFF, SUPERVISOR and HEAD  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Two different linked employee identities with distinct synthetic contact/family details.
 
 **Test Steps:**
@@ -1225,6 +1423,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Integration  
 **Required Role:** STAFF  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Configured provider with matching employee number and registered first/last name.
 
 **Test Steps:**
@@ -1248,6 +1447,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** STAFF and HR/ADMIN
+**Execution Scope:** QA only
 **Preconditions:** Isolated provider fixtures with a unique first/last name and differing scanner/HRIS numbers; duplicate employee names; same-name scanner identities across accounts.
 
 **Test Steps:**
@@ -1273,6 +1473,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Negative  
 **Required Role:** HEAD  
+**Execution Scope:** QA only
 **Preconditions:** Valid profile; provider deliberately unavailable in QA.
 
 **Test Steps:**
@@ -1298,6 +1499,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Functional  
 **Required Role:** STAFF, SUPERVISOR, HEAD and HR  
+**Execution Scope:** QA only
 **Preconditions:** Valid linked profile and reviewer chain; HR has Head HR.
 
 **Test Steps:**
@@ -1321,6 +1523,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Boundary  
 **Required Role:** STAFF  
+**Execution Scope:** QA only
 **Preconditions:** Valid reviewer; Authority To Deduct open.
 
 **Test Steps:**
@@ -1344,6 +1547,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Functional  
 **Required Role:** STAFF  
+**Execution Scope:** QA only
 **Preconditions:** Correction form; session has assigned SUP-A.
 
 **Test Steps:**
@@ -1367,6 +1571,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Boundary  
 **Required Role:** SUPERVISOR  
+**Execution Scope:** QA only
 **Preconditions:** Travel request and assigned HEAD-A.
 
 **Test Steps:**
@@ -1390,6 +1595,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Boundary  
 **Required Role:** STAFF  
+**Execution Scope:** QA only
 **Preconditions:** Overtime form open.
 
 **Test Steps:**
@@ -1413,6 +1619,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Boundary  
 **Required Role:** STAFF  
+**Execution Scope:** QA only
 **Preconditions:** Time In/Out Record open.
 
 **Test Steps:**
@@ -1436,6 +1643,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** STAFF then HR  
+**Execution Scope:** QA only
 **Preconditions:** Property form; HR available to claim its review.
 
 **Test Steps:**
@@ -1459,6 +1667,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Boundary  
 **Required Role:** STAFF  
+**Execution Scope:** QA only
 **Preconditions:** Property form open.
 
 **Test Steps:**
@@ -1482,6 +1691,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Negative  
 **Required Role:** STAFF  
+**Execution Scope:** QA only
 **Preconditions:** Any applicable form open; otherwise valid values.
 
 **Test Steps:**
@@ -1504,14 +1714,16 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Module and Feature:** Forms — Reviewer routing by submitter  
 **Priority:** Critical  
 **Test Type:** Integration  
-**Required Role:** STAFF, SUPERVISOR, HEAD, HR and Head HR  
+**Required Role:** STAFF, SUPERVISOR, HEAD, HR, designated Head HR and assigned/unassigned ADMIN
+**Execution Scope:** QA only
 **Preconditions:** Complete account chain; use an ordinary form rather than NAC.
 
 **Test Steps:**
 
-1. Submit one form per listed role.
-2. Open queues as assigned SUP-A, HEAD-A, Head HR and another HR.
-3. Forward STAFF/SUPERVISOR/HEAD forms and compare their next queue.
+1. Submit ordinary QA forms for STAFF with SUPERVISOR/HEAD/ADMIN reviewer variants; repeat SUPERVISOR with those three and HEAD with HEAD/ADMIN.
+2. Check assigned reviewers' queues and Inbox; sign/forward to HR and compare an unassigned account of the same role.
+3. Submit ordinary HR and Head HR forms; verify HR Reports To/second-head choices do not replace designated Head HR routing.
+4. Check previously submitted forms retain stored reviewer slots after account-assignment changes.
 
 **Expected Result:** STAFF→assigned SUPERVISOR/HEAD/ADMIN→HR; SUPERVISOR→assigned SUPERVISOR/HEAD/ADMIN→HR; HEAD→another assigned HEAD/ADMIN→HR; ordinary HR→Head HR for final decision; Head HR’s own form→another HR. Previously submitted forms retain their stored reviewers.
 
@@ -1528,6 +1740,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Negative  
 **Required Role:** STAFF, SUPERVISOR and HR  
+**Execution Scope:** QA only
 **Preconditions:** Isolated fixtures with missing/inactive/wrong-role assigned reviewers and no designated Head HR.
 
 **Test Steps:**
@@ -1551,6 +1764,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Functional  
 **Required Role:** STAFF or HR applicant  
+**Execution Scope:** QA only
 **Preconditions:** Own ordinary form PENDING at HEAD stage, assigned reviewer, no taken HR task.
 
 **Test Steps:**
@@ -1574,6 +1788,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** Applicant plus unrelated STAFF  
+**Execution Scope:** QA only
 **Preconditions:** Own forms rejected, approved, forwarded to HR or taken by Head HR; another employee’s editable form.
 
 **Test Steps:**
@@ -1596,7 +1811,8 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Module and Feature:** Forms — Supervisor/Head sign and forward  
 **Priority:** Critical  
 **Test Type:** Functional  
-**Required Role:** Assigned SUPERVISOR, HEAD or ADMIN
+**Required Role:** Assigned SUPERVISOR/HEAD/ADMIN, HR and applicant
+**Execution Scope:** QA only
 **Preconditions:** Pending assigned STAFF, SUPERVISOR, and HEAD ordinary forms; one older SUPERVISOR form with a stored HEAD reviewer.
 
 **Test Steps:**
@@ -1604,7 +1820,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 1. Open Review Requests → View form.
 2. Try approval without signature, then draw it and Sign.
 3. Reload applicant, assigned reviewer and HR queues.
-4. Register/edit SUPERVISOR with another SUPERVISOR/HEAD/ADMIN and HEAD with another HEAD/ADMIN. Check Reports To stays editable; verify self/cross-role assignments reject. Test either reviewer slot, signing and rejection; confirm the stored older SUPERVISOR form still accepts its original HEAD reviewer. Check the ADMIN combined queue and inbox before and after forwarding.
+4. Register/edit SUPERVISOR with another SUPERVISOR/HEAD/ADMIN and HEAD with another HEAD/ADMIN. Check Reports To stays editable; verify self-assignment and roles outside the allowed matrix reject. Test either reviewer slot, signing and rejection; confirm the stored older SUPERVISOR form still accepts its original HEAD reviewer. Check the assigned ADMIN combined queue and Inbox before and after forwarding.
 5. Attempt the same actions as an unassigned ADMIN, on an HR-stage form, on an HR employee form, and after the other reviewer has already advanced the stage; verify denial and unchanged data.
 
 **Expected Result:** Required signature enforced; approval forwards with status still PENDING and stage HR; signed-by/time retained; applicant can no longer edit.
@@ -1622,6 +1838,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Functional  
 **Required Role:** HR  
+**Execution Scope:** QA only
 **Preconditions:** Form at HR stage; an uninvolved eligible HR.
 
 **Test Steps:**
@@ -1645,6 +1862,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Negative  
 **Required Role:** Assigned reviewer then HR  
+**Execution Scope:** QA only
 **Preconditions:** Two separate pending ordinary forms; HR owns its task.
 
 **Test Steps:**
@@ -1668,6 +1886,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Medium  
 **Test Type:** Regression  
 **Required Role:** Applicant, reviewer and ADMIN  
+**Execution Scope:** QA only
 **Preconditions:** Mixed form types, states and submission dates.
 
 **Test Steps:**
@@ -1691,15 +1910,16 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** Unassigned reviewer, applicant, ADMIN and owning HR  
+**Execution Scope:** QA only
 **Preconditions:** Pending owned form; two browser tabs.
 
 **Test Steps:**
 
-1. Replay approval as applicant, wrong reviewer and ADMIN.
-2. As owner, approve simultaneously from two tabs.
-3. Retry rejection using the stale pending request.
+1. Replay approval as applicant, unrelated reviewer and unassigned ADMIN. Separately confirm an assigned ADMIN can act only at the eligible HEAD stage.
+2. Race two assigned slots on a pending ordinary form in separate profiles; repeat final HR approval from the legitimate owner's two tabs.
+3. Retry approval/rejection from a stale view and reopen the form.
 
-**Expected Result:** Unauthorized/self reviews reject; exactly one final transition succeeds; stale repeat returns already-reviewed/conflict rather than overwriting.
+**Expected Result:** Unauthorized/self actions reject. An assigned ADMIN can review a non-HR applicant at HEAD stage; unassigned ADMIN, HR-employee routing bypasses and ADMIN HR-stage processing reject. Either eligible slot can complete the one HEAD stage; one transition wins, with no stale overwrite.
 
 **Data Integrity Check:** One decision, one final audit/task completion and at most one leave deduction.
 
@@ -1714,6 +1934,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Boundary  
 **Required Role:** Two applicants  
+**Execution Scope:** QA only
 **Preconditions:** Isolated QA environment; same template and two distinct submissions.
 
 **Test Steps:**
@@ -1737,6 +1958,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Integration  
 **Required Role:** HR and applicant  
+**Execution Scope:** QA only
 **Preconditions:** Already signed historical form; applicant profile edited afterward.
 
 **Test Steps:**
@@ -1760,6 +1982,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Boundary  
 **Required Role:** Two applicants and QA operator  
+**Execution Scope:** QA only
 **Preconditions:** Disposable clock-controlled runtime around Manila Dec 31/Jan 1; no production clock changes.
 
 **Test Steps:**
@@ -1776,6 +1999,34 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Notes / Evidence:** ____________________  
 **Variant / tester / execution date / defect reference:** ____________________
 
+
+### FORM-22 — Either assigned reviewer can complete the first stage
+
+**Test ID:** FORM-22
+**Module and Feature:** Forms — Either assigned reviewer can complete the first stage
+**Priority:** Critical
+**Test Type:** Integration
+**Required Role:** Applicant, both assigned reviewers including assigned ADMIN, and HR
+**Execution Scope:** QA only
+**Preconditions:** QA ordinary forms with two stored reviewers; HR/NAC control forms.
+
+**Test Steps:**
+
+1. Submit an ordinary STAFF/SUPERVISOR/HEAD form with two reviewers; inspect both queues/Inbox.
+2. Have only the second reviewer sign/forward; check HR receives it without primary approval.
+3. On another form let primary reject; attempt a later action as second.
+4. Race both slots in separate profiles on a fresh pending form.
+5. Repeat with assigned ADMIN; compare unassigned ADMIN and unchanged HR/NAC exception routes.
+
+**Expected Result:** Either slot can forward or reject; both approvals are never required. First successful action completes the single HEAD stage; other slot becomes nonactionable. Assigned ADMIN only acts for an eligible non-HR ordinary form. Final HR ownership/signature rules are unchanged.
+
+**Data Integrity Check:** Stored slots and actual signing actor retained; one stage change/audit/notification outcome, no duplicate leave deduction.
+
+**Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.
+**Notes / Evidence:** ____________________
+**Variant / tester / execution date / defect reference:** ____________________
+
+
 ## LEAVE cases
 
 ### LEAVE-01 — All implemented types and pay choices
@@ -1785,6 +2036,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Functional  
 **Required Role:** Eligible STAFF  
+**Execution Scope:** QA only
 **Preconditions:** Regular employee above Rank and File; leave form open.
 
 **Test Steps:**
@@ -1808,6 +2060,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Boundary  
 **Required Role:** STAFF  
+**Execution Scope:** QA only
 **Preconditions:** Leave form otherwise complete.
 
 **Test Steps:**
@@ -1831,12 +2084,13 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** STAFF accounts with different employee ranks  
-**Preconditions:** Regular Supervisory, Regular Rank and File, Probationary Supervisory, Contractual and blank-rank historical fixture.
+**Execution Scope:** QA only
+**Preconditions:** Regular Supervisor, Regular Rank and File, Probationary Supervisor, Contractual and blank-rank historical fixture.
 
 **Test Steps:**
 
 1. Open balances and attempt WITH_PAY SL/VL for each fixture.
-2. Repeat a positive test using STAFF login role but Supervisory employee rank.
+2. Repeat a positive test using STAFF login role but Supervisor employee rank.
 3. Inspect the selected default pay option.
 
 **Expected Result:** Only nonarchived Regular employee with nonblank rank above Rank and File receives allowance; account login role does not determine eligibility; unavailable allowance defaults to Without Pay.
@@ -1854,6 +2108,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** Eligible applicant, assigned reviewer and HR  
+**Execution Scope:** QA only
 **Preconditions:** Fresh eligible annual SL=5 and VL=5; no historical deductions.
 
 **Test Steps:**
@@ -1877,6 +2132,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** Two HR reviewers  
+**Execution Scope:** QA only
 **Preconditions:** Same employee with one day VL left; two pending one-day requests claimed separately.
 
 **Test Steps:**
@@ -1900,6 +2156,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** HR  
+**Execution Scope:** QA only
 **Preconditions:** Paid pending form; applicant initially eligible.
 
 **Test Steps:**
@@ -1923,6 +2180,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Boundary  
 **Required Role:** Eligible applicant and HR  
+**Execution Scope:** QA only
 **Preconditions:** Employee eligible in both years; Dec 31–Jan 1 period; isolated data.
 
 **Test Steps:**
@@ -1946,6 +2204,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** HR plus QA operator  
+**Execution Scope:** QA only
 **Preconditions:** Isolated second-year insufficient balance; historical approved same/cross-year form fixtures.
 
 **Test Steps:**
@@ -1969,6 +2228,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Security  
 **Required Role:** Owning HR, applicant and assigned reviewer  
+**Execution Scope:** QA only
 **Preconditions:** Leave review dialog open at HR stage.
 
 **Test Steps:**
@@ -1992,6 +2252,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** HR plus QA operator  
+**Execution Scope:** QA only
 **Preconditions:** Isolated clock-controlled fixture: probationary employee one day before six months, one exactly due; different ranks; archived control.
 
 **Test Steps:**
@@ -2017,6 +2278,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Integration  
 **Required Role:** HR and ADMIN  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Configured QA Hik-Connect source with known scans in two departments.
 
 **Test Steps:**
@@ -2040,6 +2302,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Boundary  
 **Required Role:** HR  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Provider test records around 08:11, 18:30 and 19:01 Manila time.
 
 **Test Steps:**
@@ -2063,6 +2326,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Boundary  
 **Required Role:** HR  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** One-scan, daily-summary-only and no-provider-row employee fixtures.
 
 **Test Steps:**
@@ -2086,6 +2350,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Boundary  
 **Required Role:** HR  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Known scan sequences with seconds; see docs/Attendance.md.
 
 **Test Steps:**
@@ -2109,6 +2374,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Regression  
 **Required Role:** HR  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Arrival rescans across devices; short midday lunch; latest scan is break return.
 
 **Test Steps:**
@@ -2132,6 +2398,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Medium  
 **Test Type:** Functional  
 **Required Role:** HR  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Employee with several device names/serials and long names.
 
 **Test Steps:**
@@ -2155,6 +2422,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** HR and STAFF  
+**Execution Scope:** QA only
 **Preconditions:** Two preconfigured QA provider accounts with same numeric ID for distinct names.
 
 **Test Steps:**
@@ -2163,7 +2431,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Check department options and device logs.
 3. Open each corresponding employee’s personal dashboard.
 
-**Expected Result:** HR keeps account-scoped rows separate; personal lookup also matches registered name; no ID-only disclosure or cross-account break inference in the HR list.
+**Expected Result:** Provider-account rows remain separate even when numbers coincide. Unique registered first/last names link to the correct dashboard despite different HRIS numbers. Same-name scanner identities across accounts need explicit HR links; no ID-only disclosure or cross-account inference in the HR list.
 
 **Data Integrity Check:** Provider accounts stay distinct; no deduplication assumed across accounts.
 
@@ -2178,6 +2446,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Negative  
 **Required Role:** HR  
+**Execution Scope:** QA only
 **Preconditions:** Operator-controlled provider stub; no live credential changes.
 
 **Test Steps:**
@@ -2201,6 +2470,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Medium  
 **Test Type:** Regression  
 **Required Role:** HR and STAFF  
+**Execution Scope:** QA only
 **Preconditions:** Provider fixture can add a scan; clock and retrieval times visible.
 
 **Test Steps:**
@@ -2211,7 +2481,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 
 **Expected Result:** Normal reads may use 60-second cache; Refresh requests new data; own and HR attendance follow shared calculation; no indefinite stale display.
 
-**Data Integrity Check:** No database attendance record is created; scanner source remains authoritative.
+**Data Integrity Check:** Scans remain provider-owned, not stored as attendance punch rows. Only explicit confirmation creates/updates attendance_employee_links with an audit; normal reads do not create confirmed links.
 
 **Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.  
 **Notes / Evidence:** ____________________  
@@ -2224,6 +2494,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Negative  
 **Required Role:** HR; STAFF replay  
+**Execution Scope:** QA only
 **Preconditions:** Unconfigured/partial configuration fixture and captured listAttendance QA request.
 
 **Test Steps:**
@@ -2240,6 +2511,118 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Notes / Evidence:** ____________________  
 **Variant / tester / execution date / defect reference:** ____________________
 
+
+### ATT-11 — Unique names fill the existing personal dashboard
+
+**Test ID:** ATT-11
+**Module and Feature:** Attendance — Unique names fill the existing personal dashboard
+**Priority:** Critical
+**Test Type:** Integration
+**Required Role:** STAFF, SUPERVISOR, HEAD; HR observer
+**Execution Scope:** Live observation / QA variants
+**Preconditions:** QA scanner fixtures with unique names/different or blank HRIS number, accents/case/spacing, unmatched/partial-name controls; real records may be observed only.
+
+**Test Steps:**
+
+1. Open HR Attendance on a known date and compare the fixture's scanner times/logs.
+2. Open that employee's existing personal dashboard and compare all eight fields and Time Logs; repeat with blank/different HRIS number.
+3. Test case/accent/whitespace variants and partial/fuzzy controls that must not auto-match.
+4. Change date, Refresh and switch accounts during a slow read.
+5. Check no-provider-row dates show dashes and no unrelated employee's scans appear.
+
+**Expected Result:** Unique normalized first/last names match without equal scanner/HRIS numbers. Existing inference/AM-PM formatting fills the unchanged card. No partial/fuzzy guesses. Scanner-name ambiguity is checked among returned identities for the selected day, not a full enrollment directory. No scans means blank times.
+
+**Data Integrity Check:** Session determines self identity; caller selectors do not. Automatic reads create no confirmed mapping and never change punches; namespaces remain separate.
+
+**Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.
+**Notes / Evidence:** ____________________
+**Variant / tester / execution date / defect reference:** ____________________
+
+
+
+### ATT-12 — HR confirms duplicate-name attendance links
+
+**Test ID:** ATT-12
+**Module and Feature:** Attendance — HR confirms duplicate-name attendance links
+**Priority:** Critical
+**Test Type:** Integration
+**Required Role:** HR/ADMIN with employee-write permission; two same-name STAFF accounts
+**Execution Scope:** QA only
+**Preconditions:** QA duplicate employees and/or same-name scanner IDs across provider namespaces; no confirmed link.
+
+**Test Steps:**
+
+1. Check ambiguous personal attendance is withheld with HR-confirmation guidance.
+2. In Employees → Attendance choose Link employee under the correct scanner ID.
+3. Search/select the employee using No., employee number and department to distinguish duplicates; unselected text must not save.
+4. Cancel final confirmation once, then Confirm link. Reopen the dialog and reload the page.
+5. Refresh both personal dashboards; only the selected employee receives that scanner's logs. Confirm a second namespace separately where needed.
+
+**Expected Result:** Final confirmation identifies scanner name/ID/provider and target employee. Cancel writes nothing; save closes dialog. Confirmed links persist and override auto matching. Unresolved identities remain withheld and another provider's same ID is not linked implicitly.
+
+**Data Integrity Check:** One attendance_employee_links row per provider/scanner ID, correct target/confirmer/time and transactional ATTENDANCE_EMPLOYEE_LINK audit. No scanner punch edits or real-link mutation in this QA case.
+
+**Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.
+**Notes / Evidence:** ____________________
+**Variant / tester / execution date / defect reference:** ____________________
+
+
+
+### ATT-13 — Corrected links, changed scanner names and historical scope
+
+**Test ID:** ATT-13
+**Module and Feature:** Attendance — Corrected links, changed scanner names and historical scope
+**Priority:** Critical
+**Test Type:** Regression
+**Required Role:** HR/ADMIN and old/new linked employees
+**Execution Scope:** QA only
+**Preconditions:** QA confirmed link, two targets, old/new scanner-name dates and archived-target control.
+
+**Test Steps:**
+
+1. Reopen Link employee, verify Confirmed status and selected employee; correct to another QA target and refresh both dashboards.
+2. Change scanner name in the provider fixture, refresh and verify the previous link is withheld.
+3. Reconfirm after checking the target; archive the QA target and check no automatic reassignment.
+4. Read an earlier date; compare name-fingerprint behavior and same ID in another namespace.
+5. Restore QA fixtures; do not repurpose a live provider namespace.
+
+**Expected Result:** Correction changes the current mapping and selected recipient. Renamed scanner or archived target needs confirmation. Links are not effective-dated: reassignment affects matching-name historical reads, while old-name history may need a new confirmation. Different namespaces never share links by ID alone.
+
+**Data Integrity Check:** No employee/form/punch rewriting; current link/audit reflect the correction. Record historical-data consequences before any operational reassignment.
+
+**Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.
+**Notes / Evidence:** ____________________
+**Variant / tester / execution date / defect reference:** ____________________
+
+
+
+### ATT-14 — Attendance-link permissions, stale saves and rollback
+
+**Test ID:** ATT-14
+**Module and Feature:** Attendance — Attendance-link permissions, stale saves and rollback
+**Priority:** Critical
+**Test Type:** Security
+**Required Role:** HR/ADMIN, STAFF and read-only negative actors
+**Execution Scope:** QA only
+**Preconditions:** Two HR profiles, captured QA requests, controlled audit failure and saved/unsaved links.
+
+**Test Steps:**
+
+1. Replay HR link context/confirmation as STAFF/unrelated role and HR without employee-write permission; check read/write-specific denials.
+2. Try unknown provider/scanner/date/employee, changed scanner name and malformed prior employee ID.
+3. Open one link in two HR profiles, save different targets in turn, then try the older stale request.
+4. Race first confirmation to different targets and inspect winner/audit.
+5. Inject audit failure in QA; confirm rollback, restore dependency, reopen and retry.
+
+**Expected Result:** Only HR/Admin reads context; confirmation also needs employee-write. Input must identify a real scanner row and nonarchived employee. Stale/changed identities reject; conflicting saves require reopening. Mapping and success audit commit or roll back together.
+
+**Data Integrity Check:** No private candidate payload to STAFF, unauthorized/stale overwrite or partial mapping. Compare both target dashboards after accepted saves.
+
+**Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.
+**Notes / Evidence:** ____________________
+**Variant / tester / execution date / defect reference:** ____________________
+
+
 ## REPORT cases
 
 ### REPORT-01 — Workforce totals and filters
@@ -2249,6 +2632,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Integration  
 **Required Role:** HR  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Known fixture manifest with employment dates, active/inactive statuses and FTE values.
 
 **Test Steps:**
@@ -2272,6 +2656,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Medium  
 **Test Type:** Boundary  
 **Required Role:** HR  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Empty/one/four/five employee populations available through filters; missing government/optional details.
 
 **Test Steps:**
@@ -2295,6 +2680,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Functional  
 **Required Role:** HR and ADMIN  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Fixture manifest; expected report IDs listed in main plan.
 
 **Test Steps:**
@@ -2318,6 +2704,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Regression  
 **Required Role:** HR  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Master report with long/structured profile fields and varied employment dates.
 
 **Test Steps:**
@@ -2341,6 +2728,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Security  
 **Required Role:** HR or ADMIN  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Master/report filters; quotes, commas, Unicode and formula-like synthetic text.
 
 **Test Steps:**
@@ -2364,6 +2752,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Functional  
 **Required Role:** ADMIN then HR  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Two-year employment-date fixtures.
 
 **Test Steps:**
@@ -2387,6 +2776,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** ADMIN  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Known synthetic create/update/archive/export/access-denied/configuration events.
 
 **Test Steps:**
@@ -2410,6 +2800,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** STAFF/SUPERVISOR/HEAD; HR for load  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Captured report/export/audit requests; disposable 300+ employee dataset.
 
 **Test Steps:**
@@ -2435,6 +2826,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Functional  
 **Required Role:** HR or ADMIN  
+**Execution Scope:** QA only
 **Preconditions:** Synthetic title/message prepared.
 
 **Test Steps:**
@@ -2458,6 +2850,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Regression  
 **Required Role:** STAFF, SUPERVISOR and HEAD  
+**Execution Scope:** QA only
 **Preconditions:** New unacknowledged announcement for each account.
 
 **Test Steps:**
@@ -2481,6 +2874,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Functional  
 **Required Role:** Every role  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Mixed announcements, assigned form and accessible incident notifications.
 
 **Test Steps:**
@@ -2504,6 +2898,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Security  
 **Required Role:** HR-A, HR-B and ADMIN  
+**Execution Scope:** QA only
 **Preconditions:** One HR-authored announcement, owned form/incident and third-party events.
 
 **Test Steps:**
@@ -2526,16 +2921,18 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Module and Feature:** Notifications — Badges and collapsed group dots  
 **Priority:** Medium  
 **Test Type:** Regression  
-**Required Role:** SUPERVISOR, HEAD, HR and ADMIN  
+**Required Role:** ADMIN, HR, assigned reviewer and STAFF
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Pending review items and unresolved accessible incidents; 100+ items for cap fixture.
 
 **Test Steps:**
 
-1. Observe Inbox/review/incident badges and collapse their groups.
-2. Open Inbox, then refresh task/case state.
-3. Complete one item and wait for applicable refresh cycle.
+1. Inspect Inbox/review/incident badges and collapsed dots. As ADMIN check Account Requests after HR creates a QA request.
+2. Approve/reject and check the pending count clears at zero; return to the tab and allow the 60-second visible polling cycle.
+3. Compare a directly ADMIN-created account: it is immediately usable and must not increase the pending count.
+4. Open Inbox, refresh task/case state and complete one item; compare its badge cycle.
 
-**Expected Result:** Inbox/review numbers cap visually at 99+; yellow dots appear only on closed groups with badges; reading Inbox does not resolve incidents; completed items leave active-case badge scope.
+**Expected Result:** Numbers cap at 99+; collapsed groups show yellow dots only while relevant counts exist. Account Requests includes HR pending requests and excludes immediately applied ADMIN saves. Reading Inbox does not approve accounts/resolve incidents; completed items leave actionable badge scope.
 
 **Data Integrity Check:** Badge reads change only applicable seen markers, not workflow status.
 
@@ -2550,6 +2947,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** Reported employee, requested recipient and unrelated STAFF  
+**Execution Scope:** QA only
 **Preconditions:** Issued final decision and a pending information request with unique synthetic confidential text.
 
 **Test Steps:**
@@ -2573,6 +2971,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Medium  
 **Test Type:** Boundary  
 **Required Role:** HR and STAFF  
+**Execution Scope:** QA only
 **Preconditions:** Visible tab; notifications arriving while open; 500+ synthetic history items if available.
 
 **Test Steps:**
@@ -2598,6 +2997,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Functional  
 **Required Role:** SUPERVISOR  
+**Execution Scope:** QA only
 **Preconditions:** Sales reviewer configured; reported, concerned, involved and witness employees have active linked accounts.
 
 **Test Steps:**
@@ -2621,6 +3021,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** STAFF, ordinary HR, Head HR, assigned and unassigned ADMIN  
+**Execution Scope:** QA only
 **Preconditions:** Accounts with/without department reviewer assignments.
 
 **Test Steps:**
@@ -2644,6 +3045,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** SUPERVISOR  
+**Execution Scope:** QA only
 **Preconditions:** Two distinct reported employees; complete first report.
 
 **Test Steps:**
@@ -2652,7 +3054,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Select different identities/outcomes data and remove/re-add a report.
 3. Submit both; switch Related Incident Reports in Track.
 
-**Expected Result:** Shared details copied for review; each employee gets separate IR/outcome under one group; last report cannot be removed; only accessible siblings listed.
+**Expected Result:** File Another creates a separate report card, with its own IR number/outcome under the filing group. Each card's concerned employee, reported employee, involved people and witnesses share that card's IR number; adding participants creates no extra report. Last card cannot be removed; only accessible sibling reports are listed. Confirmation is singular for one card and states the report count for multiple cards.
 
 **Data Integrity Check:** Two reports, one group; intended employee identities and separate attachments preserved.
 
@@ -2667,6 +3069,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Boundary  
 **Required Role:** SUPERVISOR  
+**Execution Scope:** QA only
 **Preconditions:** Unsaved valid filing; QA request editor.
 
 **Test Steps:**
@@ -2690,6 +3093,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** SUPERVISOR and ADMIN  
+**Execution Scope:** QA only
 **Preconditions:** QA department with no reviewer, then reviewer listed as filer/reported/concerned/witness.
 
 **Test Steps:**
@@ -2713,6 +3117,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** Two ADMINs assigned to Heads  
+**Execution Scope:** QA only
 **Preconditions:** Report against HEAD/ADMIN or HEAD’s own-department STAFF filing; both reviewers uninvolved.
 
 **Test Steps:**
@@ -2736,7 +3141,8 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** Head HR, HR-department ADMIN reviewer and HR-B  
-**Preconditions:** HR department map configured; uninvolved HR-B available.
+**Execution Scope:** QA only
+**Preconditions:** QA Head HR files against STAFF in HR; the ordinary HR department reviewer is that Head HR. Two uninvolved Heads-pool ADMINs and HR-B are available.
 
 **Test Steps:**
 
@@ -2744,7 +3150,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Assigned ADMIN reviews/issues NTE; employee submits signed explanation.
 3. Compare Head HR and HR-B task eligibility.
 
-**Expected Result:** HR filing routes to HR department reviewer; involved Head HR cannot evaluate own filing; uninvolved HR can take later task.
+**Expected Result:** Head HR own-department filing against STAFF uses the Heads ADMIN pool, preventing self-review; reports against designated Head HR use that pool too. Other uninvolved filings follow the appropriate department mapping. Involved Head HR cannot evaluate their own filing; uninvolved HR-B can take the later task.
 
 **Data Integrity Check:** Reporter attribution preserved; no HR self-review ownership.
 
@@ -2759,6 +3165,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** Assigned HEAD and filing SUPERVISOR  
+**Execution Scope:** QA only
 **Preconditions:** New HEAD-phase report.
 
 **Test Steps:**
@@ -2782,6 +3189,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Functional  
 **Required Role:** Assigned HEAD  
+**Execution Scope:** QA only
 **Preconditions:** HEAD-phase report with no pending information requests.
 
 **Test Steps:**
@@ -2792,7 +3200,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 
 **Expected Result:** Draft survives reload; issuance requires policy/classification/Other description/signature; fixed five-calendar-day directive and issuer identity included; phase becomes EMPLOYEE and public status NTE ISSUED.
 
-**Data Integrity Check:** Immutable issued document snapshot/version and issuer signature; no response deadline until receipt.
+**Data Integrity Check:** Immutable issued document snapshot/version and issuer signature; response deadline is set immediately to the Manila issuance date plus five calendar days.
 
 **Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.  
 **Notes / Evidence:** ____________________  
@@ -2805,6 +3213,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** Reported employee, witness, assigned HEAD and HR  
+**Execution Scope:** QA only
 **Preconditions:** Saved unissued NTE and Section IV draft evidence.
 
 **Test Steps:**
@@ -2828,6 +3237,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Functional  
 **Required Role:** Assigned HEAD  
+**Execution Scope:** QA only
 **Preconditions:** HEAD-phase report with no pending request; sibling remains open.
 
 **Test Steps:**
@@ -2844,24 +3254,25 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Notes / Evidence:** ____________________  
 **Variant / tester / execution date / defect reference:** ____________________
 
-### INC-12 — Receipt signature starts deadline
+### INC-12 — Issuance starts deadline; immediate response
 
 **Test ID:** INC-12  
-**Module and Feature:** Employee response — Receipt signature starts deadline  
+**Module and Feature:** Employee response — Issuance starts deadline; immediate response
 **Priority:** Critical  
 **Test Type:** Boundary  
 **Required Role:** Reported employee  
+**Execution Scope:** QA only
 **Preconditions:** Issued NTE; receipt not yet signed; weekend/year-boundary date fixture.
 
 **Test Steps:**
 
-1. View issued NTE and confirm no receipt deadline yet.
-2. Sign receipt once and note Manila receipt date.
-3. Compare deadline five calendar days later; attempt repeated receipt from another tab.
+1. Issue the NTE as assigned HEAD and note its Manila issuance date.
+2. Before signing, open it as the reported employee; verify the explanation field, signature and countdown are already available.
+3. Compare the deadline with issuance plus five calendar days; submit the signed explanation later and verify the deadline does not reset.
 
-**Expected Result:** Only reported employee can sign; receipt binds issued document version; five calendar days include weekends/holidays; repeated receipt fails and does not reset deadline.
+**Expected Result:** Only the reported employee can respond; issuance starts the five-calendar-day period including weekends/holidays. No preliminary receipt step is required. Signed submission records receipt against the issued version and submits the explanation atomically; receipt never resets the deadline.
 
-**Data Integrity Check:** One receipt snapshot/timestamp/deadline; issuer signature unchanged.
+**Data Integrity Check:** One receipt snapshot/timestamp and explanation snapshot; deadline remains based on issuance (or an approved extension); issuer signature unchanged.
 
 **Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.  
 **Notes / Evidence:** ____________________  
@@ -2874,7 +3285,8 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Functional  
 **Required Role:** Reported employee  
-**Preconditions:** Receipt signed; phase EMPLOYEE.
+**Execution Scope:** QA only
+**Preconditions:** NTE issued; phase EMPLOYEE. Exercise both unsigned and previously acknowledged receipt variants.
 
 **Test Steps:**
 
@@ -2882,7 +3294,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Reload, reopen, draw explanation signature and submit with sufficient statement.
 3. Try resubmitting/editing explanation through stale UI/API.
 
-**Expected Result:** Draft restores for owner; submission requires receipt and signature; submitted explanation immutable; HR becomes eligible only after submission; pending extension resolves if explanation arrives first.
+**Expected Result:** Draft restores for owner without prior receipt; submission requires a signature and records any missing receipt in the same transaction; submitted explanation immutable; HR becomes eligible only after submission; pending extension resolves if explanation arrives first.
 
 **Data Integrity Check:** Draft cleared; submitted statement/signature/version snapshot retained; evidence preserved without unintended duplicate uploads.
 
@@ -2897,15 +3309,16 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** Unrelated STAFF and other involved employee  
+**Execution Scope:** QA only
 **Preconditions:** Issued NTE for STAFF-A; STAFF-B has own account.
 
 **Test Steps:**
 
 1. Replay ACKNOWLEDGE/SAVE_EXPLANATION/SUBMIT_EXPLANATION as STAFF-B.
-2. As STAFF-A try explanation before receipt.
+2. As STAFF-A save a draft before receipt, then attempt signed submission with a missing/invalid signature; also replay a response before NTE issuance.
 3. Replay explanation after case closed.
 
-**Expected Result:** Wrong author, pre-receipt and closed-case mutations reject regardless of visible buttons.
+**Expected Result:** Wrong-author, pre-issuance, invalid-signature and closed-case mutations reject regardless of visible buttons. The reported employee may save a draft before receipt; denied submissions leave the draft intact.
 
 **Data Integrity Check:** No receipt/deadline/explanation/task or success audit changes from denied actions.
 
@@ -2920,7 +3333,8 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Boundary  
 **Required Role:** Reported employee  
-**Preconditions:** Receipt signed; explanation outstanding.
+**Execution Scope:** QA only
+**Preconditions:** NTE issued; explanation outstanding, including an unsigned receipt variant.
 
 **Test Steps:**
 
@@ -2928,7 +3342,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Submit one valid request with sufficient reason.
 3. Try another request while the first remains pending.
 
-**Expected Result:** Integer 1–60 days accepted; one pending extension at a time; before-receipt/after-explanation requests rejected; deadline unchanged until HR approval.
+**Expected Result:** Integer 1–60 days accepted; one pending extension at a time; requests are available immediately after issuance, without prior receipt; before-issuance/after-explanation requests rejected; deadline unchanged until HR approval.
 
 **Data Integrity Check:** One PENDING extension; original deadline preserved while awaiting review.
 
@@ -2943,6 +3357,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Functional  
 **Required Role:** Uninvolved HR  
+**Execution Scope:** QA only
 **Preconditions:** Three separate pending extension fixtures in EMPLOYEE phase.
 
 **Test Steps:**
@@ -2966,6 +3381,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Integration  
 **Required Role:** Reported employee and HR  
+**Execution Scope:** QA only
 **Preconditions:** Outstanding NTE before receipt, due today and overdue date fixtures; QA operator controls dates.
 
 **Test Steps:**
@@ -2974,7 +3390,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Repeat after calendar date changes.
 3. Let the 15-minute overdue job run for overdue fixture and inspect HR Inbox.
 
-**Expected Result:** At most one reminder per case/employee/day; countdown distinguishes no receipt, due and overdue; overdue notifies HR but does not auto-admit violation, advance phase or sanction.
+**Expected Result:** At most one reminder per case/employee/day; countdown runs from issuance even without a receipt and distinguishes remaining days, due and overdue; overdue notifies HR but does not auto-admit violation, advance phase or sanction.
 
 **Data Integrity Check:** Unique reminder/date and deduplicated overdue notification; no decision or disciplinary entry.
 
@@ -2989,6 +3405,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Functional  
 **Required Role:** Uninvolved HR-A and HR-B  
+**Execution Scope:** QA only
 **Preconditions:** Employee explanation submitted; no task owner.
 
 **Test Steps:**
@@ -3012,6 +3429,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** Owning HR and two involved recipients  
+**Execution Scope:** QA only
 **Preconditions:** HR-phase owned task, no pending requests.
 
 **Test Steps:**
@@ -3035,6 +3453,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Integration  
 **Required Role:** Owning HR and HR-B  
+**Execution Scope:** QA only
 **Preconditions:** Owned HR-phase report; optional employee hearing request.
 
 **Test Steps:**
@@ -3058,6 +3477,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Functional  
 **Required Role:** Owning HR  
+**Execution Scope:** QA only
 **Preconditions:** HR-phase ready task; configured matrix and known finalized same-severity history.
 
 **Test Steps:**
@@ -3081,6 +3501,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Functional  
 **Required Role:** Owning HR  
+**Execution Scope:** QA only
 **Preconditions:** Separate HR-phase report ready for assessment.
 
 **Test Steps:**
@@ -3104,6 +3525,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** Owning HR  
+**Execution Scope:** QA only
 **Preconditions:** Valid assessment; eligible manager and involved/inactive alternatives.
 
 **Test Steps:**
@@ -3127,6 +3549,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Negative  
 **Required Role:** Designated ADMIN and another ADMIN  
+**Execution Scope:** QA only
 **Preconditions:** Recommendation awaiting Management.
 
 **Test Steps:**
@@ -3150,6 +3573,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** Designated ADMIN and owning HR  
+**Execution Scope:** QA only
 **Preconditions:** MANAGEMENT-phase recommendation.
 
 **Test Steps:**
@@ -3173,6 +3597,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Regression  
 **Required Role:** Owning HR  
+**Execution Scope:** QA only
 **Preconditions:** Approved FINAL_ACTION recommendation, not yet issued.
 
 **Test Steps:**
@@ -3196,6 +3621,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** Two HR owners and eligible manager  
+**Execution Scope:** QA only
 **Preconditions:** Two substantiated same-employee/same-severity cases approved against same previous count.
 
 **Test Steps:**
@@ -3219,6 +3645,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** Owning HR and reported employee  
+**Execution Scope:** QA only
 **Preconditions:** Issued final decision with phase FINALIZED.
 
 **Test Steps:**
@@ -3242,6 +3669,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Functional  
 **Required Role:** All roles; Review only HEAD/HR/ADMIN  
+**Execution Scope:** QA only
 **Preconditions:** Several open/closed/legacy cases; inaccessible control case.
 
 **Test Steps:**
@@ -3265,6 +3693,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Regression  
 **Required Role:** STAFF/SUPERVISOR; HEAD via Review Closed  
+**Execution Scope:** QA only
 **Preconditions:** Closed current report plus approved legacy version-1 fixtures and attachments.
 
 **Test Steps:**
@@ -3288,6 +3717,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** Reported, filer, witness, HEAD, HR, assigned ADMIN and manager  
+**Execution Scope:** QA only
 **Preconditions:** Same case with NTE, explanation, internal assessment, decision and two private requests.
 
 **Test Steps:**
@@ -3311,6 +3741,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Boundary  
 **Required Role:** Eligible filer/HEAD/employee  
+**Execution Scope:** QA only
 **Preconditions:** Safe files: each allowed MIME family; 8 MB/8 MB+1, combined near 18 MB, 10/11 files.
 
 **Test Steps:**
@@ -3334,6 +3765,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Regression  
 **Required Role:** Two authorized accounts  
+**Execution Scope:** QA only
 **Preconditions:** Track open with editable draft and another actor changing case.
 
 **Test Steps:**
@@ -3357,6 +3789,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Regression  
 **Required Role:** Reported employee and assigned reviewer  
+**Execution Scope:** QA only
 **Preconditions:** Group with one closed and one NTE-stage report; issued signatures and evidence.
 
 **Test Steps:**
@@ -3380,6 +3813,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** Unrelated STAFF, involved HR and stale owner  
+**Execution Scope:** QA only
 **Preconditions:** Captured current case/read/version/action/evidence requests and closed/legacy IDs.
 
 **Test Steps:**
@@ -3405,6 +3839,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Functional  
 **Required Role:** Every role  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Finalized substantiated, pending, unsubstantiated and documentation-only cases for one employee.
 
 **Test Steps:**
@@ -3428,6 +3863,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** HR/ADMIN and STAFF/SUPERVISOR/HEAD  
+**Execution Scope:** QA only
 **Preconditions:** Another employee with finalized history and an active account.
 
 **Test Steps:**
@@ -3451,6 +3887,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Functional  
 **Required Role:** HR  
+**Execution Scope:** QA only
 **Preconditions:** Original matrix captured; isolated test environment.
 
 **Test Steps:**
@@ -3474,6 +3911,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Boundary  
 **Required Role:** HR  
+**Execution Scope:** QA only
 **Preconditions:** QA matrix with occurrence 1 and 3 for one severity.
 
 **Test Steps:**
@@ -3497,6 +3935,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Regression  
 **Required Role:** HR and manager  
+**Execution Scope:** QA only
 **Preconditions:** Approved unissued recommendation and previously issued final decision.
 
 **Test Steps:**
@@ -3522,6 +3961,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** HR-A and HR-B  
+**Execution Scope:** QA only
 **Preconditions:** Unassigned HR-stage form and explained incident.
 
 **Test Steps:**
@@ -3545,6 +3985,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Functional  
 **Required Role:** ADMIN and two HR reviewers  
+**Execution Scope:** QA only
 **Preconditions:** Owned form; ADMIN HEAD assigned/manager on incident for incident repetition.
 
 **Test Steps:**
@@ -3568,6 +4009,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** Unassigned ADMIN, Management-only ADMIN, assigned ADMIN HEAD  
+**Execution Scope:** QA only
 **Preconditions:** Same explained incident, with authorized reviewer fixture.
 
 **Test Steps:**
@@ -3591,6 +4033,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Boundary  
 **Required Role:** Owning HR and ADMIN  
+**Execution Scope:** QA only
 **Preconditions:** Isolated clock-controlled ready task near Friday 18:30 and Monday 08:00.
 
 **Test Steps:**
@@ -3614,6 +4057,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** HR owner, ADMIN and recipient  
+**Execution Scope:** QA only
 **Preconditions:** Explained incident with information/hearing/Management waits.
 
 **Test Steps:**
@@ -3637,6 +4081,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Integration  
 **Required Role:** ADMIN  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Known forms approved/rejected and incidents handled repeatedly/by two HRs; unresolved owned/unowned tasks.
 
 **Test Steps:**
@@ -3660,6 +4105,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Regression  
 **Required Role:** ADMIN  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** At least one owned wait, unowned ready task and completed task for each resource type.
 
 **Test Steps:**
@@ -3683,6 +4129,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Functional  
 **Required Role:** ADMIN  
+**Execution Scope:** Live observation / QA variants
 **Preconditions:** Transferred incident task; form task and historical completed work.
 
 **Test Steps:**
@@ -3706,6 +4153,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** HR/STAFF plus ADMIN  
+**Execution Scope:** QA only
 **Preconditions:** Captured performance/history/task requests.
 
 **Test Steps:**
@@ -3729,6 +4177,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** ADMIN-U and case-authorized ADMIN HEAD  
+**Execution Scope:** QA only
 **Preconditions:** Incident task and assignment exist but ADMIN-U has no case assignment/involvement.
 
 **Test Steps:**
@@ -3754,6 +4203,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** Every role in separate profiles  
+**Execution Scope:** QA only
 **Preconditions:** Captured allowed reads and disposable mutations; QA API recipe in main plan.
 
 **Test Steps:**
@@ -3777,6 +4227,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** Signed out  
+**Execution Scope:** QA only
 **Preconditions:** Deployed QA Apache URL; DevTools network headers visible.
 
 **Test Steps:**
@@ -3800,6 +4251,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Security  
 **Required Role:** Unprivileged and authorized QA users  
+**Execution Scope:** QA only
 **Preconditions:** Captured QA read/mutation requests; synthetic values only.
 
 **Test Steps:**
@@ -3823,6 +4275,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** Authorized recipient and unrelated account  
+**Execution Scope:** QA only
 **Preconditions:** Current and legacy evidence IDs; Unicode/quote/path-like filenames.
 
 **Test Steps:**
@@ -3846,6 +4299,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** HR, filer and recipient  
+**Execution Scope:** QA only
 **Preconditions:** Harmless script-like/formula-like text fixtures in profile, announcement, form and incident narrative.
 
 **Test Steps:**
@@ -3869,6 +4323,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** QA operator and two users  
+**Execution Scope:** QA only
 **Preconditions:** Actual deployment-like URL on a second computer; no production setting edits.
 
 **Test Steps:**
@@ -3892,6 +4347,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Security  
 **Required Role:** QA operator  
+**Execution Scope:** QA only
 **Preconditions:** Isolated QA origin and synthetic account; bounded test only.
 
 **Test Steps:**
@@ -3915,6 +4371,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Regression  
 **Required Role:** HR then STAFF in same browser  
+**Execution Scope:** QA only
 **Preconditions:** HR sensitive profile/case visible; slow network and downloaded QA file.
 
 **Test Steps:**
@@ -3940,6 +4397,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** QA operator with browser tester  
+**Execution Scope:** QA only
 **Preconditions:** Disposable restored backup; before-counts, historical signatures, ownership, policy snapshots and schema inventory; approved restart window.
 
 **Test Steps:**
@@ -3948,7 +4406,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Operator starts/restarts only the isolated QA API twice against restored copy.
 3. Reload same browser records and compare baseline.
 
-**Expected Result:** Startup initializer/rerun preserves business records and expected compatibility; deprecated migrations do not unexpectedly delete required history; legacy unfinished tasks archived, ADMIN-owned open HR tasks released as documented.
+**Expected Result:** Rerun preserves employee identifiers, optional Primary/Secondary Emails, HMO Details, historical forms/cases and saved attendance links. attendance_employee_links creation is idempotent; obsolete landline_no remains absent. Legacy unfinished tasks archive and ADMIN-owned open HR tasks release as documented. Regularization/reminder effects match the operator manifest.
 
 **Data Integrity Check:** Compare record counts/keys/snapshots/ledger and task earnings; planned obsolete-column/table removal reviewed separately before production restart.
 
@@ -3963,6 +4421,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** QA operator and HR  
+**Execution Scope:** QA only
 **Preconditions:** Authorized backup process external to app; disposable restore target; synthetic attachment and signatures.
 
 **Test Steps:**
@@ -3971,7 +4430,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Restore to a separate isolated target.
 3. Point a separate QA runtime to restore and open employee, form, evidence and case documents.
 
-**Expected Result:** Usable restore contains rows, binary attachments, signatures, audit, policy and task history; restored session behavior documented; no application backup button assumed.
+**Expected Result:** Restore includes employee records, account roles/both reviewer slots, attendance_employee_links, attachments, signatures, audits, policies, leave and task history. Saved links resolve against the appropriate QA scanner namespace/name. Record restored session behavior; no backup button is assumed.
 
 **Data Integrity Check:** Source unchanged; compare restored counts, references and file hashes/readable documents.
 
@@ -3986,15 +4445,16 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** QA operator, owning HR and ADMIN  
+**Execution Scope:** QA only
 **Preconditions:** Disposable DB with controlled audit/notification failure harness; no shared database schema changes.
 
 **Test Steps:**
 
-1. Operator enables isolated failure injection; tester attempts employee/account save, configuration/matrix save, leave approval and incident recommendation.
-2. Observe errors and reload originals.
-3. Disable injection and retry once.
+1. In isolated QA, the operator injects write/audit failure. Attempt employee/account save, configuration/matrix save, leave approval, incident recommendation and attendance-link confirmation.
+2. Inspect errors and reload affected records, queues, balances and saved links.
+3. Remove injection, inspect for committed changes and retry once.
 
-**Expected Result:** Sensitive transaction paths roll back employee/request, assignments/matrix, approval/ledger/task and incident/snapshot/notification changes together; successful retry commits once.
+**Expected Result:** Sensitive paths roll back related employee/request, assignments/matrix, approval/ledger/task, incident/snapshot/notifications and attendance-link/audit together. Retry commits once after inspection; audit failure leaves no partial confirmed link.
 
 **Data Integrity Check:** Read-only compare all related tables/audit/revision against before snapshot; announcement insert/audit atomicity is not guaranteed and must be recorded separately.
 
@@ -4009,6 +4469,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** QA operator and HR  
+**Execution Scope:** QA only
 **Preconditions:** Isolated connection holds documented employee-identity named lock; no production lock.
 
 **Test Steps:**
@@ -4032,6 +4493,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Negative  
 **Required Role:** QA operator and HR  
+**Execution Scope:** QA only
 **Preconditions:** Disposable environment; service restart permitted and saved-record baseline.
 
 **Test Steps:**
@@ -4057,6 +4519,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** HR, ADMIN, STAFF, SUPERVISOR and HR reviewer  
+**Execution Scope:** QA only
 **Preconditions:** Unused employee identity and approved SUP-A chain.
 
 **Test Steps:**
@@ -4080,6 +4543,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** ADMIN, applicant, Head HR and HR reviewer  
+**Execution Scope:** QA only
 **Preconditions:** Eligible HR applicant; pending paid leave owned by old Head HR.
 
 **Test Steps:**
@@ -4103,12 +4567,13 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** Filer, HEAD, reported employee, HR, Management ADMIN  
+**Execution Scope:** QA only
 **Preconditions:** Configured map/matrix and safe evidence; uninvolved reviewers.
 
 **Test Steps:**
 
 1. File grouped reports and review one: evidence request→response→signed NTE.
-2. Employee signs receipt, drafts/submits explanation; HR takes task, requests information and completes hearing if needed.
+2. Employee drafts immediately and submits the signed explanation with receipt recorded together; HR takes task, requests information and completes hearing if needed.
 3. HR recommends→manager approves→HR issues and closes; employee checks Inbox/document/history.
 
 **Expected Result:** Every stage/notification/permission/time wait follows implementation; issued substantiated history appears only at final issuance; related report stays independent until separately closed.
@@ -4126,6 +4591,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** HEAD, employee, HR and manager  
+**Execution Scope:** QA only
 **Preconditions:** Two separate synthetic reports.
 
 **Test Steps:**
@@ -4149,6 +4615,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** HR and ADMIN with old/new reviewers  
+**Execution Scope:** QA only
 **Preconditions:** Employee has historical approved form/final incident and pending ordinary form.
 
 **Test Steps:**
@@ -4157,7 +4624,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Compare existing pending routes against stored assignment, then submit new form/incident.
 3. Compare reports, personal dashboard and historical documents.
 
-**Expected Result:** Current profile/reports/new routes use relevant saved configuration; existing ordinary STAFF/SUPERVISOR form reviewer and incident reviewer are not assumed auto-transferred; historical identity/signatures preserved. Escalate stranded pending work for operational resolution.
+**Expected Result:** Current profiles/reports/new requests use saved configuration; existing form primary/secondary reviewers and incident assignments are not assumed retroactively reassigned. Search selection binds account identity; display text alone grants no rights. HR reporting selections do not change designated Head HR routing. Completed applicant identity/signatures/history remain preserved.
 
 **Data Integrity Check:** No rewrite of completed history; rank/status changes affect current leave eligibility; text Reports To is distinct from account reviewer.
 
@@ -4172,6 +4639,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** High  
 **Test Type:** Regression  
 **Required Role:** Every role  
+**Execution Scope:** QA only
 **Preconditions:** All Critical cases already executed; Chrome/Edge plus another supported target browser; 375/768/1440 widths.
 
 **Test Steps:**
@@ -4186,5 +4654,31 @@ Every listed value, account or browser variant is required. Preserve per-variant
 
 **Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.  
 **Notes / Evidence:** ____________________  
+**Variant / tester / execution date / defect reference:** ____________________
+
+### E2E-07 — Imported employee to account and personal attendance
+
+**Test ID:** E2E-07
+**Module and Feature:** End-to-end — Imported employee to account and personal attendance
+**Priority:** Critical
+**Test Type:** Integration
+**Required Role:** HR, ADMIN and STAFF/SUPERVISOR/HEAD
+**Execution Scope:** QA only
+**Preconditions:** One QA imported employee without account and unique scanner-name match; separate ambiguous variant. Do not reimport the real workbook.
+
+**Test Steps:**
+
+1. Find the imported employee and verify one record, optional identifier handling and Inactive account status.
+2. Use Edit to request access as HR, approve as ADMIN; repeat on another QA record with immediate ADMIN save.
+3. Verify edit returns to list and account status becomes Active after refresh.
+4. Sign in to the existing personal dashboard; compare actual QA scanner data and resolve ambiguous variant using Link employee.
+5. Compare master-list/report headers and CSV, then sign out/in and verify the saved attendance link.
+
+**Expected Result:** Existing employee receives access without duplicate registration. Primary Email is login; activation follows saving actor. Data fills the existing dashboard; ambiguity waits for HR. Account Status stays screen-only; master-list/HR master default to No. ascending.
+
+**Data Integrity Check:** One employee/intended account/link per variant; real imported records, credentials, roles and links remain unchanged.
+
+**Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.
+**Notes / Evidence:** ____________________
 **Variant / tester / execution date / defect reference:** ____________________
 

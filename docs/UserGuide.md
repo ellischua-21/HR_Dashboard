@@ -287,7 +287,9 @@ or contact HR. Scanner-account connections are managed by the system administrat
 
 All accounts use the same circle tracker: **IR Filed > NTE Issued > Closed**.
 Other actions keep the current stage. A case can contain several Incident Reports,
-with a separate IR number and outcome for each reported employee. Use **Related
+with a separate IR number and outcome for each report added with **File Another**.
+The employee concerned, reported employee, involved people and witnesses listed
+in one report share that report's IR number; adding people does not create reports. Use **Related
 Incident Reports** in Track to switch between the reports you may access. The
 case reaches Closed only after every report in that case has been closed.
 
@@ -336,9 +338,10 @@ evaluation task.
 4. Use **Add Witness** for witnesses. Witnesses are listed within the IR;
    they are not automatically treated as reported employees.
 5. Attach supporting files where needed.
-6. For another reported employee in the same case, select **File Another**.
-   Shared incident details are copied for you to review and edit. Each employee
-   receives a separate IR number and can receive a different outcome.
+6. To create a separate report in the same filing session, select **File Another**.
+   Shared incident details are copied for review and editing. Each report card
+   receives its own IR number and outcome. Everyone listed within that card shares
+   its number; selecting concerned, involved or witness accounts adds no extra IR.
 7. Select **File Reports** and confirm.
 
 The involved employees and reviewing HEAD are notified. The former employee,
@@ -367,15 +370,17 @@ For each IR, the assigned HEAD can:
 1. Open the case from **Inbox** or **Incident Management > Track**.
 2. Read the issued NTE and permitted evidence. **View Document** provides a
    formatted copy and the browser's **Print / Save As PDF** option.
-3. Sign the receipt acknowledgment in Section VI. It confirms receipt, not
-   admission of the allegation.
-4. The response deadline is **five calendar days after receipt**, including
-   weekends and holidays. Track shows the countdown. An outstanding notice has
-   a reminder at most once per day.
-5. Complete Section VII, attach supporting documents, and draw your explanation
-   signature. You may **Save Draft** before submitting.
-6. Select **Submit Explanation** and confirm. The submitted statement and
-   signature are preserved and cannot be overwritten.
+3. The response deadline starts **immediately when HEAD issues the NTE** and is
+   five calendar days after the issuance date, including weekends and holidays.
+   Track shows the countdown; signing does not start or reset it.
+4. The explanation field and signature are available immediately. Complete
+   Section VII and attach supporting documents. **Save Draft** works before
+   signing; drafts do not record receipt or move the case to HR.
+5. Draw the **Employee Receipt And Explanation Signature** and select
+   **Submit Explanation**. Confirming records receipt and the explanation
+   together. Receipt confirms delivery, not admission of the allegation. An
+   existing receipt is retained. The submitted statement and signature are
+   preserved and cannot be overwritten.
 
 An employee can **Request An Extension** while an explanation is outstanding.
 HR can approve the requested days, choose a different number of additional

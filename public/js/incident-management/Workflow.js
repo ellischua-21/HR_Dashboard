@@ -263,8 +263,16 @@
       for (const record of records) reports.push(await record.value());
       if (
         !(await appConfirm(
-          'File these Incident Reports? Each employee will have a separate IR number in this case.',
-          { title: 'File Incident Reports', confirmText: 'File' }
+          reports.length === 1
+            ? 'File this Incident Report? Everyone listed in this report will share one IR number.'
+            : `File these ${reports.length} Incident Reports? Each report will have its own IR number, shared by everyone listed in that report.`,
+          {
+            title:
+              reports.length === 1
+                ? 'File Incident Report'
+                : 'File Incident Reports',
+            confirmText: 'File'
+          }
         ))
       )
         return;
@@ -341,7 +349,9 @@
           .map((slot) => slot.selected()?.employeeId)
           .filter(Boolean);
         if (new Set(ids.map(String)).size !== ids.length)
-          throw new Error(`Select each ${title.toLowerCase()} employee only once.`);
+          throw new Error(
+            `Select each ${title.toLowerCase()} employee only once.`
+          );
         return ids;
       }
       const involved = addEmployeeSelectors(
@@ -571,7 +581,7 @@
             'ISSUE_NTE',
             { ...(await value()), signature: sign() },
             reload,
-            'Issue this Notice To Explain? The issued document will be preserved.'
+            'Issue this Notice To Explain? The five-calendar-day response period starts immediately, and the issued document will be preserved.'
           )
         );
       details(f.element, [
@@ -654,17 +664,18 @@
   function documents(root, incident, includeBlankSections = false) {
     const report = incident.report;
     const first = section(root, 'I. Employee Information');
-    details(first, [
-      ['Employee Being Reported', report.employee.name],
+    const parties = node('div', undefined, 'incident-party-details');
+    first.appendChild(parties);
+    const reported = section(parties, 'Employee Being Reported');
+    details(reported, [
+      ['Name', report.employee.name],
       ['Position', report.employee.position],
       ['Department', report.employee.department],
       ['Immediate Supervisor', report.employee.supervisor]
     ]);
-    details(first, [
-      [
-        'Employee Concerned',
-        report.concernedEmployee?.name || report.employee.name
-      ],
+    const concerned = section(parties, 'Employee Concerned');
+    details(concerned, [
+      ['Name', report.concernedEmployee?.name || report.employee.name],
       [
         'Position',
         report.concernedEmployee?.position || report.employee.position
@@ -720,7 +731,9 @@
     attachments(fourth, incident, 4);
     if (incident.rights.maxSection >= 5) {
       const fifth = section(root, 'V. Directive To Submit Written Explanation');
-      fifth.appendChild(node('p', directive, 'incident-case-text'));
+      fifth.appendChild(
+        node('p', nte.directive || directive, 'incident-case-text')
+      );
     }
     if (incident.rights.maxSection >= 6) {
       const sixth = section(root, 'VI. Issuance And Acknowledgment');
@@ -732,7 +745,7 @@
           'Explanation Deadline',
           incident.deadlineDate
             ? DateUtils.formatDate(incident.deadlineDate)
-            : 'Awaiting Receipt Acknowledgment'
+            : 'Not Yet Issued'
         ]
       ]);
       if (includeBlankSections && !incident.receipt)
@@ -853,19 +866,6 @@
           'I acknowledge receipt of this Notice To Explain. My signature confirms receipt only and does not signify admission or agreement with the allegations.'
         )
       );
-      let sign;
-      const f = form(panel, 'Sign', async () =>
-        commit(
-          incident,
-          'ACKNOWLEDGE',
-          { signature: sign() },
-          reload,
-          'Acknowledge receipt of this Notice To Explain? Your five-calendar-day response period will start today.'
-        )
-      );
-      sign = signature(f.element, 'Employee Acknowledgment Of Receipt');
-      f.finish();
-      return;
     }
     panel.appendChild(
       node(
@@ -885,7 +885,9 @@
         'SUBMIT_EXPLANATION',
         { ...(await value()), signature: sign() },
         reload,
-        'Submit this signed explanation? It will be preserved and cannot be overwritten.'
+        incident.receivedAt
+          ? 'Submit this signed explanation? It will be preserved and cannot be overwritten.'
+          : 'Acknowledge receipt and submit this signed explanation? Your signature confirms receipt and your explanation. The existing deadline will not change. Your submission will be preserved and cannot be overwritten.'
       )
     );
     statement = input(f.element, 'VII. Your Written Explanation', {
@@ -899,7 +901,12 @@
     hearing.checked = Boolean(incident.explanationDraft?.hearingRequested);
     files = input(f.element, 'Supporting Documents', { type: 'file' });
     attachments(f.element, incident, 7);
-    sign = signature(f.element, 'Employee Explanation Signature');
+    sign = signature(
+      f.element,
+      incident.receivedAt
+        ? 'Employee Explanation Signature'
+        : 'Employee Receipt And Explanation Signature'
+    );
     const value = async () => ({
       statement: statement.value,
       hearingRequested: hearing.checked,

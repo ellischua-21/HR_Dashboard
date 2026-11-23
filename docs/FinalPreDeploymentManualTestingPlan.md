@@ -1,20 +1,54 @@
 # Final Pre-Deployment Manual Testing Plan
 
-**Start with fixture preparation below, then execute BOOT-01 and AUTH-01.**
+**Start with the imported-data checks below; run data-changing and failure/security variants on a separate QA copy.**
 
-Prepared 11/13/2026. Repository baseline: `66a1184`; working tree was clean before this documentation task. Scope: first-party browser views/controllers/styles, API registration and services, shared rules, schema/migrations, integrations, maintenance scripts, tests and documentation. Dependency internals, live employee records, credentials and production configuration values were not inspected. No application, database, configuration, existing-record or business-rule changes were made.
+Prepared 11/13/2026; revised 11/23/2026 against application commit `5056004`. This revision compares post-plan implementations and the current UI/API/service rules, updates outdated procedures, and preserves existing execution evidence. Imported real employee data is now in place. This documentation review made no application, database, account, scanner-link or configuration changes and executed no manual case. Dependency internals, credentials and live employee records were not inspected.
 
 | Deliverable | Use |
 | --- | --- |
-| [Detailed test cases](FinalPreDeploymentManualTestCases.md) | 179 cases with roles, numbered browser steps, expected behavior and integrity checks. |
-| [Execution results CSV](FinalPreDeploymentManualTestResults.csv) | One row per case; record status, tester, date, defect and evidence. Every case starts Not Tested. |
+| [Detailed test cases](FinalPreDeploymentManualTestCases.md) | 190 cases with roles, execution scope, numbered steps, expected behavior and integrity checks. |
+| [Execution results CSV](FinalPreDeploymentManualTestResults.csv) | One row per case, with Execution scope for filtering. Existing results/evidence are preserved; new cases start Not Tested. |
 | This document | Fixture roster, feature inventory, evidence, execution order, implementation limits and release criteria. |
 
 **Readiness is undetermined.** Passing source checks and mock tests does not establish browser usability, deployed access control, real MySQL locking, recoverability or actual scanner behavior. This is a plan, not a completed manual test report. An implemented path below means its UI/API/service path exists in source, not that it passed real-world testing.
 
-## 1. Prepare an isolated execution environment
+## 1. Start after the real-data import
 
-1. Have the operator provide a deployment-like QA URL and isolated database. Use synthetic records for write, rejection, archive, concurrency, security and failure cases. Never disable, archive or corrupt a real employee to execute this plan. Record the exact application commit and browser versions.
+The imported employee list is the baseline, not a fixture generator. Do not rerun
+setup, sample-data generation or the completed workbook import to prepare tests.
+Read-only here means no change to employee/account/link/form/case business data;
+login, viewed/seen markers and export audits may still be recorded.
+
+1. Record the deployed application commit and take an operator-managed backup of the imported baseline. Keep the original workbook and baseline counts in protected local evidence; do not paste employee data into this plan or a public defect.
+2. On the existing HRIS, observe BOOT-01, AUTH-01, EMP-04, SELF-01/02, ATT-01 and REPORT-03/04. Compare actual imported headers, No. order, account strip, unique-name attendance and report populations. Allow 30–45 minutes for this first inspection; this is a planning estimate, not a complete sign-off.
+3. For write, archive, role, leave, incident, link-confirmation, concurrency, security-replay and failure cases, use a separate QA runtime/database or restored copy under the operator's control. Add only clearly identified QA fixtures there; never manufacture disciplinary history or change a real person's role/link just to test.
+4. Filter the results CSV by **Execution scope**. **QA only** prohibits executing the case on the real imported records. **Live observation / QA variants** permits only its non-mutating observations on existing data; complete exceptional/writing variants in QA. Record a live subset in Variants and observations; leave the overall case Not Tested or Blocked until every required variant is covered.
+5. Follow the fixture roster and release gates below. No existing result is reset by this revision; recheck changed expectations before treating older evidence as current.
+
+### Prepare the QA environment
+
+**Local test environment prepared 11/23/2026:** the current API at
+`http://127.0.0.1:3001` now uses `hr_dashboard_test`; the original `hr_dashboard`
+is retained for launch. All 54 table schemas/checksums matched immediately after
+copying, including 127 employee records and 127 accounts. Existing account password
+hashes were preserved. The normal app URL remains the same; sign in again after
+the API restart. This is environment preparation, not a Pass for any manual case.
+
+The baseline SQL backup and switch metadata are private local files under
+`server/.local-backups/`, excluded from Git and blocked by Apache. Do not upload
+these files or include their contents in test evidence. `.env` currently selects
+`DB_NAME=hr_dashboard_test`; all other settings were preserved. Scanner integration
+continues to read the real connected providers; this is not permission to change
+live scanner enrollment, punches or credentials for failure tests.
+
+When testing finishes, stop the test API, change only `DB_NAME` back to
+`hr_dashboard`, restart and verify the original before deleting the test database.
+Do not restore the test database over the original. Test forms, NTEs, leave effects,
+password/profile changes and settings remain in the copy; deliberately reapply
+only approved employee/account/configuration corrections needed for launch. Keep
+the baseline backup until the launch is verified. No test database has been deleted.
+
+1. Have the operator provide a deployment-like QA URL and isolated database, optionally restored from the protected imported baseline. Use synthetic records for write, rejection, archive, concurrency, security and failure cases. Never disable, archive or corrupt a real employee to execute this plan. Record the exact application commit and browser versions.
 2. Have the operator verify an existing backup and demonstrate restore into a separate target. Normal API startup calls schema initialization and background writers; merely starting it against a database is not read-only. Obtain separate authorization for operator migrations, fixture injection, service restarts and controlled clock tests.
 3. Prepare the account roster below, approving HEAD accounts before SUPERVISOR accounts and SUPERVISOR accounts before STAFF accounts. Use separate browser profiles/private sessions for concurrent actors; two tabs in one profile share a login. Keep passwords out of this plan and all evidence.
 4. Save an expected-results manifest: synthetic employee numbers, role/rank/status, departments, FTE, dates, reviewer assignments, expected SL/VL and known finalized violations. Add case/form IDs as they are created. Use a permitted read-only database viewer for integrity checks; do not run setup or sample generation against existing organizational data.
@@ -22,7 +56,7 @@ Prepared 11/13/2026. Repository baseline: `66a1184`; working tree was clean befo
 
 ### Account and employee roster
 
-Names below are aliases, not real employees. Use unique `.invalid` emails, such as `qa-staff-a@example.invalid`, only where the QA system permits them. Scanner identities must match registered employee number and first/last name; use a provider stub or an authorized QA scanner account rather than enrolling invented people on production hardware.
+Names below are aliases, not real employees. Use unique `.invalid` emails, such as `qa-staff-a@example.invalid`, only where the QA system permits them. Scanner/HRIS numbers may differ: automatic personal attendance uses unique normalized first and last names. Prepare duplicate employee names and same-name scanner identities across accounts for explicit HR confirmation, plus blank-number and unmatched-name controls. Use a provider stub/authorized QA scanner account; do not enroll invented people or repurpose live scanner namespaces.
 
 | Alias | Stored role / employee setup | Purpose |
 | --- | --- | --- |
@@ -35,10 +69,10 @@ Names below are aliases, not real employees. Use unique `.invalid` emails, such 
 | STAFF-A / STAFF-B | STAFF, active, linked, assigned to SUP-A / SUP-B | Own profiles, forms, reported employee and unrelated-access tests. |
 | STAFF-C / STAFF-W | STAFF, active, linked | Employee concerned/involved and witness; enough different people to test confidentiality. |
 | HR-A / HR-B / HR-C | HR, active, linked; HR-A initially Head HR | Independent review, ownership races, Head HR replacement and uninvolved evaluator. |
-| Pending chain | Pending HEAD, SUPERVISOR and STAFF requests | Out-of-order approval, rejection and stale actions. |
+| Pending chain | HR-created pending HEAD, SUPERVISOR and STAFF requests | Out-of-order approval, rejection and stale actions; ADMIN-created accounts instead activate immediately. |
 | Exception profiles | Unlinked imported, archived, inactive-account and ambiguous historical identities | Negative identity tests; operator prepares exceptional states only in QA. |
 
-Employee **rank is independent of account role**. Prepare Regular Supervisory (paid leave eligible), Regular Rank and File, Probationary Supervisory, Contractual, and historical blank-rank controls. A STAFF login may have Supervisory rank. Employment statuses are `Regular`, `Probationary`, `Contractual`, `Resigned`, `Terminated`, `Retired`, `Inactive`. Archive state is separately `Active`/`Archived`; neither table uses a generic employee `Approved` state.
+Employee **rank is independent of account role**. Prepare Regular Supervisor (paid leave eligible), Regular Rank and File, Probationary Supervisor, Contractual, and historical blank-rank controls. A STAFF login may have Supervisor rank. Employment statuses are `Regular`, `Probationary`, `Contractual`, `Resigned`, `Terminated`, `Retired`, `Inactive`. Archive state is separately `Active`/`Archived`; neither table uses a generic employee `Approved` state.
 
 ### Data packs
 
@@ -50,19 +84,19 @@ Employee **rank is independent of account role**. Prepare Regular Supervisory (p
 | Incidents | Independent valid reports plus multi-report group; HEAD pool case, NTE receipt/draft/submitted explanation, extension, requests to two recipients, hearing, Management return/approval, no violation and substantiated outcomes | Full incident and privacy coverage. Valid employee-concerned selection is required by current UI/service, even though older guide steps omit it. |
 | Operator-only | Read-only legacy version-1 records and documents; safe file-limit samples; known provider scan sequences; clock/failure fixtures; disposable restore | Cannot be synthesized through ordinary current browser workflow. Mark Blocked if unavailable; do not fabricate a Pass. |
 
-Lookups come from `lookup_values`, with defaults in EmployeeSchema. Incident configuration defaults include Sales/HR and other departments, while IT/Finance/Operations are hidden by the current configuration reader. Do not assume a valid employee department automatically has an incident reviewer. Bootstrap ADMIN without an employee cannot be selected as a linked incident reviewer/manager until an actual employee exists.
+Lookups come from `lookup_values`, with defaults in EmployeeSchema. ADMIN can add Company Name, Work Location and Department in Manage Accounts → Accounts → Organization Settings; each Add persists immediately. Incident Reviewers and Management Approver changes use Save Changes. Department choices combine active lookups, nonarchived employees and saved mappings; IT/Finance/Operations are not deliberately hidden. Do not assume a valid or newly added department already has a reviewer. Bootstrap ADMIN without an employee cannot be selected as a linked incident reviewer/manager until an actual employee exists.
 
 ## 2. Execution order and release decision
 
 | Pass | Bounded batch | Estimated hands-on time |
 | --- | --- | --- |
 | 1 | Fixtures, service/URL check, BOOT and AUTH; essential EMP/ACC provisioning | 3–5 hours including preparation. |
-| 2 | EMP/IMP/SELF; seven forms and LEAVE; reports and announcements | 7–10 hours. |
-| 3 | Incident filing through closure, confidentiality, COC and ownership/performance | 8–12 hours. |
+| 2 | EMP/IMP/SELF; current role/search/save changes; seven forms and LEAVE; reports and announcements | 8–12 hours. |
+| 3 | Incident filing through closure, confidentiality, COC, ownership/performance, and attendance-link confirmation | 9–14 hours. |
 | 4 | SEC, OPS and concurrency/failure/restore checks with operator | 4–7 hours; coordination additional. |
 | 5 | E2E and browser/responsive reruns; fix verification and sign-off | 3–5 hours before defect retests. |
 
-Budget **25–39 hours** total hands-on work across several days. Session expiry needs more than eight elapsed hours; reminders/year rollover/regularization require scheduled observation or isolated operator-controlled clock fixtures. Estimates are planning allowances, not measured performance or a claim every case takes the same time.
+Budget **27–43 hours** total hands-on work across several days. Session expiry needs more than eight elapsed hours; reminders/year rollover/regularization require scheduled observation or isolated operator-controlled clock fixtures. Estimates are planning allowances, not measured performance or a claim every case takes the same time.
 
 Priorities: **Critical** = identity/privacy, authorization, financial/disciplinary integrity, workflow gates, recoverability or deployment feasibility; **High** = normal operation, validation and important integration; **Medium** = secondary usability/presentation. No Low cases are needed to pad coverage. Full counts are recorded in the results sheet.
 
@@ -74,7 +108,7 @@ Priorities: **Critical** = identity/privacy, authorization, financial/disciplina
 
 ## 3. How to execute and record a case
 
-Each detailed case includes the requested Test ID, Module and Feature, Priority, Test Type, Required Role, Preconditions, numbered Test Steps, Expected Result, Data Integrity Check, Result and Notes / Evidence. Alias references resolve to the roster above. An integrity check is performed through the browser first, then read-only database inspection where stated. Without access to required database evidence, mark the integrity portion Blocked and do not silently count the complete case as passed.
+Each detailed case includes the requested Test ID, Module and Feature, Priority, Test Type, Required Role, Execution Scope, Preconditions, numbered Test Steps, Expected Result, Data Integrity Check, Result and Notes / Evidence. Alias references resolve to the roster above. An integrity check is performed through the browser first, then read-only database inspection where stated. Without access to required database evidence, mark the integrity portion Blocked and do not silently count the complete case as passed.
 
 | Result | Meaning |
 | --- | --- |
@@ -110,7 +144,7 @@ Login uses `POST /api/login` with `{email,password}`, logout `POST /api/logout`;
 | --- | --- | --- | --- | --- | --- |
 | Own employee dashboard/profile/attendance | Yes | Yes | Yes | No personal dashboard grant | No personal dashboard grant |
 | Own seven form templates / submissions | Yes | Yes | Yes | Yes | No |
-| Assigned ordinary form review | No | Assigned STAFF | Assigned SUPERVISOR | Head HR reviews other HR | View only |
+| Assigned ordinary form review | No | Assigned STAFF/SUPERVISOR | Assigned STAFF/SUPERVISOR/HEAD | Designated Head HR reviews other HR | Explicitly assigned STAFF/SUPERVISOR/HEAD HEAD-stage review; no final HR-stage processing |
 | HR-stage form review / Take Task | No | No | No | Eligible uninvolved HR owner | View/authorized assignment only |
 | Employees / import / export / attendance / HR Reports | No | No | No | Yes | Yes |
 | Workforce analytics | No | No | No | Yes | No; its Dashboard is HR Performance |
@@ -118,12 +152,12 @@ Login uses `POST /api/login` with `{email,password}`, logout `POST /api/logout`;
 | Announcement creation | No | No | No | Yes | Yes |
 | Inbox / own password / COC matrix reading | Yes | Yes | Yes | Yes | Yes |
 | Incident filing | No | Yes | Yes | Only designated Head HR | Only ADMIN with department HEAD assignment |
-| Incident Review page | No | No | Assigned cases | Uninvolved after NTE issued | Assigned HEAD/Management/shared Heads-pool scope |
+| Incident Review page | No | No | Assigned cases | Uninvolved after NTE; saved assigned HR department HEAD-stage case also visible before NTE | Assigned HEAD/Management/shared Heads-pool scope |
 | Incident History page | Own accessible cases | Own accessible cases | Use Review Closed | Use Review Closed | Use Review Closed within scope |
 | COC matrix editing | No | No | No | Yes | No |
 | Other employees’ finalized violation history | No | No | No | Yes | Yes, through authorized employee history reader |
 
-Head HR is a designation on HR, not a sixth role. ADMIN role alone grants neither blanket incident access nor HR processing. Residual `extra_perms` cannot restore role-only privileged permissions. Current active identity is re-read server-side on protected requests.
+Head HR is a designation on HR, not a sixth role. Reporting eligibility: STAFF/SUPERVISOR → SUPERVISOR/HEAD/ADMIN; HEAD → HEAD/ADMIN; HR → HR/ADMIN; ADMIN → ADMIN. Self-assignment is forbidden. Primary is required for STAFF/SUPERVISOR/HEAD and optional for HR/ADMIN; the optional second must be distinct and requires a primary. Either stored reviewer can complete the one first-review stage; both approvals are not required. HR reporting assignments do not replace designated Head HR form routing. ADMIN role alone grants neither blanket incident access nor HR processing. Residual `extra_perms` cannot restore role-only privileged permissions. Current active identity is re-read server-side on protected requests.
 
 ### Forms and saved states
 
@@ -143,7 +177,7 @@ SL/VL: Regular + nonblank employee rank above Rank and File + nonarchived identi
 
 ### Current incident states and access
 
-Public status stays **IR FILED → NTE ISSUED → CLOSED**. Internal phase is **HEAD → EMPLOYEE → HR → MANAGEMENT → FINAL_ACTION → FINALIZED → CLOSED**. Management return and Revise Evaluation return to HR; HEAD can close for documentation directly. Explanation submission unlocks HR evaluation/task creation. Five **calendar** days start at signed receipt, not issue. Overdue notification never establishes a violation. Extension statuses: PENDING/APPROVED/REJECTED/RESOLVED; information requests PENDING/RESPONDED; hearings NONE/SCHEDULED/COMPLETED. Management approve/return is recorded without a signature pad.
+Public status stays **IR FILED → NTE ISSUED → CLOSED**. Internal phase is **HEAD → EMPLOYEE → HR → MANAGEMENT → FINAL_ACTION → FINALIZED → CLOSED**. Management return and Revise Evaluation return to HR; HEAD can close for documentation directly. Explanation submission unlocks HR evaluation/task creation. Five **calendar** days start immediately at HEAD issuance. Explanation text and signature are available together without a prior receipt step; drafts do not acknowledge receipt, and signed submission records any missing receipt in the same transaction. Receipt never resets the deadline. Missing deadlines on open issued notices are backfilled from issuance; previously granted deadlines/extensions are preserved. Overdue notification never establishes a violation. Extension statuses: PENDING/APPROVED/REJECTED/RESOLVED; information requests PENDING/RESPONDED; hearings NONE/SCHEDULED/COMPLETED. Management approve/return is recorded without a signature pad.
 
 | Viewer | Permitted current case material |
 | --- | --- |
@@ -169,21 +203,21 @@ Rows group controls that share the same implemented workflow; each named small c
 | F04 | **Login / current session**: Password verification, email normalization, role/current employee identity, eight-hour cookie, logout | All approved active accounts | Sign in / Sign out | user_roles, employees, Auth, password hashing, express-session | Implemented | Yes; setup exception | Critical | AUTH-01–07 | S04 |
 | F05 | **First setup ADMIN**: Specifically flagged first account can bootstrap without fabricated employee | Flagged ADMIN only | Sign in; operator provisioning | EmployeeIdentity, create-user | Implemented | No initially | Critical | AUTH-04 | S04 |
 | F06 | **Change Password**: Current password, length validation, confirmation and audit | All | Change Password | AccountService, Password, user_roles | Implemented; session limits below | Yes | High | AUTH-08–10 | S05 |
-| F07 | **Employee master list**: Name/number search; company/department/location/rank/status filters; header sorting; all-row scroll; keyboard profile opening | HR / ADMIN | Employees → Employee Master List | employees, LIGHT allowlist, list metadata | Implemented | Yes | High | EMP-04 | S06 |
+| F07 | **Employee master list**: Name/number search; visible company/department/status filters; No. ascending; frozen Account Status/No./Name/Employee Number; centered cells and light status colors | HR / ADMIN | Employees → Employee Master List | employees, account-active metadata, shared row sizing/CSS | Implemented; status excluded from CSV/print/HR Reports | Yes | High | EMP-04; REPORT-04–05 | S06 |
 | F08 | **Employee registration**: Required/optional/sensitive fields, preview, atomic employee plus HR pending request or immediate ADMIN account | HR / ADMIN | Employees → Employee Registration | EmployeeSchema, validation, identity lock, AccountService | Implemented | Reviewer data first | Critical | EMP-01–02,12 | S06 |
 | F09 | **Structured profile fields**: Sibling/child/organization add/remove tables; church conditional requirement; family/emergency/social data | HR / ADMIN | Registration / Edit / profile | JSON schemas, field metadata, shared renderer | Implemented | Yes | Medium | EMP-03,10 | S06 |
 | F10 | **Profile / edit / print**: Full employee reader, preview/back/cancel/save, immutable IDs and audit metadata | HR / ADMIN | Master List profile; HR Reports master reader | EmployeeService, Employees renderer, reports | Implemented | Yes | High | EMP-05,11; REPORT-04–05 | S06 |
 | F11 | **Employee number / email integrity**: Current/archived uniqueness, case/space comparison, linked-email protection, serialized participating writes | HR / ADMIN writes | Registration / Edit / Import | EmployeeEmailService, named lock, accounts/requests | Implemented; no email DB uniqueness constraint | Yes | Critical | EMP-06–08; IMP-03–04,08; OPS-04 | S07 |
 | F12 | **Archive and employment status**: Archive confirmation; exclude archived records; retain history; employment status distinct from login active flag | HR / ADMIN | Profile → Archive / Edit status | record_status, user_roles.active, identity checks | Implemented; no restore UI | Yes | Critical | EMP-09,13 | S06 |
-| F13 | **Import template / reader / mapping**: CSV/XLSX first sheet, header mapping/skip, dates/leading zeros, non-JSON template | HR / ADMIN | Master List → Import | SheetJS external CDN, metadata, browser parser | Implemented | No existing employee needed | High | IMP-01,05–07 | S08 |
+| F13 | **Import template / reader / mapping**: CSV/XLSX first sheet, current master headers, mapping/skip, dates/leading zeros; generated/JSON destinations disabled | HR / ADMIN | Master List → Import | SheetJS external CDN, metadata, browser parser | Implemented; JSON contents not imported | No existing employee needed | High | IMP-01,05–07,09 | S08 |
 | F14 | **Import validation / commit**: Preview, row errors, valid-row partial import, confirmation, 300-row client chunks / 500-row API cap | HR / ADMIN | Import → Validate / Import | ImportService, counter, validation, named lock, bulk audit | Implemented; not whole-file atomic | Mixed | Critical | IMP-02–04,08 | S08 |
 | F15 | **Account requests**: Request new access or role/reviewer/password edits; approve in chain or reject with confirmation/refresh | HR requests; ADMIN saves immediately or decides HR requests | Registration / Employee Edit; Manage Accounts → Account Requests | employees, account_requests, user_roles | Implemented; HR edits require approval, ADMIN edits apply immediately | Yes | Critical | ACC-01–02,11; AUTH-02 | S05 |
-| F16 | **Account reviewer assignments**: Grouped accounts and staged STAFF/SUPERVISOR→SUPERVISOR/HEAD/ADMIN and HEAD→HEAD/ADMIN saves | ADMIN | Manage Accounts → Accounts | AccountService transaction and audit | Implemented | Yes | Critical | ACC-03–04; E2E-05 | S05 |
+| F16 | **Account reviewer assignments**: STAFF/SUPERVISOR/HEAD/HR/ADMINS tabs, primary/second search, names selected and emails in suggestions; role matrix above | ADMIN | Manage Accounts → Accounts | AccountService transaction/audit; shared EmployeeSearch | Implemented; either reviewer acts | Yes | Critical | ACC-03–04,13; FORM-22; E2E-05 | S05 |
 | F17 | **Head HR designation**: Single saved designation; pending HR form/task transfer and self-review prevention | ADMIN config; HR reviews | Accounts → Head HR switch / Save Changes | AccountService, FormReviewScope, TaskService | Implemented | Yes | Critical | ACC-05–06; E2E-02 | S05 |
-| F18 | **Incident reviewer settings**: Department reviewer, two Heads ADMIN slots, Management default; staged Save Changes and atomic audit | ADMIN | Accounts → Incident Reviewer Assignments | WorkflowConfiguration, linked active accounts, seeded defaults | Implemented; hidden department limits | Yes | Critical | ACC-07–09 | S09 |
+| F18 | **Incident Reviewers**: Dynamic departments; department HEAD/ADMIN; HR also allows designated Head HR; two Heads ADMIN slots and separate Management default | ADMIN | Manage Accounts → Accounts → Organization Settings → Incident Reviewers | WorkflowConfiguration, linked active accounts, saved mappings | Implemented; assignments use Save Changes | Yes | Critical | ACC-07–09,12 | S09 |
 | F19 | **Account management scope**: List/refresh, account edit requests and decisions; no general disable/delete | ADMIN | Manage Accounts | Current registered APIs / account view | Partial administration surface | Yes | High | ACC-10; AUTH-07; EMP-13 | S05 |
 | F20 | **Personal dashboard**: Own greeting/profile/job details, direct manager, Full Profile expansion, read-only sensitive own fields | STAFF / SUPERVISOR / HEAD | Dashboard | Central employee identity, profile renderer, employee.self | Implemented | Yes | Critical | SELF-01; EMP-11 | S10 |
-| F21 | **Own daily attendance**: Today/date arrows/refresh, eight time fields, scan/device/serial popover, identity-number/name matching | STAFF / SUPERVISOR / HEAD | Dashboard → Daily Attendance | Provider accounts, cache and shared inference | Implemented; provider dependent | Yes + scanner | Critical | SELF-02–04 | S10 |
+| F21 | **Own daily attendance**: Today/date arrows/refresh, eight time fields, scan/device/serial popover, unique first/last-name matching and HR-confirmed duplicate links | STAFF / SUPERVISOR / HEAD | Dashboard → Daily Attendance | Provider accounts, cache and shared inference | Implemented; provider dependent | Yes + scanner | Critical | SELF-02–04; ATT-11–14; E2E-07 | S10 |
 | F22 | **Form catalog / common authoring**: Seven templates, autofill/locked applicant, signature, acknowledgments, submit feedback and serial | STAFF / SUPERVISOR / HEAD / HR | Forms → Fill Out | FormTemplates, FormValidation, FormService, employee identity | Implemented | Yes | Critical | FORM-01,09,19,21 | S11 |
 | F23 | **Leave Application**: Six leave choices, dates/days/reason/pay, Others description, SL/VL display, cross-year allocation and HR SIL text | Form submitters; HR review | Fill Out → Leave Application | LeaveService, ledger, employee rank/status | Implemented | Yes | Critical | LEAVE-01–09 | S12 |
 | F24 | **Authority To Deduct**: Particulars, amount 0.01–10000000, authorization and signed request | Form submitters; reviewers | Fill Out → Authority To Deduct | Template + standard form route | Implemented as request only | Yes | High | FORM-02 | S11 |
@@ -193,7 +227,7 @@ Rows group controls that share the same implemented workflow; each named small c
 | F28 | **Time In/Out Record**: Add/remove dated time/break rows, applicant signature, view/print | Form submitters; reviewers | Fill Out → Time In/Out Record | Shared row editor; maximum 100 rows | Implemented as request only | Yes | High | FORM-06 | S11 |
 | F29 | **Company Property Accountability**: Description/quantity/tag/dates/remarks rows, acknowledgment; direct HR route, signature-free reviewer approval | Form submitters; HR | Fill Out → Company Property Accountability | nexus-accountability template, HR task | Implemented; omitted in overview docs | Yes | Critical | FORM-07–08 | S11 |
 | F30 | **My Submissions / editing**: Summary, status/type/search, newest-first view/print, eligible edit with fresh signature | Form submitters | Forms → My Submissions | FormStatus, own user_forms query, document renderer | Implemented | Yes | High | FORM-12–13,17,20 | S11 |
-| F31 | **Assigned form review**: View, sign/forward or reasoned reject; date/type/status/search/refresh | Assigned SUPERVISOR/HEAD; designated Head HR for HR | Forms → Review Requests | Stored assigned reviewer, scope, signature requirements | Implemented | Yes | Critical | FORM-10–11,14,16–18 | S11 |
+| F31 | **Assigned form review**: View, sign/forward or reasoned reject; date/type/status/search/refresh | Assigned SUPERVISOR/HEAD/ADMIN; designated Head HR for HR | Forms → Review Requests | Stored assigned reviewer, scope, signature requirements | Implemented | Yes | Critical | FORM-10–11,14,16–18,22 | S11 |
 | F32 | **HR final review / ADMIN view**: Take Task, template-specific signature/approve, reasoned reject, HR leave fields; ADMIN view/assignment only at the HR stage; explicitly assigned ADMIN can review the first stage | HR owner; ADMIN viewer | Review Requests / View Forms; Inbox links | TaskService, FormService transaction/audit, leave approval | Implemented | Yes | Critical | FORM-15–18; TASK-01–03 | S11 |
 | F33 | **Leave ledger / regularization**: Annual five SL/five VL, idempotent historical sync, locked final deduction, rank/status recheck, six-month job | Eligible employees; HR; operator observes job | Leave form / review; startup and hourly job | leave_accounts, leave_transactions, RegularizationService | Implemented; no holiday/carryover engine | Yes | Critical | LEAVE-03–10 | S12 |
 | F34 | **HR attendance list**: Date/day arrows/refresh, employee/department/main-status filters, chronological logs, department grouping, all rows | HR / ADMIN | Employees → Attendance | AttendanceService/Rules/UI; Hik client/accounts | Implemented; no UI paging/sort headers | Scanner data | High | ATT-01–06,09–10 | S13 |
@@ -209,7 +243,7 @@ Rows group controls that share the same implemented workflow; each named small c
 | F44 | **Incident filing / grouping**: Reported and concerned selectors, five involved/five witnesses, facts, files, File Another/Remove, one group/separate IRs | SUPERVISOR/HEAD; Head HR; assigned ADMIN | Incident Management → File | WorkflowReports, employee/account lookup, sequences | Implemented | Yes + active accounts | Critical | INC-01–04 | S17 |
 | F45 | **Incident routing / conflict rules**: Filer department route; Heads shared queue for HEAD/ADMIN subjects and own-department HEAD filings; no involved reviewer | Eligible filer / configured reviewers | File / Review / Take HEAD Review Task | WorkflowAccess/Reports, department mapping | Implemented | Yes | Critical | INC-05–07 | S17 |
 | F46 | **HEAD review / NTE**: Request filer evidence/wait, NTE draft/issuance with issuer signature, close-for-documentation reason | Assigned HEAD or assigned ADMIN HEAD | Review → View → Track | WorkflowActions, signed document snapshots/evidence | Implemented | Yes | Critical | INC-08–11 | S18 |
-| F47 | **Employee NTE response**: Signed receipt/deadline, draft/explanation signature/files, hearing request, extension request/review/reminders/overdue | Reported employee; uninvolved HR reviews extension | Track / Inbox / popup | WorkflowActions/Queries, versioned documents, reminders job | Implemented | Yes | Critical | INC-12–17 | S18 |
+| F47 | **Employee NTE response**: Issue-started deadline, immediate draft/explanation signature/files and combined receipt/submission, hearing request, extension request/review/reminders/overdue | Reported employee; uninvolved HR reviews extension | Track / Inbox / popup | WorkflowActions/Queries, versioned documents, reminders job | Implemented | Yes | Critical | INC-12–17 | S18 |
 | F48 | **HR evaluation and investigation**: Take Task, involved-recipient requests/waits, hearing schedule/complete, findings/indicators/severity/matrix recommendation and drafts | Uninvolved owning HR | Review → Track | TaskService, WorkflowActions, Conduct, private requests | Implemented | Yes | Critical | INC-18–22 | S18 |
 | F49 | **Management and final action**: Eligible approver, send/pause, approve/return, revise/new approval, final issue/version/count gate, close with reason | Designated ADMIN; HR owner | Track / Management Inbox | Versioned assessment, snapshots, discipline history, task locks | Implemented | Yes | Critical | INC-23–28 | S18 |
 | F50 | **Track / Review / History**: Keyboard case selector, role categories/counters/search, sibling switch, shared circles, polling/dirty protection, archived filters and read-only view | Case-authorized roles; History STAFF/SUPERVISOR | Incident Management pages | WorkflowQueries/Reports, Tracking, browser controllers | Implemented | Yes | High | INC-29–30,33–34 | S19 |
@@ -221,7 +255,10 @@ Rows group controls that share the same implemented workflow; each named small c
 | F56 | **Server/API security**: Current-role permissions, input allowlists, malformed/unknown methods, session/cookie/CORS boundaries | All; operator verifies hosting | RPC / login / downloads / private URLs | Auth, Permissions, Express, Apache | Implemented controls with gaps below | Mixed | Critical | SEC-01–08; AUTH-03–10 | S23 |
 | F57 | **Background / startup compatibility**: Initializer/migrations, defaults, regularization hourly, overdue every 15 minutes, task seeding/archive/Admin release | Operator; HR observes browser effects | API startup / jobs | database.js, IncidentWorkflowSchema, TaskSchema, services | Implemented; not read-only startup | QA restored data | Critical | LEAVE-10; INC-17; OPS-01,03–05 | S24 |
 | F58 | **Operational readiness**: Backup/restore, failure recovery, remote/HTTPS feasibility, dependency outages and real-MySQL contention | Operator with QA tester | External operations plus browser verification | Deployment environment, provider and database | Environment unconfirmed; no backup UI | QA fixtures | Critical | OPS-01–05; SEC-06–07 | S24 |
-| F59 | **Cross-module lifecycle**: Registration→access→form; paid leave transfer; full/no-violation incident; organization changes; browser smoke | All actors as specified | Connected pages | All implemented modules above | Implemented paths; unexecuted manually | Yes | Critical | E2E-01–06 | S25 |
+| F59 | **Cross-module lifecycle**: Registration→access→form; paid leave transfer; full/no-violation incident; organization changes; browser smoke | All actors as specified | Connected pages | All implemented modules above | Implemented paths; unexecuted manually | Yes | Critical | E2E-01–07 | S25 |
+
+| F60 | **Organization choices**: Add company/location/department immediately; fresh employee selectors/import validation use saved choices | ADMIN | Manage Accounts → Accounts → Organization Settings | lookup_values, addEmployeeLookupValue, audit | Implemented; separate from Save Changes | Yes | High | ACC-12; IMP-05 | S05/S06 |
+| F61 | **Attendance links**: HR search/confirm/correct scanner-to-employee mapping; duplicate-name blocking, changed-name/stale-save guards | HR/ADMIN with employee-write confirmation; personal employee reads | Attendance → Link employee; existing personal Daily Attendance | AttendanceIdentityService, link table, shared search/confirmation/audit | Implemented; daily-identity and historical-scope limits below | Yes + scanner | Critical | ATT-11–14; E2E-07 | S10/S13 |
 
 ## 6. Implementation limits and deployment questions
 
@@ -231,13 +268,13 @@ These are source observations to carry into testing, not runtime findings or aut
 | --- | --- | --- |
 | Remote API and transport | Browser defaults to `http://localhost:3001/api`; API binds `127.0.0.1`; session cookie has `secure:false`; default Express session store is memory. Actual proxy/TLS/base override setup was not inspected. | SEC-06 is a deployment gate. A second computer's localhost is that computer, not the server. Verify intended URL, transport, cookies and restart session loss in deployment-like QA. |
 | Authentication hardening | No application login rate limiter/lockout, explicit CSRF-token mechanism, forgotten-password flow or general session-revocation control is registered in the inspected server. Password change does not invalidate other sessions; same-password prevention is browser-only. | AUTH-10 / SEC-07 require a documented organizational/perimeter decision. Do not claim these controls passed because valid login works. |
-| Offboarding and provisioning | Employment status does not itself revoke login. No general disable/role-edit/reset UI. Existing imported employees cannot request accounts through Edit; new registration must include an account request. CLI create-user remains the documented operator path. | EMP-13 / ACC-10–11 must prove a usable authorized offboarding/provisioning process before real use. Never duplicate employee profiles to work around it. |
-| Email integrity | Cooperating writers use a five-second acquisition MySQL named lock. There is no DB unique constraint for normalized Personal Email; direct SQL/old writers bypass it. | Verify actual lock behavior, deployed collation and all writer versions; do not create conflicting records in production. Existing ambiguity blocks ordinary login rather than auto-repairing it. |
+| Offboarding and provisioning | Employment status does not revoke login. Existing employee Edit supports role/reviewer/password access changes and first access for imported employees: HR creates pending requests, ADMIN applies immediately. Only ADMIN can grant ADMIN. No general disable/delete-account UI exists. | EMP-13 / ACC-10–11 / E2E-07 verify the authorized account path without duplicate employee registration. Record a usable offboarding procedure; status change alone does not revoke access. |
+| Email integrity | Cooperating writers use a five-second acquisition MySQL named lock. There is no DB unique constraint for normalized Primary Email; direct SQL/old writers bypass it. | Verify actual lock behavior, deployed collation and all writer versions; do not create conflicting records in production. Existing ambiguity blocks ordinary login rather than auto-repairing it. |
 | Assignment changes | Ordinary STAFF/SUPERVISOR reviewer and incident assignments are stored on existing requests/cases. Head HR transfer is explicitly implemented; general department/account changes do not promise retroactive pending reassignment. Configuration defaults seed at startup only under their stored condition. | ACC-09 / E2E-05: compare old/new items and identify stranded pending work; test seeded defaults on disposable first install, not by resetting live settings. |
-| Incident departments | Configuration reader hides IT, Finance and Operations although these occur in employee default lookups. Missing/involved reviewers block filing; reviewer/manager choices require real linked active employees. | Exercise actual organization departments. Unavailable needed routing is a release blocker, not a reason to invent a fallback reviewer. |
+| Incident departments | Active lookup, nonarchived employee and saved-mapping departments appear dynamically; missing/involved reviewers block filing. HR allows designated Head HR; Heads slots and Management need ADMIN. | ACC-07–09/12 verify the actual department list and eligible assignments. Do not add an unapproved fallback or confuse HR department incident assignment with HR form routing. |
 | Attachments | Allowlist is MIME/type and size based, with no inspected malware scanning/content authenticity service. Per action ten files, 8 MiB each, 18 MiB decoded total; filing-session combined cap 18 MiB. Express JSON cap is 25 MB, including base64 overhead. | INC-32 verifies practical wire-size limit and rejected-file rollback; near-18 MiB payload can exceed JSON limit. Do not promise virus-free files or exact decoded limit acceptance without real HTTP verification. |
-| Import | First worksheet only; JSON profile tables and employee supporting-document files not carried. Preview is not a reservation; client commits independent 300-row chunks and reports only first 50 row errors in popup plus total. | Reconcile actual commits, preserve source manifest, and do not assume whole-file rollback or all errors displayed at once. |
-| Attendance | On-demand read-only external provider, one-minute cache; inferred breaks/departure and gross elapsed hours. No HRIS roster row can establish absence if provider returns neither scans nor summary. | Attendance operational status/credentials/hardware unconfirmed. Correction/overtime/time-record approval does not write scanner punches or payroll. |
+| Import | First worksheet; generated fields unwritable, no JSON/docs-file import. Number/FTE/Primary Email are optional; sole hyphen becomes empty. Nonblank number/Primary Email deduplicate; both-blank rows lack a repeat-import identity key. Preview is not a reservation; independent 300-row chunks, first 50 row errors plus total. | IMP-01–09 run on QA files. Preserve source-to-generated-ID reconciliation; never rerun the completed real workbook as a test or assume whole-file rollback. |
+| Attendance | One-minute provider cache; existing inference/card. Unique normalized names auto-match despite different HRIS numbers; HR/Admin with employee-write can confirm ambiguous/unmatched links. Current provider-namespace/scanner-ID/name mapping is persisted and audited, not effective-dated. Name/archived-target changes withhold a link. | ATT-11–14 cover actual times, confirmation/correction/races and privacy. Ambiguity is evaluated over returned daily identities, not a complete scanner enrollment directory. Reassignment can change historical matching-name reads; verify before operational correction. No scan means no fabricated attendance or absence. |
 | Lists and caps | Master list, HR Reports, Audit, incident History and COC history UIs request all rows. Attendance renders all returned rows with fixed ordering. Inbox/management queries cap at 500; Track selector offers first 50 matching options; provider row retrieval has 10,000-row safety limits. | Measure realistic browser load; do not test nonexistent UI pagination. API pagination helpers are tested separately by automation; UI paging claims in older Attendance guide are stale. |
 | Financial/business scope | ATD, travel, overtime, daily time and property templates record/approve documents. No inspected payroll posting, scanner correction, booking or inventory engine is connected. No general form cancellation, withdrawal or approved-record editing workflow. | Expected outcomes stop at saved requests/approvals; do not count missing downstream external writes as a regression in an unimplemented feature. |
 | Leave/timing | SL/VL yearly allowance only; SIL is form text. No carryover, leave public-holiday calendar or automatic working-day duration calculation. Task working clock counts full weekdays including lunch/holidays. | Distinguish leave calendar days, NTE calendar deadline and HR work-time clock. Operator supplies cross-year/regularization fixtures. |
@@ -245,7 +282,7 @@ These are source observations to carry into testing, not runtime findings or aut
 | Announcement auditing | Announcement insert and audit write are separate pool operations, unlike the transactional configuration/matrix/leave/incident paths. | An audit failure may leave a published announcement despite error; inspect before retrying to avoid duplicate announcements. |
 | Startup writes | Initializer includes compatibility role/status changes, obsolete employee-column removal, obsolete performance-settings removal, workflow/task initialization and default seeding; startup also releases ADMIN-owned open HR tasks and processes regularization/overdue notices. | No server startup was performed for this investigation. A production restart/migration needs backup, compatibility review and separate operator approval; OPS checks run on restored QA copy. |
 | Legacy/inactive code | Historical incident renderers and tables remain for read access. Retired facade mutation methods return 409; they are not current features. Old COC publish/version edit workflow is not exposed; direct matrix save is current. | Retain/read history and test denial; do not execute legacy signature-first/investigation/evaluation write instructions from old audit notes. |
-| Docs drift | README/UserGuide summarize six forms while FormTemplates/controller expose seven; older attendance paging text and generic HR waiting descriptions exceed current UI/task behavior. | This plan follows source: NAC included, no attendance paging, HR incident tasks only after explanation. No application/guide behavior was silently changed. |
+| Docs drift | Older overview text may omit Company Property Accountability, mention attendance paging, or describe HR waiting tasks before explanation. Original plan text also predates the current import/account/search/name-link behavior. | Follow current named controls and cases: seven templates, no attendance paging, HR incident tasks only after explanation, current actor-specific account saves and attendance links. Treat the old 221-test baseline as historical, not a current manual result. |
 | Not confirmed / absent | Live deployment topology, actual MySQL schema/collation/record state, real scanner product/permissions, backup operations and supported browser policy are unconfirmed. No connected email/SMS sender, recruitment, payroll run, shift scheduler or restore-employee UI found in registered product paths. | Mark relevant checks Blocked pending evidence; do not infer common HRIS capabilities. Notifications here mean in-app Inbox/popups. |
 
 ### Actual report choices and Review filters
@@ -279,17 +316,17 @@ Database structures were inspected in source only. Most business relationships a
 
 | Relationship | Keys / constraints seen in source | What the tester/operator reconciles |
 | --- | --- | --- |
-| Central employee → account | employees.record_id PK; unique emp_no and seq_no; user_roles.email PK; normalized Personal Email lookup must find exactly one nonarchived employee, except flagged setup ADMIN | Identity and role stay distinct; archive blocks ordinary linked authentication without deleting history. |
-| Registration → pending request → approval | account_requests unique email; user_roles assigned_head_email / is_hr_head; registration and approval use transactions and identity lock | Employee/request atomicity, ordered reviewer approval, rejected request retains employee, no plaintext credentials. |
-| Form → owner / reviewer / serial | user_forms.user_email / head_reviewer_email; unique control_no; form_serial_sequences key template/year | One saved row/reference; stored applicant/signature preserved; stage and terminal status consistent. |
+| Central employee → account | employees.record_id PK; unique emp_no and seq_no; user_roles.email PK; normalized Primary Email lookup must find exactly one nonarchived employee, except flagged setup ADMIN | Identity and role stay distinct; archive blocks ordinary linked authentication without deleting history. |
+| Employee save → account access | HR uses account_requests; ADMIN applies immediately. user_roles has assigned_head_email / secondary_head_email / is_hr_head; transactional save/approval and identity lock | Same employee record, correct actor-specific approval, either stored reviewer, imported-record provisioning, no plaintext credentials. |
+| Form → owner / reviewer / serial | user_forms.user_email / head_reviewer_email / secondary_head_reviewer_email; unique control_no; form_serial_sequences key template/year | One saved row/reference; stored applicant/signature preserved; stage and terminal status consistent. |
 | Leave → employee/year/type/form | leave_accounts composite employee/year/type PK; leave_transactions unique form/year/type/transaction_type | One grant, one applicable deduction; correct separate years/types; no overdraw or partial failed approval. |
-| Current incident → group / sections | incident_reports workflow_version/group_id; incident_workflows incident key, JSON sections, phase/revision; incident_groups | Group atomicity and shared progress; each reported employee retains separate IR and outcome. |
+| Current incident → group / sections | incident_reports workflow_version/group_id; incident_workflows incident key, JSON sections, phase/revision; incident_groups | One IR number per submitted report card, shared by its concerned/reported/involved/witness accounts. Only File Another adds another card/number within the group; participant selection does not. A later new filing gets a new IR number. Group writes remain atomic. |
 | Incident → subject / participants / files | incident_case_subjects unique incident/email; participants employee IDs; evidence incident/request/section pointers | No identity substitution; only intended participants; request files attached to correct section/recipient. |
 | Incident → approval / history | versioned workflow documents; management reviewVersion; evaluations/decisions/history subject-scoped uniqueness; legacy rows retained | Issued approval matches assessment version and finalized offense count; no duplicate discipline, no-violation excluded, old policy snapshot preserved. |
 | Notification → recipient / state | incident_notifications unique incident/recipient/type; announcement_views account/announcement; inbox_views recipient/type/item; daily workflow reminder incident/employee/date | Actor excluded; seen state scoped; no duplicate reminders; reading never changes business resolution. |
 | Review ownership → events | hr_tasks unique resource_type/resource_id/phase; hr_task_events references task by foreign key; revision singleton | Single claim, real MySQL race protection, retained earned time, pause/resume/transfer history and stale-owner denial. |
 | Sensitive actions → audit | audit_logs actor/action/record/detail; transactional writer supplied on related sensitive saves | Correct actor and timestamps; success audit commits/rolls back with relevant business write; no copied secrets/policy/file bodies. |
-| Attendance → provider | Provider records are read, inferred and cached in memory; not persisted as attendance/enrollment tables here | No scanner writes, account IDs kept separate, raw scan history preserved, personal selection bound to session identity. |
+| Attendance → provider / employee link | Punches read/inferred/cached, not persisted. attendance_employee_links PK provider_account/scanner_no, employee FK, normalized scanner name and confirming actor/time | No scanner writes; provider namespaces separate, auto-name uniqueness and stored confirmation take precedence correctly. Link + ATTENDANCE_EMPLOYEE_LINK audit commit/roll back together; personal selection stays session-bound. |
 
 ## 8. Source evidence and automated coverage
 
@@ -306,10 +343,10 @@ Evidence keys below point to repository files used to trace implementation. Comp
 | S07 | [EmployeeEmailIntegrity.md](EmployeeEmailIntegrity.md) | [EmployeeEmailService.js](../server/services/EmployeeEmailService.js), [EmployeeIdentityLock.js](../server/utils/EmployeeIdentityLock.js) |
 | S08 | [Employees.js import mapping/chunks](../public/js/Employees.js) | [ImportService.js](../server/services/ImportService.js), [database.js counters](../server/db/database.js) |
 | S09 | [Assignments.js](../public/js/incident-management/Assignments.js), [Accounts.js](../public/js/Accounts.js) | [WorkflowConfiguration.js](../server/services/incident-management/WorkflowConfiguration.js), [IncidentWorkflowSchema.js defaults](../server/db/IncidentWorkflowSchema.js) |
-| S10 | [EmployeeDashboard.html](../public/views/EmployeeDashboard.html), [EmployeeDashboard.js](../public/js/EmployeeDashboard.js) | [EmployeeService.js self profile](../server/services/EmployeeService.js), [AttendanceService.js self attendance](../server/services/AttendanceService.js) |
+| S10 | [EmployeeDashboard.html](../public/views/EmployeeDashboard.html), [EmployeeDashboard.js](../public/js/EmployeeDashboard.js) | [EmployeeService.js self profile](../server/services/EmployeeService.js), [AttendanceService.js self attendance](../server/services/AttendanceService.js), [AttendanceIdentityService.js](../server/services/AttendanceIdentityService.js) |
 | S11 | [UserDashboard.html](../public/views/UserDashboard.html), [UserDashboard.js](../public/js/UserDashboard.js) | [FormTemplates.js](../shared/FormTemplates.js), [FormStatus.js](../shared/FormStatus.js), [FormValidation.js](../shared/FormValidation.js), [FormService.js](../server/services/FormService.js) |
 | S12 | [UserDashboard.js leave/HR fields](../public/js/UserDashboard.js) | [LeaveService.js](../server/services/LeaveService.js), [RegularizationService.js](../server/services/RegularizationService.js) |
-| S13 | [Attendance.html](../public/views/Attendance.html), [Attendance.js](../public/js/Attendance.js), [AttendanceUI.js](../public/js/AttendanceUI.js), [Attendance.md](Attendance.md) | [AttendanceService.js](../server/services/AttendanceService.js), [AttendanceRules.js](../server/services/AttendanceRules.js), [HikConnectClient.js](../server/integrations/HikConnectClient.js), [HikConnectAccounts.js](../server/integrations/HikConnectAccounts.js) |
+| S13 | [Attendance.html](../public/views/Attendance.html), [Attendance.js](../public/js/Attendance.js), [AttendanceUI.js](../public/js/AttendanceUI.js), [Attendance.md](Attendance.md) | [AttendanceService.js](../server/services/AttendanceService.js), [AttendanceRules.js](../server/services/AttendanceRules.js), [HikConnectClient.js](../server/integrations/HikConnectClient.js), [HikConnectAccounts.js](../server/integrations/HikConnectAccounts.js), [AttendanceIdentityService.js](../server/services/AttendanceIdentityService.js), [database.js links](../server/db/database.js) |
 | S14 | [Dashboard.html](../public/views/Dashboard.html), [Reports.html](../public/views/Reports.html), [Main.js charts](../public/js/Main.js), [Reports.js](../public/js/Reports.js) | [DashboardService.js](../server/services/DashboardService.js), [ReportService.js](../server/services/ReportService.js), [EmployeeFilters.js](../server/utils/EmployeeFilters.js), [Pagination.js](../server/utils/Pagination.js) |
 | S15 | [Reports.js audit controls](../public/js/Reports.js) | [AuditService.js](../server/services/AuditService.js) |
 | S16 | [Reports.js Inbox/announcement](../public/js/Reports.js), [UserDashboard.js popup](../public/js/UserDashboard.js), [Main.js badges](../public/js/Main.js) | [AnnouncementService.js](../server/services/AnnouncementService.js), [InboxService.js](../server/services/InboxService.js), [Notifications.js](../server/services/incident-management/Notifications.js), [WorkflowQueries.js](../server/services/incident-management/WorkflowQueries.js) |
@@ -323,16 +360,16 @@ Evidence keys below point to repository files used to trace implementation. Comp
 | S24 | [README.md setup/maintenance](../README.md), [package.json commands](../package.json), [Setup.js](../scripts/Setup.js), [SampleData.js](../scripts/SampleData.js) | [database.js](../server/db/database.js), [IncidentWorkflowSchema.js](../server/db/IncidentWorkflowSchema.js), [TaskSchema.js](../server/db/TaskSchema.js), [server.js startup jobs](../server/server.js) |
 | S25 | [UserGuide.md](UserGuide.md), [README.md](../README.md), all connected UI groups above | [RegressionCoverage.md](RegressionCoverage.md), connected services/schema above |
 
-### Automated baseline actually run for this investigation
+### Historical automated evidence; not a current full-suite certification
 
-| Check | Result on 11/13/2026 | What it establishes / does not |
+| Check | Historical result on 11/13/2026 | What it establishes / does not |
 | --- | --- | --- |
 | `npm.cmd run check` | Passed: 113 JavaScript files, browser assets, module paths and static HTML IDs. | Source structure only; no HTTP authorization, rendering, MySQL or hardware proof. |
 | Registered regression test file set from `package.json`, run with Node test runner | **221 passed, 0 failed, 0 skipped**, approximately 6.23 seconds runner time. | All registered files were run. A temporary Node preload outside the repo replaced unmocked MySQL pool methods and global fetch with throwing guards. No actual DB/network access was required; tests used their own synthetic connections/fetch implementations. No production modules/tests were edited. |
 | Documentation checks | Case IDs/counts, required fields, inventory/source references, local file links, result defaults and whitespace checked after writing. | Documentation consistency only; results CSV remains entirely Not Tested. |
 | Live/browser/operator verification | Not run. | No app-server startup, schema initialization, setup/create-user/sample-data command, real provider request, employee entry, UI mutation or manual scenario was executed. |
 
-Older AGENTS/audit notes mention stale failures. The current reproduced baseline has none: do not carry forward the historical 159/200 result as today’s outcome. Existing test expectations were not changed.
+The 221-pass result above belongs to the original 11/13 investigation and predates later employee/account/attendance changes. It is not today's reproduced baseline. Earlier implementation work reported 53 Attendance and two shared browser-control checks, plus focused synthetic identity/UI checks; those are not a full regression or manual sign-off. No application test suite or live workflow was rerun for this documentation-only update. Existing automated tests may still contain superseded expectations; log the requirement and failure separately rather than editing assertions to manufacture a Pass.
 
 | Test file(s) | Existing automated evidence | Manual gap addressed |
 | --- | --- | --- |
@@ -360,16 +397,16 @@ No dedicated end-to-end real-browser or live-MySQL suite is registered. Performa
 
 ## 10. API-to-test traceability
 
-All **87 registered RPC method names** in `server/server.js` are accounted for below. This names the implemented surface and compatibility stubs; it does not claim 87 separately executed HTTP tests. Browser-first cases use the corresponding method through the UI; Security cases replay the same captured payload as another actor. `searchFormEmployees` and `assignAccountHead` are retained service/compatibility helpers, not proof of extra visible pages.
+All **91 registered RPC method names** in `server/server.js` are accounted for below. This names the implemented surface and compatibility stubs; it does not claim 91 separately executed HTTP tests. Browser-first cases use the corresponding method through the UI; Security cases replay the same captured payload as another actor. `searchFormEmployees` and `assignAccountHead` are retained service/compatibility helpers, not proof of extra visible pages.
 
 | Registered group | Exact RPC names | Planned case family |
 | --- | --- | --- |
 | Session / identity | `getSession` | AUTH-01–07 |
 | Employee metadata / records | `getFilterOptions`, `getMyEmployeeProfile`, `listEmployees`, `getEmployee`, `getFormOptions`, `getFormMeta`, `saveEmployee`, `archiveEmployee`, `importEmployees` | EMP / IMP / SELF; SEC-01 |
-| Attendance | `getAttendanceContext`, `listAttendance`, `getMyDailyAttendance` | ATT / SELF |
+| Attendance | `getAttendanceContext`, `listAttendance`, `getMyDailyAttendance`, `getAttendanceIdentity`, `confirmAttendanceIdentity` | ATT-01–14 / SELF; E2E-07 |
 | Workforce reports / audit | `getDashboard`, `getExecutiveSummary`, `listReports`, `runReport`, `exportReportCsv`, `getAuditLogs` | REPORT; SEC-01 |
 | Announcements / Inbox | `createAnnouncement`, `listAnnouncementsForManagement`, `listUnseenAnnouncements`, `markAnnouncementsSeen`, `getInbox`, `getInboxNotificationCount`, `markInboxSeen` | NOTIFY |
-| Accounts | `listAssignableHeads`, `getAccountManagement`, `assignAccountHead`, `saveAccountChanges`, `approveAccountRequest`, `rejectAccountRequest`, `changeMyPassword` | ACC / AUTH-08–10 |
+| Accounts | `listAssignableHeads`, `getAccountManagement`, `getAccountRequestCount`, `addEmployeeLookupValue`, `assignAccountHead`, `saveAccountChanges`, `approveAccountRequest`, `rejectAccountRequest`, `changeMyPassword` | ACC / AUTH-08–10 |
 | Forms / leave | `listMyForms`, `getMyLeaveBalances`, `getReviewLeaveBalances`, `searchFormEmployees`, `submitLeaveForm`, `submitUserForm`, `updateMyForm`, `listFormsForReview`, `getFormReviewSummary`, `reviewUserForm` | FORM / LEAVE |
 | Task ownership / performance | `takeReviewTask`, `reassignReviewTask`, `getReviewTaskRevision`, `getReviewTaskAssignees`, `getHrPerformance`, `getPerformanceForm`, `getReviewTaskHistory` | TASK |
 | Current incident commands / configuration | `getIncidentFileContext`, `getIncidentWorkflowConfiguration`, `saveIncidentWorkflowConfiguration`, `submitIncidentGroup`, `incidentWorkflowAction`, `getIncidentCorrectiveAction`, `searchIncidentEmployees` | ACC-07–09; INC-01–28 |
@@ -381,6 +418,6 @@ Current `incidentWorkflowAction` action keys are `TAKE_HEAD`, `SAVE_NTE`, `ISSUE
 
 Non-RPC routes: `POST /api/login`, `POST /api/logout`, and five `GET /api/incidents/{evidence|nte-evidence|explanation-evidence|explanation-draft-evidence|explanation-addendum-evidence}/:evidenceId` routes. The generic evidence route serves current/authorized legacy IR files; specialized routes retain legacy document access checks. AUTH and SEC/INC attachment cases cover these routes.
 
-**Immediate next action (under two minutes):** open the results CSV and enter your tester name beside BOOT-01; leave Result as Not Tested until the case is executed.
+**Immediate next action (under two minutes):** open the results CSV, enter your tester name beside BOOT-01, and filter Execution scope for Live observation / QA variants. Start the imported-data observations above; do not mark a whole mixed case Pass for only its live subset.
 
 

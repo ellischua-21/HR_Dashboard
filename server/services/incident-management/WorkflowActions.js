@@ -8,13 +8,15 @@ const {
   classifications,
   evidenceTypes,
   reviewIndicators,
-  responseCalendarDays
+  responseCalendarDays,
+  directive
 } = require('../../../shared/IncidentWorkflow');
-const participantEmails = (report) => [
-  report.concernedEmployee?.email,
-  ...(report.involved || []).map((person) => person.email),
-  ...(report.witnesses || []).map((person) => person.email)
-].filter(Boolean);
+const participantEmails = (report) =>
+  [
+    report.concernedEmployee?.email,
+    ...(report.involved || []).map((person) => person.email),
+    ...(report.witnesses || []).map((person) => person.email)
+  ].filter(Boolean);
 async function head(db, row, rights) {
   A.assert(
     rights.head && row.phase === 'HEAD',
@@ -136,6 +138,7 @@ async function saveNte(req, id, input = {}, issue = false) {
       nte.issuerPosition = employee?.position || user.role;
       nte.issuedAt = A.now();
       nte.dateIssued = manilaDate();
+      nte.directive = directive;
       const [files] = await db.execute(
         'SELECT id,SHA2(file_data,256) AS hash FROM incident_evidence WHERE incident_id=? AND section_number IN (2,4) ORDER BY id',
         [row.id]
@@ -150,8 +153,12 @@ async function saveNte(req, id, input = {}, issue = false) {
         files
       });
       await db.execute(
-        "UPDATE incident_workflows SET nte=?,nte_issued_at=CURRENT_TIMESTAMP,phase='EMPLOYEE' WHERE incident_id=?",
-        [JSON.stringify(nte), row.id]
+        "UPDATE incident_workflows SET nte=?,nte_issued_at=CURRENT_TIMESTAMP,deadline_date=?,phase='EMPLOYEE' WHERE incident_id=?",
+        [
+          JSON.stringify(nte),
+          A.calendarDays(nte.dateIssued, responseCalendarDays),
+          row.id
+        ]
       );
       await A.activity(
         db,
@@ -176,36 +183,38 @@ async function saveNte(req, id, input = {}, issue = false) {
     }
   });
 }
+async function recordReceipt(db, row, user, signature) {
+  const receipt = {
+    signature: normalizeSignature(signature),
+    receivedAt: A.now(),
+    employeeName: user.full_name || user.email,
+    employeeEmail: user.email,
+    documentVersion: row.nte.documentVersion
+  };
+  await A.document(db, row, user, 'NTE_RECEIPT', receipt);
+  await db.execute(
+    'UPDATE incident_workflows SET receipt=?,received_at=CURRENT_TIMESTAMP WHERE incident_id=?',
+    [JSON.stringify(receipt), row.id]
+  );
+  await A.activity(
+    db,
+    row,
+    user,
+    'NTE_RECEIVED',
+    'Receipt acknowledged; existing explanation deadline unchanged.'
+  );
+  await A.notify(db, row, 'NTE_RECEIVED', user, [
+    row.assigned_head_email,
+    ...(await A.reviewers(db))
+  ]);
+}
 async function acknowledge(req, id, input = {}) {
   return A.mutate(req, id, async (db, row, user, rights) => {
     A.assert(
       rights.reported && row.phase === 'EMPLOYEE' && !row.received_at,
       'Only the reported employee can acknowledge this notice once.'
     );
-    const receipt = {
-      signature: normalizeSignature(input.signature),
-      receivedAt: A.now(),
-      employeeName: user.full_name || user.email,
-      employeeEmail: user.email,
-      documentVersion: row.nte.documentVersion
-    };
-    const deadline = A.calendarDays(manilaDate(), responseCalendarDays);
-    await A.document(db, row, user, 'NTE_RECEIPT', receipt);
-    await db.execute(
-      'UPDATE incident_workflows SET receipt=?,received_at=CURRENT_TIMESTAMP,deadline_date=? WHERE incident_id=?',
-      [JSON.stringify(receipt), deadline, row.id]
-    );
-    await A.activity(
-      db,
-      row,
-      user,
-      'NTE_RECEIVED',
-      'Receipt acknowledged; five-calendar-day response period started.'
-    );
-    await A.notify(db, row, 'NTE_RECEIVED', user, [
-      row.assigned_head_email,
-      ...(await A.reviewers(db))
-    ]);
+    await recordReceipt(db, row, user, input.signature);
   });
 }
 async function explanation(req, id, input = {}, submit = false) {
@@ -213,9 +222,9 @@ async function explanation(req, id, input = {}, submit = false) {
     A.assert(
       rights.reported &&
         row.phase === 'EMPLOYEE' &&
-        row.received_at &&
+        row.nte_issued_at &&
         !row.explanation_submitted_at,
-      'Acknowledge the NTE before preparing your explanation.'
+      'Only the reported employee can respond to an outstanding issued NTE.'
     );
     const statement = submit
       ? A.explanation(input.statement, 'Employee Explanation')
@@ -230,6 +239,8 @@ async function explanation(req, id, input = {}, submit = false) {
       record.employeeName = user.full_name || user.email;
       record.employeeEmail = user.email;
       record.documentVersion = row.nte.documentVersion;
+      if (!row.received_at)
+        await recordReceipt(db, row, user, record.signature);
       await A.document(db, row, user, 'EMPLOYEE_EXPLANATION', record);
       await db.execute(
         "UPDATE incident_workflows SET explanation=?,explanation_draft=NULL,explanation_submitted_at=CURRENT_TIMESTAMP,phase='HR' WHERE incident_id=?",
@@ -360,8 +371,8 @@ async function respond(req, id, input = {}) {
 async function requestExtension(req, id, input = {}) {
   return A.mutate(req, id, async (db, row, user, rights) => {
     A.assert(
-      rights.reported && row.phase === 'EMPLOYEE' && row.received_at,
-      'Extensions can be requested after acknowledging an outstanding NTE.'
+      rights.reported && row.phase === 'EMPLOYEE' && row.nte_issued_at,
+      'Extensions can be requested for an outstanding issued NTE.'
     );
     const days = Number(input.days);
     A.assert(

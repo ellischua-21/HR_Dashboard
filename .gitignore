@@ -1,6 +1,7 @@
 node_modules/
 tests/
 .env
+/server/.local-backups/
 
 # Local AI agent configuration and generated code graphs
 /.codex/
