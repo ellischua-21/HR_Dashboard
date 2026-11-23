@@ -311,22 +311,30 @@ function renderAccountManagement(result) {
         ]) {
           const wrapper = document.createElement('label');
           wrapper.textContent = label;
-          const select = document.createElement('select');
-          select.className = 'account-head-assignment';
-          select.setAttribute('aria-label', `${label} for ${account.email}`);
-          const none = document.createElement('option');
-          none.value = '';
-          none.textContent =
-            key === 'headEmail' && FormStatus.assignedReviewerRole(account.role) ? `Select a ${reviewerRole}` : 'None';
-          select.appendChild(none);
-          reviewerOptions
-            .filter((optionAccount) => optionAccount.email !== account.email)
-            .forEach((optionAccount) => {
-              const option = document.createElement('option');
-              option.value = optionAccount.email;
-              option.textContent = `${optionAccount.full_name || optionAccount.email} (${optionAccount.email})`;
-              select.appendChild(option);
-            });
+          const select = document.createElement('input');
+          select.type = 'hidden';
+          const search = document.createElement('input');
+          search.type = 'search';
+          search.className = 'account-head-assignment';
+          search.placeholder = 'Search name or email';
+          search.setAttribute('aria-label', `${label} for ${account.full_name || account.email}`);
+          const suggestions = document.createElement('div');
+          suggestions.className = 'head-search-results';
+          suggestions.id = `account-${group}-${accounts.indexOf(account)}-${key}-suggestions`;
+          const options = reviewerOptions.filter(reviewer => reviewer.email !== account.email);
+          search.value = options.find(reviewer => reviewer.email === staged[key])?.full_name || staged[key] || '';
+          window.createEmployeeSearch({
+            input: search,
+            suggestions,
+            minLength: 1,
+            delay: 0,
+            search: query => options.filter(reviewer =>
+              `${reviewer.full_name} ${reviewer.email}`.toLowerCase().includes(query.toLowerCase())
+            ).slice(0, 8).map(reviewer => ({ ...reviewer, name: reviewer.full_name || reviewer.email })),
+            details: reviewer => [reviewer.email],
+            onClear: () => { select.value = ''; select.onchange(); },
+            onSelect: reviewer => { select.value = reviewer.email; select.onchange(); }
+          });
           select.value = staged[key];
           selections[key] = select;
           select.onchange = () => {
@@ -343,7 +351,7 @@ function renderAccountManagement(result) {
             else pendingHeadAssignments.set(account.email, next);
             updateAccountSaveButton();
           };
-          wrapper.appendChild(select);
+          wrapper.append(select, search, suggestions);
           assignmentCell.appendChild(wrapper);
         }
         row.append(

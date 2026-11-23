@@ -5,6 +5,7 @@ let META = null,
   IMP = null,
   HEAD_OPTIONS = [];
 let registrationReviewerSearch = null;
+let registrationSecondarySearch = null;
 window.addEventListener('employee-options-changed', () => { META = null; });
 const TABLES = {
   siblings: {
@@ -267,7 +268,7 @@ function renderEmployeeAccountStatus(rows) {
   const strip = $("e_account_status");
   const heading = el(
     "div",
-    "Account status",
+    "Account\nStatus",
     "employee-account-status-heading",
   );
   heading.setAttribute("aria-hidden", "true");
@@ -275,6 +276,7 @@ function renderEmployeeAccountStatus(rows) {
   rows.forEach((row) => {
     const label = Number(row.account_active) ? "Active" : "Inactive";
     const cell = el("div", label, "employee-account-status-row");
+    cell.dataset.accountStatus = label.toLowerCase();
     cell.setAttribute("role", "listitem");
     cell.setAttribute(
       "aria-label",
@@ -440,6 +442,23 @@ $('p_archive').onclick = guard(async () => {
 /* ---------- Registration / update form ---------- */
 VIEWS.register = guard(async () => {
   registrationReviewerSearch = null;
+  if (!registrationSecondarySearch) {
+    registrationSecondarySearch = window.createEmployeeSearch({
+      input: $('r_secondary_head_search'),
+      suggestions: $('r_secondary_head_results'),
+      minLength: 1,
+      delay: 0,
+      search: (query) => HEAD_OPTIONS.filter(head =>
+        FormStatus.assignedReviewerRoles($('r_account_role').value).includes(head.role) &&
+        head.email.toLowerCase() !== $('ff_personal_email').value.trim().toLowerCase() &&
+        `${head.full_name} ${head.email}`.toLowerCase().includes(query.toLowerCase())
+      ).slice(0, 8).map(head => ({ ...head, name: head.full_name || head.email })),
+      details: head => [head.email],
+      onClear: () => { $('r_secondary_head').value = ''; },
+      onSelect: head => { $('r_secondary_head').value = head.email; }
+    });
+  }
+  registrationSecondarySearch.reset();
   META = await api('getFormMeta');
   let rec = PENDING;
   if (rec) rec = await api('getEmployee', rec.record_id);
@@ -602,6 +621,8 @@ VIEWS.register = guard(async () => {
     $('ff_assigned_head_email').value = account.assignedHeadEmail || '';
     $('ff_reports_to').value = first?.full_name || account.assignedHeadEmail || rec.reports_to || '';
     $('r_secondary_head').value = account.secondaryHeadEmail || '';
+    const second = HEAD_OPTIONS.find(head => head.email === account.secondaryHeadEmail);
+    $('r_secondary_head_search').value = second?.full_name || account.secondaryHeadEmail || '';
   } else if (rec) $('ff_reports_to').value = rec.reports_to || '';
   updateRegistrationAccountAccess();
   const churchChoice = $('ff_church_has');
@@ -658,6 +679,7 @@ function updateRegistrationAccountAccess() {
     $(id).required = hasEmail && !CUR?.record_id;
   const supportsReviewers = FormStatus.assignedReviewerRoles($('r_account_role').value).length > 0;
   $('r_secondary_head').disabled = !supportsReviewers;
+  $('r_secondary_head_search').disabled = !supportsReviewers;
   $('ff_reports_to').disabled = hasEmail && !supportsReviewers;
   $('ff_reports_to').dataset.requiredIndicator = String(
     hasEmail && Boolean(FormStatus.assignedReviewerRole($('r_account_role').value))
@@ -667,25 +689,10 @@ function updateRegistrationRoleHelp() {
   const role = $('r_account_role').value;
   const hasEmail = Boolean($('ff_personal_email').value.trim());
   const secondary = $('r_secondary_head');
-  secondary.replaceChildren();
-  const none = el('option', 'None');
-  none.value = '';
-  secondary.appendChild(none);
   const supportsReviewers = FormStatus.assignedReviewerRoles(role).length > 0;
   secondary.disabled = !supportsReviewers;
-  if (supportsReviewers)
-    HEAD_OPTIONS.filter(
-      (head) =>
-        FormStatus.assignedReviewerRoles(role).includes(head.role) &&
-        head.email.toLowerCase() !== $('ff_personal_email').value.trim().toLowerCase()
-    ).forEach((head) => {
-      const option = el(
-        'option',
-        `${head.full_name || head.email} (${head.email})`
-      );
-      option.value = head.email;
-      secondary.appendChild(option);
-    });
+  $('r_secondary_head_search').disabled = !supportsReviewers;
+  registrationSecondarySearch?.reset();
   if (registrationReviewerSearch) registrationReviewerSearch.reset();
   const search = $('ff_reports_to');
   if (search) {
@@ -793,7 +800,7 @@ $('r_preview').onclick = () => {
     dl.appendChild(el('dt', 'Account role'));
     dl.appendChild(el('dd', d.accountAccess.role));
     dl.appendChild(el('dt', 'Assigned Head'));
-    dl.appendChild(el('dd', [d.accountAccess.assignedHeadEmail, d.accountAccess.secondaryHeadEmail].filter(Boolean).join(' / ') || 'None'));
+    dl.appendChild(el('dd', [d.accountAccess.assignedHeadEmail, d.accountAccess.secondaryHeadEmail].filter(Boolean).map(email => HEAD_OPTIONS.find(head => head.email === email)?.full_name || email).join(' / ') || 'None'));
     dl.appendChild(el('dt', 'Account approval'));
     dl.appendChild(el('dd', session.role === 'ADMIN' ? 'Applied immediately on save' : 'Pending ADMIN approval'));
   }
@@ -814,7 +821,8 @@ $('pv_save').onclick = guard(async () => {
     r.accountAccessApplied ? 'Saved. Account access applied immediately.' :
       r.accountRequestSubmitted ? 'Saved. Account request sent for ADMIN approval.' : 'Saved successfully.'
   );
-  $('r_preview').disabled = true;
+  if (CUR?.record_id) go(NAV.find((n) => n[0] === 'employees'));
+  else await VIEWS.register();
   window.refreshAccountRequestsBadge?.().catch((error) => showErr(error.message || String(error)));
 });
 $('r_cancel').onclick = () => go(NAV.find((n) => n[0] === 'employees'));

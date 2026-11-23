@@ -230,19 +230,28 @@
   .tablewrap tbody > tr {
     --table-row-bg: #fffdf9;
   }
-  .tablewrap tbody > tr:nth-child(even) {
+  .tablewrap tbody > tr:nth-child(even),
+  .employee-account-status-row:nth-child(odd) {
     --table-row-bg: #faf7f2;
   }
   .tablewrap tbody > tr:hover {
     --table-row-bg: var(--table-hover-bg);
   }
-  .tablewrap tbody > tr > td {
+  .tablewrap tbody > tr > td,
+  .employee-account-status-row {
     background-color: var(--table-row-bg);
     border-bottom-color: #eee5dd;
   }
-  .tablewrap thead > tr > th {
+  .tablewrap thead > tr > th,
+  .employee-account-status-heading {
     color: #5f4c3c;
     border-bottom-color: #d9c7b6;
+  }
+  .employee-account-status-row[data-account-status='active'] {
+    background-color: #edf7ef;
+  }
+  .employee-account-status-row[data-account-status='inactive'] {
+    background-color: #fceeee;
   }
   /* Existing employee/attendance status colors retain their meanings. */
   .badge:not(.ok):not(.off):not([class*='employee-status-']) {

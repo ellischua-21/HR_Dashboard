@@ -362,7 +362,7 @@ async function loadMyForms() {
   mySubmittedForms = result.forms;
   const assignedHeadLabel = $('uf_assigned_head');
   if (result.assignedHead) {
-    assignedHeadLabel.textContent = `Your ${FormStatus.reviewerLabel(session.role)}: ${(result.assignedHead.reviewers || [result.assignedHead]).map(head => `${head.full_name} (${head.email})${head.active ? '' : ' - inactive'}`).join(' / ')}`;
+    assignedHeadLabel.textContent = `Your ${FormStatus.reviewerLabel(session.role)}: ${(result.assignedHead.reviewers || [result.assignedHead]).map(head => `${head.full_name || head.email}${head.active ? '' : ' - inactive'}`).join(' / ')}`;
     assignedHeadLabel.hidden = false;
   } else if (session.role === 'HR' && session.is_hr_head) {
     assignedHeadLabel.textContent =
@@ -1060,7 +1060,7 @@ function reviewRow(form) {
   row.append(
     userCell(form.control_no),
     userCell(formTemplate(form.template_key).title),
-    userCell(`${form.applicant_name || ''} (${form.user_email})`),
+    userCell(form.applicant_name || form.user_email),
     userCell(userDate(form.submitted_at)),
     userCell(
       FormStatus.formatFormStatus(

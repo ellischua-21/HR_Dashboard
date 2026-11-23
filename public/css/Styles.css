@@ -630,7 +630,9 @@ button.ghost {
   max-height: min(calc(68vh + 140px), 860px);
 }
 .employee-list-with-status {
-  --account-status-width: 72px;
+  --account-status-width: 64px;
+  --employee-name-width: 200px;
+  --employee-number-width: 120px;
   display: flex;
   align-items: flex-start;
 }
@@ -648,17 +650,34 @@ button.ghost {
   box-sizing: border-box;
   display: flex;
   align-items: center;
+}
+.employee-list-with-status .employee-account-status > div {
+  padding-inline: 6px;
   justify-content: center;
-  padding: 4px;
-  border-bottom: 1px solid var(--rule);
-  font-size: 11px;
   text-align: center;
 }
-.employee-account-status-heading {
+.employee-account-status-row {
+  font-size: 13px;
+}
+.employee-account-status > .employee-account-status-heading {
   position: sticky;
   top: 0;
   background: var(--table-head-bg, #eee5dd);
   font-weight: 600;
+  white-space: pre-line;
+}
+#e_head th {
+  height: 58px;
+  text-align: center;
+}
+#e_body td {
+  text-align: center;
+}
+.tablewrap.employee-list-with-status > table tr > :first-child:not(:only-child) {
+  width: 60px;
+  min-width: 60px;
+  max-width: 60px;
+  text-align: center;
 }
 .tablewrap:not(.attendance-table-scroll) > table {
   border-collapse: separate;
@@ -693,6 +712,33 @@ button.ghost {
   background: var(--table-head-bg, #eee5dd);
 }
 .tablewrap:not(.attendance-table-scroll) > table tbody tr:hover > :first-child {
+  background: var(--table-hover-bg, #fbf4ed);
+}
+.tablewrap.employee-list-with-status > table tr > :nth-child(2) {
+  left: calc(var(--account-status-width) + 60px);
+  width: var(--employee-name-width);
+  min-width: var(--employee-name-width);
+  max-width: var(--employee-name-width);
+}
+.tablewrap.employee-list-with-status > table tr > :nth-child(3) {
+  left: calc(var(--account-status-width) + 60px + var(--employee-name-width));
+  width: var(--employee-number-width);
+  min-width: var(--employee-number-width);
+  max-width: var(--employee-number-width);
+  box-shadow: 2px 0 4px rgb(23 32 51 / 12%);
+}
+.tablewrap.employee-list-with-status > table tr > :nth-child(n + 2):nth-child(-n + 3) {
+  position: sticky;
+}
+.tablewrap.employee-list-with-status > table tbody tr > :nth-child(n + 2):nth-child(-n + 3) {
+  z-index: 2;
+  background: var(--table-row-bg, #fff);
+}
+.tablewrap.employee-list-with-status > table thead tr > th:nth-child(-n + 3) {
+  z-index: 4;
+  background: var(--table-head-bg, #eee5dd);
+}
+.tablewrap.employee-list-with-status > table tbody tr:hover > :nth-child(-n + 3) {
   background: var(--table-hover-bg, #fbf4ed);
 }
 .report-table-scroll > .report-table {
@@ -1208,18 +1254,22 @@ table {
   width: 100%;
 }
 th,
-td {
+td,
+.employee-account-status > div {
   padding: 9px 12px;
   text-align: left;
   border-bottom: 1px solid var(--rule);
   white-space: nowrap;
 }
-th {
+th,
+.employee-account-status-heading {
   font-weight: 600;
   font-size: 13px;
   color: var(--muted);
-  cursor: pointer;
   user-select: none;
+}
+th {
+  cursor: pointer;
 }
 tbody tr {
   cursor: pointer;
@@ -1720,7 +1770,17 @@ legend {
     flex-basis: 100%;
   }
 }
+@media (max-width: 600px) {
+  .employee-list-with-status {
+    --employee-name-width: 136px;
+    --employee-number-width: 96px;
+  }
+}
 @media print {
+  .tablewrap.employee-list-with-status > table tr > :nth-child(-n + 3) {
+    position: static !important;
+    box-shadow: none;
+  }
   .employee-account-status { display: none !important; }
   .employee-list-with-status { display: block; }
   .tablewrap:not(.attendance-table-scroll) { max-height: none; overflow: visible; }
