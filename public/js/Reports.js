@@ -65,6 +65,7 @@ VIEWS.reports = guard(async () => {
     });
   $('rp_export').hidden = !can('emp.export');
   RP.sortCol = -1;
+  RP.sortDir = 'asc';
   await runRep();
 });
 async function runRep() {
@@ -77,6 +78,10 @@ async function runRep() {
   h.innerHTML = '';
   const tr = el('tr');
   const isMaster = $('rp_id').value === 'master';
+  if (isMaster && RP.sortCol < 0) {
+    RP.sortCol = r.columnKeys.indexOf('seq_no');
+    RP.sortDir = 'asc';
+  }
   const table = h.closest('table');
   table.classList.toggle('report-table-master', isMaster);
   table.querySelector('colgroup')?.remove();
@@ -158,6 +163,7 @@ async function runRep() {
 }
 $('rp_run').onclick = guard(async () => {
   RP.sortCol = -1;
+  RP.sortDir = 'asc';
   await runRep();
 });
 $('rp_id').onchange = $('rp_run').onclick;

@@ -629,6 +629,37 @@ button.ghost {
 .tablewrap.employee-table-scroll {
   max-height: min(calc(68vh + 140px), 860px);
 }
+.employee-list-with-status {
+  --account-status-width: 72px;
+  display: flex;
+  align-items: flex-start;
+}
+.employee-account-status {
+  box-sizing: border-box;
+  position: sticky;
+  left: 0;
+  z-index: 6;
+  flex: 0 0 var(--account-status-width);
+  width: var(--account-status-width);
+  background: var(--table-row-bg, #fff);
+  border-right: 1px solid var(--rule);
+}
+.employee-account-status > div {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 11px;
+  text-align: center;
+}
+.employee-account-status-heading {
+  position: sticky;
+  top: 0;
+  background: var(--table-head-bg, #eee5dd);
+  font-weight: 600;
+}
 .tablewrap:not(.attendance-table-scroll) > table {
   border-collapse: separate;
   border-spacing: 0;
@@ -649,7 +680,7 @@ button.ghost {
 }
 .tablewrap:not(.attendance-table-scroll) > table tr > :first-child:not(:only-child) {
   position: sticky;
-  left: 0;
+  left: var(--account-status-width, 0px);
   z-index: 2;
   background: var(--table-row-bg, #fff);
   box-shadow: 2px 0 4px rgb(23 32 51 / 12%);
@@ -657,7 +688,7 @@ button.ghost {
 .tablewrap:not(.attendance-table-scroll) > table thead tr > th:first-child:not(:only-child) {
   position: sticky;
   top: 0;
-  left: 0;
+  left: var(--account-status-width, 0px);
   z-index: 4;
   background: var(--table-head-bg, #eee5dd);
 }
@@ -1690,6 +1721,8 @@ legend {
   }
 }
 @media print {
+  .employee-account-status { display: none !important; }
+  .employee-list-with-status { display: block; }
   .tablewrap:not(.attendance-table-scroll) { max-height: none; overflow: visible; }
   .tablewrap:not(.attendance-table-scroll) > table thead th,
   .tablewrap:not(.attendance-table-scroll) > table thead tr > th:first-child:not(:only-child),

@@ -6,7 +6,12 @@ const { logAudit } = require('./AuditService');
 const { sanitize, isValidDate } = require('../utils/Validation');
 const FORM_TEMPLATES = require('../../shared/FormTemplates');
 const { hasSufficientExplanation } = require('../../shared/FormValidation');
-const { canEditForm, isAssignedReviewer } = require('../../shared/FormStatus');
+const {
+  canEditForm,
+  assignedReviewerRole,
+  assignedReviewerRoles,
+  canReviewHeadStage
+} = require('../../shared/FormStatus');
 const { httpError } = require('../utils/HttpError');
 const { buildReviewScope } = require('./FormReviewScope');
 const LeaveService = require('./LeaveService');
@@ -377,7 +382,7 @@ async function getAssignedFormReviewer(email) {
             CASE WHEN owner.role = 'HR' AND owner.is_hr_head = 0 THEN hr_head.active ELSE h.active END AS active
      FROM user_roles owner
      LEFT JOIN user_roles h ON h.email = owner.assigned_head_email
-     LEFT JOIN user_roles h2 ON h2.email = owner.secondary_head_email AND owner.role IN ('STAFF', 'SUPERVISOR')
+     LEFT JOIN user_roles h2 ON h2.email = owner.secondary_head_email AND owner.role IN ('STAFF', 'SUPERVISOR', 'HEAD')
      LEFT JOIN user_roles hr_head ON hr_head.role = 'HR' AND hr_head.is_hr_head = 1 AND hr_head.active = 1
      WHERE owner.email = ? AND owner.active = 1 LIMIT 1`,
     [email]
@@ -479,14 +484,14 @@ async function getSubmissionHeads(email, role) {
   }
   const assignedHead = rows[0].assigned_head_email;
   if (!assignedHead) {
-    if (role === 'STAFF' || role === 'SUPERVISOR')
+    if (assignedReviewerRole(role))
       throw httpError(
-        `An Admin must assign a ${role === 'STAFF' ? 'Supervisor' : 'Head'} to your account before you can submit forms.`,
+        `An Admin must assign a reviewer (${assignedReviewerRoles(role).join(", ")}) before you can submit forms.`,
         409
       );
     return [];
   }
-  const expectedRole = role === 'STAFF' ? 'SUPERVISOR' : 'HEAD';
+  const allowedRoles = assignedReviewerRoles(role);
   const candidates = [
     {
       email: assignedHead,
@@ -506,7 +511,7 @@ async function getSubmissionHeads(email, role) {
           (head) =>
             head.email &&
             head.email !== email &&
-            [expectedRole, 'ADMIN'].includes(head.role) &&
+            allowedRoles.includes(head.role) &&
             head.active
         )
         .map((head) => head.email)
@@ -514,7 +519,7 @@ async function getSubmissionHeads(email, role) {
   ];
   if (!available.length)
     throw httpError(
-      `Your assigned ${role === 'STAFF' ? 'Supervisor' : 'Head'} is inactive or has an invalid role. Contact an Admin before submitting.`,
+      'Your assigned reviewer is inactive or has an invalid role. Contact an Admin before submitting.',
       409
     );
   return available;
@@ -955,23 +960,11 @@ async function reviewUserForm(
       rows[0].review_stage === 'HEAD' && template?.headReviewRequired !== false;
     if (isHead) {
       await requireFormView(req, reviewer);
-      const mayReviewAsHead =
-        (reviewer.role === 'SUPERVISOR' &&
-          rows[0].submitter_role === 'STAFF') ||
-        (reviewer.role === 'HEAD' && rows[0].submitter_role === 'SUPERVISOR') ||
-        (reviewer.role === 'ADMIN' &&
-          ['STAFF', 'SUPERVISOR'].includes(rows[0].submitter_role)) ||
-        (reviewer.role === 'HR' &&
-          reviewer.is_hr_head &&
-          rows[0].submitter_role === 'HR');
-      if (!mayReviewAsHead)
+      if (!canReviewHeadStage(reviewer, rows[0]))
         throw httpError(
           'Access denied: this form requires its assigned reviewer.',
           403
         );
-      if (!isAssignedReviewer(rows[0], reviewer.email)) {
-        throw httpError('This form is not assigned to you.', 403);
-      }
     } else {
       await requirePerm(req, 'forms.review');
       if (reviewer.role !== 'HR') {

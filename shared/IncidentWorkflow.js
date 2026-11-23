@@ -3,7 +3,20 @@
   if (typeof module === 'object' && module.exports) module.exports = value;
   else root.IncidentWorkflowDefinition = value;
 })(typeof window === 'undefined' ? globalThis : window, function () {
+  function canAssignDepartmentHead(account, department) {
+    const key = String(department || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+    if (key === 'heads') return account.role === 'ADMIN';
+    return (
+      ['HEAD', 'ADMIN'].includes(account.role) ||
+      (['hr', 'humanresources'].includes(key) &&
+        account.role === 'HR' &&
+        Boolean(Number(account.is_hr_head)))
+    );
+  }
   return {
+    canAssignDepartmentHead,
     classifications: [
       'Attendance / Punctuality',
       'Negligence / Work Performance',

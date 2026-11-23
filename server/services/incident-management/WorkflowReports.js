@@ -71,7 +71,7 @@ async function number(db, dateReported) {
 async function employee(db, employeeId) {
   const [[row]] = await db.execute(
     `SELECT e.record_id, e.name, e.emp_no, e.department, e.position,
-    u.email, u.role, u.assigned_head_email, h.full_name AS supervisor_name
+    u.email, u.role, u.is_hr_head, u.assigned_head_email, h.full_name AS supervisor_name
     FROM employees e JOIN user_roles u ON LOWER(u.email) = LOWER(e.personal_email) AND u.active = 1
     LEFT JOIN user_roles h ON h.email = u.assigned_head_email
     WHERE e.record_id = ? AND e.record_status <> 'Archived'`,
@@ -126,22 +126,33 @@ async function submit(req, input = {}) {
         'You cannot file an IR against yourself.'
       );
       const [departmentReviewers] = await db.execute(
-        `SELECT d.department, u.email FROM incident_department_reviewers d JOIN user_roles u
-        ON u.email = d.reviewer_email AND u.active = 1 AND u.role IN ('HEAD','ADMIN')`
+        `SELECT d.department, u.email, u.role, u.is_hr_head FROM incident_department_reviewers d JOIN user_roles u
+        ON u.email = d.reviewer_email AND u.active = 1 AND
+          (u.role IN ('HEAD','ADMIN') OR (u.role = 'HR' AND u.is_hr_head = 1))`
       );
-      const departmentHead = departmentReviewers.find((reviewer) =>
-        A.sameDepartment(reviewer.department.trim(), reporter.department.trim())
+      const departmentHead = departmentReviewers.find(
+        (reviewer) =>
+          (reviewer.role !== 'HR' ||
+            A.canAssignDepartmentHead(reviewer, reviewer.department)) &&
+          A.sameDepartment(
+            reviewer.department.trim(),
+            reporter.department.trim()
+          )
       );
-      const reportedDepartmentHead = departmentReviewers.find((reviewer) =>
-        A.sameDepartment(
-          reviewer.department.trim(),
-          reported.department?.trim()
-        )
+      const reportedDepartmentHead = departmentReviewers.find(
+        (reviewer) =>
+          (reviewer.role !== 'HR' ||
+            A.canAssignDepartmentHead(reviewer, reviewer.department)) &&
+          A.sameDepartment(
+            reviewer.department.trim(),
+            reported.department?.trim()
+          )
       );
       // A HEAD must not review their own filing against STAFF in their department.
       // Department assignments also identify the departments an ADMIN heads.
       const headFilingInDepartment =
-        ['HEAD', 'ADMIN'].includes(user.role) &&
+        (['HEAD', 'ADMIN'].includes(user.role) ||
+          (user.role === 'HR' && user.is_hr_head)) &&
         reported.role === 'STAFF' &&
         (A.sameDepartment(
           reporter.department.trim(),
@@ -149,7 +160,9 @@ async function submit(req, input = {}) {
         ) ||
           A.same(reportedDepartmentHead?.email, user.email));
       const headPool =
-        ['HEAD', 'ADMIN'].includes(reported.role) || headFilingInDepartment;
+        ['HEAD', 'ADMIN'].includes(reported.role) ||
+        (reported.role === 'HR' && reported.is_hr_head) ||
+        headFilingInDepartment;
       const headEmail = headPool ? null : departmentHead?.email;
       A.assert(
         headPool || headEmail,
@@ -191,7 +204,12 @@ async function submit(req, input = {}) {
             concerned.supervisor_name || concerned.assigned_head_email || '',
           email: concerned.email
         },
-        title: A.text(what.replace(/\s+/g, ' ').slice(0, 191), 'Incident Summary', true, 191),
+        title: A.text(
+          what.replace(/\s+/g, ' ').slice(0, 191),
+          'Incident Summary',
+          true,
+          191
+        ),
         what,
         date: normalizeDate(entry.date, 'incident date'),
         time: normalizeTime(entry.time),

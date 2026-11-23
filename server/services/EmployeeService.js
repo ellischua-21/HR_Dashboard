@@ -57,10 +57,13 @@ async function listEmployees(req, params = {}) {
     EMPLOYEE_LIST_FIELDS.includes(params.sortKey) &&
     F.get(params.sortKey)[2] !== 'json'
       ? params.sortKey
-      : 'name';
+      : 'seq_no';
   const direction = params.sortDir === 'desc' ? 'DESC' : 'ASC';
   const [rows] = await pool.execute(
-    `SELECT ${EMPLOYEE_LIST_FIELDS.map(quote).join(', ')} FROM employees WHERE ${where} ORDER BY ${quote(sortKey)} ${direction}${params.allRows === true ? '' : ' LIMIT ? OFFSET ?'}`,
+    `SELECT ${EMPLOYEE_LIST_FIELDS.map(quote).join(', ')},
+       EXISTS(SELECT 1 FROM user_roles account WHERE account.email = LOWER(TRIM(employees.personal_email))
+         AND account.active = 1) AS account_active
+     FROM employees WHERE ${where} ORDER BY ${quote(sortKey)} ${direction}${params.allRows === true ? '' : ' LIMIT ? OFFSET ?'}`,
     params.allRows === true ? values : [...values, size, offset]
   );
   return {

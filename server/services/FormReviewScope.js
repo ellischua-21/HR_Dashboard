@@ -12,6 +12,12 @@ function buildReviewScope(reviewer, requestedScope = null) {
   const branches = [];
   const hrQueueStageFilter =
     "(f.review_stage = 'HR' OR (f.template_key = 'nexus-accountability' AND f.review_stage = 'HEAD'))";
+  const assignedSubmitters =
+    reviewer.role === 'SUPERVISOR'
+      ? "role IN ('STAFF', 'SUPERVISOR')"
+      : reviewer.role === 'HEAD'
+        ? "role IN ('STAFF', 'SUPERVISOR', 'HEAD')"
+        : "role = 'HR'";
 
   function addBranch(where, values, pendingStage) {
     branches.push({ where, values, pendingStage });
@@ -23,7 +29,7 @@ function buildReviewScope(reviewer, requestedScope = null) {
     ['ALL', 'HEAD'].includes(scope)
   ) {
     addBranch(
-      "f.template_key <> 'nexus-accountability' AND (f.head_reviewer_email = ? OR f.secondary_head_reviewer_email = ?) AND f.user_email IN (SELECT email FROM user_roles WHERE role IN ('STAFF', 'SUPERVISOR'))",
+      "f.template_key <> 'nexus-accountability' AND (f.head_reviewer_email = ? OR f.secondary_head_reviewer_email = ?) AND f.user_email IN (SELECT email FROM user_roles WHERE role IN ('STAFF', 'SUPERVISOR', 'HEAD'))",
       [reviewer.email, reviewer.email],
       'HEAD'
     );
@@ -32,7 +38,7 @@ function buildReviewScope(reviewer, requestedScope = null) {
   if (scope === 'ALL') {
     if (['SUPERVISOR', 'HEAD'].includes(reviewer.role)) {
       addBranch(
-        `f.template_key <> 'nexus-accountability' AND (f.head_reviewer_email = ? OR f.secondary_head_reviewer_email = ?) AND f.user_email IN (SELECT email FROM user_roles WHERE role = '${reviewer.role === 'SUPERVISOR' ? 'STAFF' : 'SUPERVISOR'}')`,
+        `f.template_key <> 'nexus-accountability' AND (f.head_reviewer_email = ? OR f.secondary_head_reviewer_email = ?) AND f.user_email IN (SELECT email FROM user_roles WHERE ${assignedSubmitters})`,
         [reviewer.email, reviewer.email],
         'HEAD'
       );
@@ -57,14 +63,8 @@ function buildReviewScope(reviewer, requestedScope = null) {
       ['SUPERVISOR', 'HEAD'].includes(reviewer.role) ||
       (reviewer.role === 'HR' && reviewer.is_hr_head)
     ) {
-      const submitterRole =
-        reviewer.role === 'SUPERVISOR'
-          ? 'STAFF'
-          : reviewer.role === 'HEAD'
-            ? 'SUPERVISOR'
-            : 'HR';
       addBranch(
-        `f.template_key <> 'nexus-accountability' AND (f.head_reviewer_email = ? OR f.secondary_head_reviewer_email = ?) AND f.user_email IN (SELECT email FROM user_roles WHERE role = '${submitterRole}')`,
+        `f.template_key <> 'nexus-accountability' AND (f.head_reviewer_email = ? OR f.secondary_head_reviewer_email = ?) AND f.user_email IN (SELECT email FROM user_roles WHERE ${assignedSubmitters})`,
         [reviewer.email, reviewer.email],
         'HEAD'
       );

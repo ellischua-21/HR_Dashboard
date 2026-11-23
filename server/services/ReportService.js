@@ -251,25 +251,31 @@ async function buildReport(id, filters) {
 }
 
 async function runReport(req, id, filters, options) {
-  await requireEmployeeAccess(req, 'report.run');
-  id = id || 'master';
+  await requireEmployeeAccess(req, "report.run");
+  id = id || "master";
   options = options || {};
   const { page, pageSize, offset } = normalizePagination(options, {
     defaultPageSize: CFG.PAGE_SIZE,
     maxPageSize: 200,
-    clampSize: true
+    clampSize: true,
   });
   const report = await buildReport(id, filters || {});
-  const column = Number(options.sortCol);
-  if (
-    Number.isInteger(column) &&
-    column >= 0 &&
-    column < report.columns.length
-  ) {
-    const direction = options.sortDir === 'desc' ? -1 : 1;
+  const requestedColumn = Number(options.sortCol);
+  const explicitSort =
+    Number.isInteger(requestedColumn) &&
+    requestedColumn >= 0 &&
+    requestedColumn < report.columns.length;
+  const column = explicitSort
+    ? requestedColumn
+    : id === "master"
+      ? report.columnKeys.indexOf("seq_no")
+      : -1;
+  if (column >= 0) {
+    const direction = explicitSort && options.sortDir === "desc" ? -1 : 1;
     report.rows.sort(
       (a, b) =>
-        (a[column] > b[column] ? 1 : a[column] < b[column] ? -1 : 0) * direction
+        (a[column] > b[column] ? 1 : a[column] < b[column] ? -1 : 0) *
+        direction,
     );
   }
   return {
@@ -284,10 +290,9 @@ async function runReport(req, id, filters, options) {
     rows:
       options.allRows === true
         ? report.rows
-        : report.rows.slice(offset, offset + pageSize)
+        : report.rows.slice(offset, offset + pageSize),
   };
 }
-
 async function exportReportCsv(req, id, filters) {
   const user = await requireEmployeeAccess(req, 'emp.export');
   await requireEmployeeAccess(req, 'report.run');

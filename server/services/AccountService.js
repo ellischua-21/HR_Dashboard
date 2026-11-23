@@ -8,6 +8,10 @@ const { logAudit } = require('./AuditService');
 const { hashPassword, verifyPassword } = require('../utils/Password');
 const { sanitize } = require('../utils/Validation');
 const { getAccountEmployee } = require('../utils/EmployeeIdentity');
+const {
+  assignedReviewerRole,
+  assignedReviewerRoles
+} = require('../../shared/FormStatus');
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -61,14 +65,15 @@ function validateHeadAssignment(
   const assignedEmail = String(headEmail || '')
     .trim()
     .toLowerCase();
-  if (!['STAFF', 'SUPERVISOR'].includes(accountRole)) {
+  const allowedRoles = assignedReviewerRoles(accountRole);
+  if (!allowedRoles.length) {
     return {
-      error: 'Only STAFF and SUPERVISOR accounts can be assigned a reviewer.'
+      error: 'This account role cannot be assigned a reviewer.'
     };
   }
-  if (!assignedEmail) {
+  if (!assignedEmail && assignedReviewerRole(accountRole)) {
     return {
-      error: `Assign a ${accountRole === 'STAFF' ? 'Supervisor' : 'Head'} to this ${accountRole} account.`
+      error: `Assign a reviewer (${assignedReviewerRoles(accountRole).join(", ")}) to this ${accountRole} account.`
     };
   }
   if (ownerEmail === assignedEmail)
@@ -80,9 +85,9 @@ function validateHeadAssignment(
   const owner = accountByEmail.get(ownerEmail);
   const head = accountByEmail.get(assignedEmail);
   if (!owner || !owner.active) return { error: 'This account is not active.' };
-  const expectedRole = accountRole === 'STAFF' ? 'SUPERVISOR' : 'HEAD';
-  if (!head || !head.active || ![expectedRole, 'ADMIN'].includes(head.role)) {
-    return { error: `Choose an active ${expectedRole} or ADMIN account.` };
+  if (!assignedEmail) return { headEmail: null };
+  if (!head || !head.active || !allowedRoles.includes(head.role)) {
+    return { error: `Choose an active ${allowedRoles.join(', ')} account.` };
   }
   return { headEmail: assignedEmail };
 }
@@ -97,10 +102,10 @@ async function listAssignableHeads(req) {
   }
   const [rows] = await pool.query(
     `SELECT email, full_name, role, 'ACTIVE' AS assignment_status
-     FROM user_roles WHERE role IN ('HEAD', 'SUPERVISOR', 'ADMIN') AND active = 1
+     FROM user_roles WHERE role IN ('HEAD', 'SUPERVISOR', 'HR', 'ADMIN') AND active = 1
      UNION ALL
      SELECT email, full_name, assigned_role AS role, 'PENDING' AS assignment_status
-     FROM account_requests WHERE assigned_role IN ('HEAD', 'SUPERVISOR', 'ADMIN')
+     FROM account_requests WHERE assigned_role IN ('HEAD', 'SUPERVISOR', 'HR', 'ADMIN')
        AND email NOT IN (SELECT email FROM user_roles)
      ORDER BY full_name, email`
   );
@@ -172,40 +177,44 @@ async function createEmployeeAccountRequest(
       400
     );
   }
-  if (['STAFF', 'SUPERVISOR'].includes(role) && !assignedHeadEmail) {
+  if (assignedReviewerRole(role) && !assignedHeadEmail) {
     throw httpError(
-      `Assign a ${role === 'STAFF' ? 'Supervisor' : 'Head'} to this ${role} account using Reports To.`,
+      `Select a Reports To reviewer (${assignedReviewerRoles(role).join(", ")}) for this ${role} account.`,
       400
     );
   }
   if (
-    !['STAFF', 'SUPERVISOR'].includes(role) &&
+    !assignedReviewerRoles(role).length &&
     (assignedHeadEmail || secondaryHeadEmail)
   ) {
     throw httpError(
-      'Only STAFF and SUPERVISOR accounts can be assigned a reviewer.',
+      'This account role cannot be assigned a reviewer.',
       400
     );
   }
+  if (secondaryHeadEmail && !assignedHeadEmail)
+    throw httpError('Choose a primary Reports To reviewer before a second reviewer.', 400);
   if (secondaryHeadEmail && secondaryHeadEmail === assignedHeadEmail)
     throw httpError('Choose two different reviewers.', 400);
+  const reviewerRoles = assignedReviewerRoles(role);
+  const reviewerPlaceholders = reviewerRoles.map(() => '?').join(', ');
   for (const headEmail of [assignedHeadEmail, secondaryHeadEmail].filter(
     Boolean
   )) {
     const [headRows] = await connection.execute(
-      `SELECT email FROM user_roles WHERE email = ? AND (role = ? OR role = 'ADMIN') AND active = 1
+      `SELECT email FROM user_roles WHERE email = ? AND role IN (${reviewerPlaceholders}) AND active = 1
        UNION
-       SELECT email FROM account_requests WHERE email = ? AND (assigned_role = ? OR assigned_role = 'ADMIN')`,
+       SELECT email FROM account_requests WHERE email = ? AND assigned_role IN (${reviewerPlaceholders})`,
       [
         headEmail,
-        role === 'STAFF' ? 'SUPERVISOR' : 'HEAD',
+        ...reviewerRoles,
         headEmail,
-        role === 'STAFF' ? 'SUPERVISOR' : 'HEAD'
+        ...reviewerRoles
       ]
     );
     if (!headRows.length || headEmail === email) {
       throw httpError(
-        `Choose an active or pending ${role === 'STAFF' ? 'SUPERVISOR' : 'HEAD'} or ADMIN account in Reports To.`,
+        `Choose an active or pending ${reviewerRoles.join(', ')} account in Reports To.`,
         400
       );
     }
@@ -468,6 +477,8 @@ async function saveAccountChanges(req, changes) {
         ? sanitize(item.secondaryHeadEmail).toLowerCase()
         : owner.secondary_head_email || '';
       if (secondaryHeadEmail) {
+        if (!assignment.headEmail)
+          throw httpError('Choose a primary Reports To reviewer before a second reviewer.', 400);
         if (secondaryHeadEmail === assignment.headEmail)
           throw httpError('Choose two different reviewers.', 400);
         const secondary = validateHeadAssignment(email, owner.role, secondaryHeadEmail, accounts);
@@ -617,16 +628,16 @@ async function applyAccountRequest(admin, requestId, connection) {
       throw httpError('Resolve pending forms and reassign this account\'s reviewer, department, or Management responsibilities before changing its role.', 409);
   }
   if (
-    ['STAFF', 'SUPERVISOR'].includes(role) &&
+    assignedReviewerRole(role) &&
     !accountRequest.assigned_head_email
   ) {
     throw httpError(
-      `This ${role} request has no assigned ${role === 'STAFF' ? 'Supervisor' : 'Head'}. Reject it and recreate it from Employee Registration.`,
+      `This ${role} request has no assigned reviewer. Reject it and recreate it from Employee Registration.`,
       400
     );
   }
   if (
-    !['STAFF', 'SUPERVISOR'].includes(role) &&
+    !assignedReviewerRoles(role).length &&
     (accountRequest.assigned_head_email || accountRequest.secondary_head_email)
   ) {
     throw httpError(
@@ -634,15 +645,19 @@ async function applyAccountRequest(admin, requestId, connection) {
       400
     );
   }
+  if (accountRequest.secondary_head_email && !accountRequest.assigned_head_email)
+    throw httpError('Choose a primary Reports To reviewer before a second reviewer.', 400);
   if (accountRequest.secondary_head_email && accountRequest.secondary_head_email === accountRequest.assigned_head_email)
     throw httpError('Choose two different reviewers.', 400);
+  const reviewerRoles = assignedReviewerRoles(role);
+  const reviewerPlaceholders = reviewerRoles.map(() => '?').join(', ');
   for (const headEmail of [accountRequest.assigned_head_email, accountRequest.secondary_head_email].filter(Boolean)) {
     if (headEmail === accountRequest.email) throw httpError('An account cannot be assigned to itself.', 400);
     const [heads] = await connection.execute(
-      `SELECT email FROM user_roles WHERE email = ? AND (role = ? OR role = 'ADMIN') AND active = 1`,
+      `SELECT email FROM user_roles WHERE email = ? AND role IN (${reviewerPlaceholders}) AND active = 1`,
       [
         headEmail,
-        role === 'STAFF' ? 'SUPERVISOR' : 'HEAD'
+        ...reviewerRoles
       ]
     );
     if (!heads.length) {

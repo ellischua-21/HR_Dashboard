@@ -1,5 +1,5 @@
 let META = null,
-  EQ = { sortKey: 'name', sortDir: 'asc' },
+  EQ = { sortKey: 'seq_no', sortDir: 'asc' },
   PENDING = null,
   CUR = null,
   IMP = null,
@@ -261,6 +261,39 @@ function employeeDetailsRecord(employee) {
   };
 }
 /* ---------- Employee list ---------- */
+let employeeAccountStatusObserver;
+function renderEmployeeAccountStatus(rows) {
+  employeeAccountStatusObserver?.disconnect();
+  const strip = $("e_account_status");
+  const heading = el(
+    "div",
+    "Account status",
+    "employee-account-status-heading",
+  );
+  heading.setAttribute("aria-hidden", "true");
+  strip.replaceChildren(heading);
+  rows.forEach((row) => {
+    const label = Number(row.account_active) ? "Active" : "Inactive";
+    const cell = el("div", label, "employee-account-status-row");
+    cell.setAttribute("role", "listitem");
+    cell.setAttribute(
+      "aria-label",
+      `${row.name || row.emp_no || "Employee"}: ${label} account`,
+    );
+    strip.appendChild(cell);
+  });
+  const tableRows = [$("e_head").children[0], ...$("e_body").children];
+  const cells = [...strip.children];
+  const align = () => {
+    const heights = tableRows.map((row) => row.getBoundingClientRect().height);
+    cells.forEach((cell, index) => {
+      cell.style.height = `${heights[index]}px`;
+    });
+  };
+  employeeAccountStatusObserver = new ResizeObserver(align);
+  tableRows.forEach((row) => employeeAccountStatusObserver.observe(row));
+  align();
+}
 VIEWS.employees = guard(async () => {
   $('e_import').hidden = !can('emp.write');
   $('e_add').hidden = !can('emp.write');
@@ -356,6 +389,7 @@ async function loadEmployees() {
     };
     b.appendChild(t);
   });
+  renderEmployeeAccountStatus(r.rows);
   $('e_info').textContent = r.total + ' employee(s)';
 }
 $('e_go').onclick = guard(async () => {
@@ -528,11 +562,8 @@ VIEWS.register = guard(async () => {
           search: (query) =>
             HEAD_OPTIONS.filter(
               (head) =>
-                (head.role === 'ADMIN' ||
-                  head.role ===
-                    ($('r_account_role').value === 'STAFF'
-                      ? 'SUPERVISOR'
-                      : 'HEAD')) &&
+                FormStatus.assignedReviewerRoles($('r_account_role').value).includes(head.role) &&
+                head.email.toLowerCase() !== $('ff_personal_email').value.trim().toLowerCase() &&
                 `${head.full_name} ${head.email}`
                   .toLowerCase()
                   .includes(query.toLowerCase())
@@ -625,13 +656,11 @@ function updateRegistrationAccountAccess() {
   $('r_account_role').dataset.requiredIndicator = String(hasEmail);
   for (const id of ['r_account_password', 'r_account_password_confirm'])
     $(id).required = hasEmail && !CUR?.record_id;
-  const supportsReviewers = ['STAFF', 'SUPERVISOR'].includes(
-    $('r_account_role').value
-  );
+  const supportsReviewers = FormStatus.assignedReviewerRoles($('r_account_role').value).length > 0;
   $('r_secondary_head').disabled = !supportsReviewers;
   $('ff_reports_to').disabled = hasEmail && !supportsReviewers;
   $('ff_reports_to').dataset.requiredIndicator = String(
-    hasEmail && supportsReviewers
+    hasEmail && Boolean(FormStatus.assignedReviewerRole($('r_account_role').value))
   );
 }
 function updateRegistrationRoleHelp() {
@@ -642,13 +671,13 @@ function updateRegistrationRoleHelp() {
   const none = el('option', 'None');
   none.value = '';
   secondary.appendChild(none);
-  const supportsReviewers = ['STAFF', 'SUPERVISOR'].includes(role);
+  const supportsReviewers = FormStatus.assignedReviewerRoles(role).length > 0;
   secondary.disabled = !supportsReviewers;
   if (supportsReviewers)
     HEAD_OPTIONS.filter(
       (head) =>
-        head.role === 'ADMIN' ||
-        head.role === (role === 'STAFF' ? 'SUPERVISOR' : 'HEAD')
+        FormStatus.assignedReviewerRoles(role).includes(head.role) &&
+        head.email.toLowerCase() !== $('ff_personal_email').value.trim().toLowerCase()
     ).forEach((head) => {
       const option = el(
         'option',
@@ -661,16 +690,22 @@ function updateRegistrationRoleHelp() {
   const search = $('ff_reports_to');
   if (search) {
     search.value = '';
-    search.disabled = hasEmail && !['STAFF', 'SUPERVISOR'].includes(role);
+    search.disabled = hasEmail && !supportsReviewers;
     search.dataset.requiredIndicator = String(
-      hasEmail && ['STAFF', 'SUPERVISOR'].includes(role)
+      hasEmail && Boolean(FormStatus.assignedReviewerRole(role))
     );
   }
   $('r_head_assignment_note').textContent =
-    role === 'STAFF'
-      ? 'Assign one or two Supervisors or Admins. Either may approve before HR review.'
-      : role === 'SUPERVISOR'
+    role === 'SUPERVISOR'
+      ? 'Assign one or two Supervisors, Heads, or Admins. Either may approve before HR review.'
+      : role === 'STAFF'
+      ? 'Assign one or two Supervisors, Heads, or Admins. Either may approve before HR review.'
+      : role === 'HEAD'
         ? 'Assign one or two Heads or Admins. Either may approve before HR review.'
+        : role === 'ADMIN'
+          ? 'Optionally assign another Admin as Head, with a second Admin if needed.'
+          : role === 'HR'
+            ? 'Optionally assign another HR or Admin as Head, with a second reviewer if needed.'
         : 'This role does not need an assigned reviewer.';
 }
 const formData = () => {
@@ -687,7 +722,7 @@ const formData = () => {
     const account = {
       role: $('r_account_role').value,
       password: $('r_account_password').value,
-      assignedHeadEmail: ['STAFF', 'SUPERVISOR'].includes($('r_account_role').value)
+      assignedHeadEmail: FormStatus.assignedReviewerRoles($('r_account_role').value).length
         ? $('ff_assigned_head_email').value : '',
       secondaryHeadEmail: $('r_secondary_head').disabled ? '' : $('r_secondary_head').value
     };
@@ -711,16 +746,16 @@ $('r_preview').onclick = () => {
       .filter((f) => f.required && !d[f.key])
       .map((f) => f.label);
   if (d.accountAccess) {
+    if (d.accountAccess.secondaryHeadEmail && !d.accountAccess.assignedHeadEmail)
+      miss.push('Primary Reports To reviewer before a second reviewer');
     if (d.accountAccess.secondaryHeadEmail && d.accountAccess.secondaryHeadEmail === d.accountAccess.assignedHeadEmail)
       miss.push('Two different reviewers');
     if (
-      ['STAFF', 'SUPERVISOR'].includes(d.accountAccess.role) &&
+      FormStatus.assignedReviewerRole(d.accountAccess.role) &&
       !d.accountAccess.assignedHeadEmail
     )
       miss.push(
-        d.accountAccess.role === 'STAFF'
-          ? 'Assigned Supervisor'
-          : 'Assigned Head'
+        'Assigned ' + FormStatus.reviewerLabel(d.accountAccess.role)
       );
     if ((d.accountAccess.password || !CUR?.accountAccess) && (
       d.accountAccess.password.length < 12 ||

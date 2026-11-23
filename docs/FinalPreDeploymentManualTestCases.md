@@ -457,7 +457,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Functional  
 **Required Role:** HR or ADMIN  
-**Preconditions:** Reviewer chain HEAD-A then SUP-A already approved; unused employee number and email.
+**Preconditions:** SUP-A assigned to an active SUPERVISOR or ADMIN and already approved; unused employee number and email.
 
 **Test Steps:**
 
@@ -534,7 +534,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Change company/department/location/rank/status filters; clear them.
 3. Click each sortable master-list header twice, then search an absent term.
 
-**Expected Result:** Matching list and total are correct; ascending/descending order changes; zero results show an empty state; current UI loads all rows and has no page-next requirement.
+**Expected Result:** Matching list and total are correct; initial order is No. ascending; ascending/descending order changes; zero results show an empty state; current UI loads all rows and has no page-next requirement. A separate narrow strip to the left of No. shows Active for an active linked account and Inactive for disabled/missing accounts, including blank-email employees. Status stays aligned with the employee after sorting, filtering, scrolling, and resizing; the strip is outside the employee data table.
 
 **Data Integrity Check:** Read-only operations preserve employee count and values.
 
@@ -944,7 +944,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Integration  
 **Required Role:** ADMIN  
-**Preconditions:** Pending HEAD-B, SUP-B assigned to HEAD-B, and STAFF-B assigned to SUP-B.
+**Preconditions:** Pending HEAD-B assigned to an active HEAD/ADMIN, SUP-B assigned to an active SUPERVISOR/ADMIN, and STAFF-B assigned to pending SUP-B.
 
 **Test Steps:**
 
@@ -997,8 +997,10 @@ Every listed value, account or browser variant is required. Preserve per-variant
 1. Change both reviewer dropdowns without saving.
 2. Refresh or leave/reopen and verify persisted assignments.
 3. Change again, select Save Changes, then refresh.
+4. In ADMINS, assign another active ADMIN as head and optionally a second ADMIN; save, reopen, then clear both and save. Repeat the assignment during registration and employee editing.
+5. Repeat for HR using another HR or ADMIN in either slot. Verify the Head HR toggle stays separate and new HR forms still route through the designated Head HR workflow.
 
-**Expected Result:** Dropdown edits are staged locally; Save Changes persists both together; unsaved edits are not represented as saved.
+**Expected Result:** Dropdown edits are staged locally; Save Changes persists both together; unsaved edits are not represented as saved. ADMIN Reports To is optional; its selectors offer only other active ADMIN accounts in Manage Accounts, with eligible pending ADMIN suggestions during registration/editing. HR Reports To is optional and permits other HR/ADMIN accounts. These HR reporting assignments do not replace the designated Head HR form routing or grant HR form-review authority. A second head needs a primary head first.
 
 **Data Integrity Check:** Only saved assignments change; HEAD_ASSIGNED audit for each saved assignment.
 
@@ -1021,7 +1023,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Attempt the same save as HR.
 3. Reload Manage Accounts.
 
-**Expected Result:** STAFF requires active SUPERVISOR; SUPERVISOR requires active HEAD; malformed/unauthorized batch is rejected.
+**Expected Result:** STAFF requires an active SUPERVISOR/HEAD/ADMIN; SUPERVISOR requires another SUPERVISOR, HEAD, or ADMIN; HEAD requires another active HEAD or ADMIN. ADMIN may have no head or another active ADMIN, with an optional different second ADMIN. Self-assignment, wrong-role ADMIN heads, second-only assignments, and malformed/unauthorized batches are rejected.
 
 **Data Integrity Check:** All assignments in a failed batch retain their previous values; no success audit committed.
 
@@ -1090,7 +1092,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Select one reviewer per ordinary department, two distinct ADMINs for Heads and an active ADMIN Management Approver.
 3. Save Changes, refresh, then file a new Sales report.
 
-**Expected Result:** Saved map reappears; new report routes by filer department; Heads slots allow only ADMIN; one reviewer may cover multiple departments.
+**Expected Result:** Saved map reappears; new report routes by filer department; Heads slots allow only ADMIN; one reviewer may cover multiple departments. HR/Human Resources also offers the active, employee-linked designated Head HR. That account can be saved for HR, receives the assigned incident in Review before NTE issuance, and can perform the HEAD stage when uninvolved. Ordinary HR and Head HR assigned to unrelated departments are rejected. Reports involving Head HR or their own-department filing use the Heads queue, preserving involvement restrictions. Existing saved case assignments remain actionable after the designation changes.
 
 **Data Integrity Check:** INCIDENT_WORKFLOW_CONFIG_UPDATED records counts and selected/cleared status, without policy or copied employee details.
 
@@ -1507,9 +1509,9 @@ Every listed value, account or browser variant is required. Preserve per-variant
 
 1. Submit one form per listed role.
 2. Open queues as assigned SUP-A, HEAD-A, Head HR and another HR.
-3. Forward STAFF/SUPERVISOR forms and compare their next queue.
+3. Forward STAFF/SUPERVISOR/HEAD forms and compare their next queue.
 
-**Expected Result:** STAFF→assigned SUPERVISOR→HR; SUPERVISOR→assigned HEAD→HR; HEAD→HR; ordinary HR→Head HR for final decision; Head HR’s own form→another HR.
+**Expected Result:** STAFF→assigned SUPERVISOR/HEAD/ADMIN→HR; SUPERVISOR→assigned SUPERVISOR/HEAD/ADMIN→HR; HEAD→another assigned HEAD/ADMIN→HR; ordinary HR→Head HR for final decision; Head HR’s own form→another HR. Previously submitted forms retain their stored reviewers.
 
 **Data Integrity Check:** Saved reviewer/stage match each route; no self-review or additional invented approval stage.
 
@@ -1593,14 +1595,14 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Priority:** Critical  
 **Test Type:** Functional  
 **Required Role:** Assigned SUPERVISOR, HEAD or ADMIN
-**Preconditions:** A pending assigned STAFF/SUPERVISOR ordinary form.
+**Preconditions:** Pending assigned STAFF, SUPERVISOR, and HEAD ordinary forms; one older SUPERVISOR form with a stored HEAD reviewer.
 
 **Test Steps:**
 
 1. Open Review Requests → View form.
 2. Try approval without signature, then draw it and Sign.
 3. Reload applicant, assigned reviewer and HR queues.
-4. Assign ADMIN in either Reports To/reviewer slot for STAFF and SUPERVISOR; repeat signing and rejection. Check the ADMIN combined queue and inbox before and after forwarding.
+4. Register/edit SUPERVISOR with another SUPERVISOR/HEAD/ADMIN and HEAD with another HEAD/ADMIN. Check Reports To stays editable; verify self/cross-role assignments reject. Test either reviewer slot, signing and rejection; confirm the stored older SUPERVISOR form still accepts its original HEAD reviewer. Check the ADMIN combined queue and inbox before and after forwarding.
 5. Attempt the same actions as an unassigned ADMIN, on an HR-stage form, on an HR employee form, and after the other reviewer has already advanced the stage; verify denial and unchanged data.
 
 **Expected Result:** Required signature enforced; approval forwards with status still PENDING and stage HR; signed-by/time retained; applicant can no longer edit.
@@ -2322,7 +2324,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Click numeric/text/date report headers twice.
 3. Open View employee and compare sectioned read-only data.
 
-**Expected Result:** Correct inclusive employment-date population; sorting changes direction; master reader preserves all returned profile fields except docs; UI loads all rows rather than paging.
+**Expected Result:** Correct inclusive employment-date population; the HR master report initially uses No. ascending (1, 2, 10); sorting changes direction; master reader preserves all returned profile fields except docs; UI loads all rows rather than paging. The employee list's separate account-status strip does not appear in HR reports.
 
 **Data Integrity Check:** Sorting/reader do not alter saved records.
 
@@ -2345,7 +2347,7 @@ Every listed value, account or browser variant is required. Preserve per-variant
 2. Open CSV as data and compare all rows/headers with chosen filters.
 3. Print HR report and employee profile to PDF, then cancel one print.
 
-**Expected Result:** CSV filename/date and quoting correct; exported population follows report filters, not necessarily list-only search/sort; formula-like text neutralized; print excludes navigation and is legible.
+**Expected Result:** CSV filename/date and quoting correct; exported population follows report filters, not necessarily list-only search/sort; formula-like text neutralized; print excludes navigation and is legible. Account status remains a separate screen-only employee-list strip and never appears in CSV headers, CSV values, or printed tables.
 
 **Data Integrity Check:** EXPORT audit records report/row/column counts; no extra employee mutation.
 

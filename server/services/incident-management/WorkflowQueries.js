@@ -89,7 +89,9 @@ async function review(req, input = {}) {
     (row) =>
       row.legacy ||
       (user.role === 'HR'
-        ? Boolean(row.nteIssuedAt) && !Number(row.userInvolved)
+        ? (Boolean(row.nteIssuedAt) ||
+            A.same(row.assignedHeadEmail, user.email)) &&
+          !Number(row.userInvolved)
         : A.same(row.assignedHeadEmail, user.email) ||
           A.same(row.managementEmail, user.email) ||
           (adminHeadReviewer && row.headPool && !row.assignedHeadEmail))
@@ -174,10 +176,11 @@ async function badges(req) {
     reviewSql = 'LOWER(r.assigned_head_email) = LOWER(?)';
     values.push(user.email);
   } else if (user.role === 'HR') {
-    reviewSql = `w.nte_issued_at IS NOT NULL
+    reviewSql = `(w.nte_issued_at IS NOT NULL OR LOWER(r.assigned_head_email) = LOWER(?))
       AND LOWER(r.reporter_email) <> LOWER(?) AND LOWER(r.reported_employee_email) <> LOWER(?)
       AND NOT EXISTS (SELECT 1 FROM incident_participants hp JOIN employees he ON he.record_id=hp.employee_record_id
         WHERE hp.incident_id=r.id AND LOWER(he.personal_email)=LOWER(?))`;
+    values.push(user.email);
     values.push(user.email, user.email, user.email);
   } else if (user.role === 'ADMIN') {
     const eligible = await A.adminHeadsReviewer(A.pool, user.email);

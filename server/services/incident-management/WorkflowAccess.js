@@ -5,6 +5,7 @@ const { normalizeText, normalizeEvidence } = require('./Validation');
 const { notifyAccount } = require('./Notifications');
 const { manilaDate } = require('../../../shared/DateUtils');
 const { hasSufficientExplanation } = require('../../../shared/FormValidation');
+const { canAssignDepartmentHead } = require('../../../shared/IncidentWorkflow');
 
 const same = (a, b) => Boolean(a && b) && a.toLowerCase() === b.toLowerCase();
 const sameDepartment = (a, b) =>
@@ -141,12 +142,19 @@ async function access(db, user, row) {
     manager,
     poolReviewer,
     hr,
+    // Preserve a saved HR head's case assignment after a designation change.
     head:
       assigned &&
       !reported &&
       !reporter &&
       !participant &&
-      ['HEAD', 'ADMIN'].includes(user.role),
+      (['HEAD', 'ADMIN'].includes(user.role) ||
+        (user.role === 'HR' &&
+          (sameDepartment(row.report?.reporter?.department, 'HR') ||
+            sameDepartment(
+              row.report?.reporter?.department,
+              'Human Resources'
+            )))),
     maxSection:
       hr || manager || (user.role === 'ADMIN' && assigned)
         ? 8
@@ -276,6 +284,7 @@ module.exports = {
   pool,
   same,
   sameDepartment,
+  canAssignDepartmentHead,
   json,
   text,
   explanation,

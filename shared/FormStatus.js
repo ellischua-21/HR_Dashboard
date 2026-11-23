@@ -10,8 +10,23 @@
       .replace(/\b\w/g, (letter) => letter.toUpperCase());
   }
 
+  function assignedReviewerRole(accountRole) {
+    if (['STAFF', 'SUPERVISOR'].includes(accountRole)) return 'SUPERVISOR';
+    return accountRole === 'HEAD' ? 'HEAD' : null;
+  }
+
+  function assignedReviewerRoles(accountRole) {
+    if (accountRole === 'ADMIN') return ['ADMIN'];
+    if (accountRole === 'HR') return ['HR', 'ADMIN'];
+    const primary = assignedReviewerRole(accountRole);
+    if (!primary) return [];
+    return ['STAFF', 'SUPERVISOR'].includes(accountRole)
+      ? ['SUPERVISOR', 'HEAD', 'ADMIN']
+      : [primary, 'ADMIN'];
+  }
+
   function reviewerLabel(submitterRole) {
-    return submitterRole === 'STAFF'
+    return assignedReviewerRole(submitterRole) === 'SUPERVISOR'
       ? 'Supervisor'
       : submitterRole === 'HR'
         ? 'Head HR'
@@ -55,7 +70,26 @@
     );
   }
 
+  function canReviewHeadStage(reviewer, form) {
+    // HR reporting assignments do not replace the designated Head HR workflow.
+    return (
+      form.review_stage === 'HEAD' &&
+      form.template_key !== 'nexus-accountability' &&
+      String(form.user_email || '').toLowerCase() !==
+        String(reviewer.email || '').toLowerCase() &&
+      isAssignedReviewer(form, reviewer.email) &&
+      ((form.submitter_role !== 'HR' &&
+        assignedReviewerRoles(form.submitter_role).includes(reviewer.role)) ||
+        (reviewer.role === 'HR' &&
+          reviewer.is_hr_head &&
+          form.submitter_role === 'HR'))
+    );
+  }
+
   return {
+    assignedReviewerRole,
+    assignedReviewerRoles,
+    canReviewHeadStage,
     titleCase,
     reviewerLabel,
     formatFormStatus,

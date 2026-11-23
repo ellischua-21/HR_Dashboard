@@ -43,10 +43,18 @@
           select.setAttribute('aria-label', `Heads reviewer ${slot + 1}`);
         select.add(new Option('Unassigned', ''));
         data.accounts
-          .filter((account) => !isHeads || account.role === 'ADMIN')
+          .filter((account) =>
+            IncidentWorkflowDefinition.canAssignDepartmentHead(
+              account,
+              department
+            )
+          )
           .forEach((account) =>
             select.add(
-              new Option(`${account.name} (${account.role})`, account.email)
+              new Option(
+                `${account.name} (${account.role === 'HR' && account.is_hr_head ? 'Head HR' : account.role})`,
+                account.email
+              )
             )
           );
         select.value = assigned[slot]?.reviewerEmail || '';

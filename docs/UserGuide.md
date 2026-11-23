@@ -52,7 +52,7 @@ their existing dashboard and attendance list.
 | ------- | ------------- |
 | STAFF   | Fill out forms, check personal submissions, track incidents involving you, view case history and the Code of Conduct, read the Inbox, and change your password. |
 | SUPERVISOR | STAFF features, plus review assigned STAFF form requests and file Incident Reports. |
-| HEAD    | Personal dashboard and forms, assigned SUPERVISOR form reviews, Incident Report filing and assigned department incident reviews. Closed incidents are in Review. |
+| HEAD    | Personal dashboard and forms, assigned HEAD form reviews (and stored older SUPERVISOR reviews), Incident Report filing and assigned department incident reviews. Closed incidents are in Review. |
 | HR      | Dashboard, employee records, attendance, reports, announcements, personal forms, form reviews, and incident filing and review. |
 | ADMIN   | HR Performance Dashboard, employee records, attendance, reports, announcements, View Forms, account management, and assigned incident access. ADMINs acting as department HEADs can file/review IRs; designated Management approvers approve recommendations. ADMIN has no personal form submission pages. |
 
@@ -135,9 +135,9 @@ are checked again at final approval.
 
 ### Understand where a form goes
 
-- STAFF forms go to their assigned Supervisor(s) or ADMIN reviewer(s); either may approve, then HR reviews.
-- SUPERVISOR forms go to their assigned Head(s) or ADMIN reviewer(s); either may approve, then HR reviews.
-- HEAD forms go directly to HR.
+- STAFF forms go to their assigned Supervisor(s), Head(s), or ADMIN reviewer(s); either may approve, then HR reviews.
+- SUPERVISOR forms go to their assigned Supervisor(s), Head(s), or ADMIN reviewer(s); either may approve, then HR reviews.
+- HEAD forms go to another assigned Head or ADMIN, then HR.
 - HR forms go to the designated Head HR. The Head HR's own forms go to another
   eligible HR reviewer.
 
@@ -154,7 +154,7 @@ serial number or details.
 1. Open **Forms → Review Requests**, or **View Forms** for ADMIN.
 2. Use status, form type, search, and submission-date filters to find the request.
 3. Select **View form** and read the request.
-   HR must select **Take Task** before processing it. ADMIN can review the first stage of STAFF/SUPERVISOR forms explicitly assigned to them; HR-stage processing remains HR-only. ADMIN can also view requests and assign or reassign HR tasks. If another
+   HR must select **Take Task** before processing it. ADMIN can review the first stage of STAFF/SUPERVISOR/HEAD forms explicitly assigned to them; HR-stage processing remains HR-only. ADMIN can also view requests and assign or reassign HR tasks. If another
    reviewer has taken it, their name is shown and you can still view the form.
 4. Select **Sign** when a signature is required, or **Approve** when it is not. Supervisor or Head approval normally forwards the request to HR.
 5. To reject a request, select **Reject** and enter the reason.
@@ -175,6 +175,12 @@ details in the approval or rejection window. Select **Refresh** to reload the qu
 
 Authorized accounts can also export the employee list using its export button.
 
+The employee list and HR master report start in **No. ascending** order. Click a
+column heading to choose another sort. The employee list alone has a narrow,
+separate account-status strip to the left of No.: **Active** means a matching
+active account exists; **Inactive** includes employees without accounts. It is
+not an employee field and is omitted from CSV exports, printed tables, and HR reports.
+
 **Archive** removes a record from normal active lists without permanently deleting
 it. Read the confirmation before archiving an employee.
 
@@ -185,7 +191,7 @@ it. Read the confirmation before archiving an employee.
    leave it blank to save a record without a login account. Secondary Email and
    Corporate Email do not create accounts.
 3. If Primary Email is entered, select the correct **Reports To** suggestion:
-   a Supervisor or ADMIN for STAFF, or a Head or ADMIN for SUPERVISOR.
+   a Supervisor or ADMIN for STAFF; another Supervisor, Head, or ADMIN for SUPERVISOR; or another Head or ADMIN for HEAD.
    Optionally select a second reviewer under Account Access Request. Without Primary Email,
    Reports To can be recorded as optional text.
 4. **Account access request** stays visible and can be filled in any order. Choose STAFF,
@@ -193,13 +199,13 @@ it. Read the confirmation before archiving an employee.
 5. Select **Review and save**, check the preview, and save.
 6. If HR saved the account, ask ADMIN to approve it in **Manage Accounts → Account Requests**. Accounts saved by ADMIN are ready immediately; assigned reviewers must already be active.
 
-A STAFF account needs a Supervisor or ADMIN; a SUPERVISOR needs a Head or ADMIN.
+STAFF needs a Supervisor or ADMIN. SUPERVISOR needs another Supervisor, Head, or ADMIN. HEAD needs another Head or ADMIN.
 An optional second reviewer must be a different account with an eligible role. Either reviewer can approve or reject a submitted form.
 The first approval forwards it to HR; the other reviewer cannot approve that stage
 again. Both assigned reviewers see it in their review queue and inbox. Approve any
 pending reviewer accounts before approving the employee account request.
 
-In Manage Accounts, open the STAFF or SUPERVISOR role tab and choose the first reviewer and optional second reviewer in the
+In Manage Accounts, open the STAFF, SUPERVISOR, or HEAD role tab and choose the first reviewer and optional second reviewer in the
 Assignment column, then select Save Changes. New submissions capture these
 assignments; forms already submitted keep their original reviewers. Imported
 Reports To text does not automatically assign reviewer accounts.
@@ -280,7 +286,9 @@ case reaches Closed only after every report in that case has been closed.
 
 1. Open **Manage Accounts > Organization Settings**.
 2. Under **Department Heads**, choose a HEAD or ADMIN for each
-   department. One reviewer may cover several departments. The **Heads** department
+   department. The **HR** department also offers the active designated **Head HR**
+   (including a department named Human Resources). Ordinary HR accounts are excluded.
+   One reviewer may cover several departments. The **Heads** department
    has two ADMIN reviewer slots.
 3. Select any active ADMIN as the **Management Approver**.
 4. Select the existing **Save Changes** button. Leaving the page without saving
@@ -449,7 +457,7 @@ Approval enables the requested account to sign in. Approve a pending reviewer be
 ### Change reviewer assignments
 
 1. Open **Manage Accounts → Accounts**. The page heading is **Manage Accounts**.
-2. Find the STAFF or SUPERVISOR account and change its assignment.
+2. Find the STAFF, SUPERVISOR, or HEAD account and change its assignment.
 3. Select **Save Changes** button.
 
 ### Designate the Head HR
@@ -474,7 +482,7 @@ prevents removing the assignment without an eligible replacement.
 
 **Available to:** ADMIN, on **Dashboard**.
 
-Only HR accounts are included in the performance figures. ADMIN can view performance and assign or reassign permitted tasks, but cannot take HR tasks, process the HR stage of forms, or edit the COC matrix. ADMIN can sign or reject the first stage of STAFF/SUPERVISOR forms explicitly assigned to them. Department HEAD duties and Management approvals performed by ADMIN are separate from HR performance.
+Only HR accounts are included in the performance figures. ADMIN can view performance and assign or reassign permitted tasks, but cannot take HR tasks, process the HR stage of forms, or edit the COC matrix. ADMIN can sign or reject the first stage of STAFF/SUPERVISOR/HEAD forms explicitly assigned to them. Department HEAD duties and Management approvals performed by ADMIN are separate from HR performance.
 
 1. Choose a date range, reviewer, and request type, then select **Apply Filters**.
 2. Use the overview cards and charts to compare completed form reviews, reviewed
@@ -583,6 +591,16 @@ without changing role does not require clearing those responsibilities.
 FTE Allocation may be left blank in both registration and editing.
 
 ADMIN accounts appear in Reports To suggestions and both reviewer selectors.
+For HR accounts, Reports To and the optional second head offer other HR or ADMIN
+accounts. Set or clear both in registration, employee editing, or
+**Manage Accounts → HR**. The Head HR toggle stays separate: HR forms continue
+through the designated Head HR workflow, regardless of these reporting assignments.
+Selecting a reporting head does not grant HR form-review authority.
+An ADMIN account may also optionally report to another ADMIN, with a second
+ADMIN head if needed. Set or clear these assignments in Employee Registration,
+employee editing, or **Manage Accounts → ADMINS**. Only other ADMIN accounts
+are eligible; self-assignment is blocked. Select a primary head before adding
+a second, or clear both to leave the ADMIN unassigned.
 Pending ADMIN reviewers must be approved before employee accounts assigned to them.
 An assigned ADMIN uses **View Forms** to sign/forward or reject that first stage;
 no HR task ownership or HR performance time is recorded for this first-stage action.
@@ -592,3 +610,9 @@ Pending HR-created accounts appear as a number beside **Account Requests**.
 A yellow dot marks the collapsed **Manage Accounts** group while any are pending.
 Approval/rejection updates the count; it also refreshes every 60 seconds while
 the page is visible and when you return to the browser tab.
+
+HEAD Reports To and the optional second reviewer stay editable during registration
+and editing. Pick a different account with the eligible role; selecting yourself
+is not allowed. Existing saved assignments are not changed automatically. Older
+submitted forms keep their original reviewers, while new submissions use the
+current assignment rules.

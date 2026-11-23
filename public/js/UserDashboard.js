@@ -362,7 +362,7 @@ async function loadMyForms() {
   mySubmittedForms = result.forms;
   const assignedHeadLabel = $('uf_assigned_head');
   if (result.assignedHead) {
-    assignedHeadLabel.textContent = `Your ${session.role === 'STAFF' ? 'Supervisor' : session.role === 'HR' ? 'Head HR' : 'Head'}: ${(result.assignedHead.reviewers || [result.assignedHead]).map(head => `${head.full_name} (${head.email})${head.active ? '' : ' - inactive'}`).join(' / ')}`;
+    assignedHeadLabel.textContent = `Your ${FormStatus.reviewerLabel(session.role)}: ${(result.assignedHead.reviewers || [result.assignedHead]).map(head => `${head.full_name} (${head.email})${head.active ? '' : ' - inactive'}`).join(' / ')}`;
     assignedHeadLabel.hidden = false;
   } else if (session.role === 'HR' && session.is_hr_head) {
     assignedHeadLabel.textContent =
@@ -372,8 +372,8 @@ async function loadMyForms() {
     assignedHeadLabel.textContent =
       'Your forms are routed to the designated Head HR.';
     assignedHeadLabel.hidden = false;
-  } else if (['STAFF', 'SUPERVISOR'].includes(session.role)) {
-    assignedHeadLabel.textContent = `No assigned ${session.role === 'STAFF' ? 'Supervisor' : 'Head'} yet`;
+  } else if (FormStatus.assignedReviewerRole(session.role)) {
+    assignedHeadLabel.textContent = `No assigned ${FormStatus.reviewerLabel(session.role)} yet`;
     assignedHeadLabel.hidden = false;
   } else {
     assignedHeadLabel.textContent = '';
@@ -1085,14 +1085,7 @@ function reviewRow(form) {
     ? activeTemplate.headSignatureRequired === false
     : activeTemplate.hrSignatureRequired === false;
   const canReviewStage = isHead
-    ? (session.role === 'SUPERVISOR' && form.submitter_role === 'STAFF') ||
-      (session.role === 'HEAD' && form.submitter_role === 'SUPERVISOR') ||
-      (session.role === 'ADMIN' &&
-        ['STAFF', 'SUPERVISOR'].includes(form.submitter_role) &&
-        FormStatus.isAssignedReviewer(form, session.email)) ||
-      (session.role === 'HR' &&
-        session.is_hr_head &&
-        form.submitter_role === 'HR')
+    ? FormStatus.canReviewHeadStage(session, form)
     : session.role === 'HR' &&
       session.perms.includes('forms.review');
   const requiresTask = session.role === 'HR' || (session.role === 'ADMIN' && !isHead);

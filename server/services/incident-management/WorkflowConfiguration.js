@@ -10,8 +10,8 @@ async function get(req) {
         'SELECT department, reviewer_email AS reviewerEmail FROM incident_department_reviewers ORDER BY department, reviewer_email'
       ),
       A.pool
-        .execute(`SELECT email, COALESCE(NULLIF(full_name, ''), email) AS name, role FROM user_roles
-      WHERE role IN ('HEAD','ADMIN') AND active = 1 AND EXISTS
+        .execute(`SELECT email, COALESCE(NULLIF(full_name, ''), email) AS name, role, is_hr_head FROM user_roles
+      WHERE (role IN ('HEAD','ADMIN') OR (role = 'HR' AND is_hr_head = 1)) AND active = 1 AND EXISTS
       (SELECT 1 FROM employees e WHERE LOWER(e.personal_email) = LOWER(user_roles.email) AND e.record_status <> 'Archived') ORDER BY full_name, email`),
       A.pool
         .execute(`SELECT email, COALESCE(NULLIF(full_name, ''), email) AS name FROM user_roles
@@ -83,13 +83,20 @@ async function save(req, input = {}, executor = null) {
       seen.add(assignmentKey);
       departmentCounts.set(departmentKey, assignmentCount);
       const [[account]] = await db.execute(
-        "SELECT email,role FROM user_roles WHERE LOWER(email) = LOWER(?) AND role IN ('HEAD','ADMIN') AND active = 1 AND EXISTS (SELECT 1 FROM employees e WHERE LOWER(e.personal_email)=LOWER(user_roles.email) AND e.record_status<>'Archived')",
+        "SELECT email,role,is_hr_head FROM user_roles WHERE LOWER(email) = LOWER(?) AND (role IN ('HEAD','ADMIN') OR (role = 'HR' AND is_hr_head = 1)) AND active = 1 AND EXISTS (SELECT 1 FROM employees e WHERE LOWER(e.personal_email)=LOWER(user_roles.email) AND e.record_status<>'Archived')",
         [email]
       );
-      A.assert(account, 'Choose an active HEAD or ADMIN reviewer.');
+      A.assert(
+        account,
+        'Choose an active HEAD, ADMIN, or designated Head HR reviewer.'
+      );
       A.assert(
         departmentKey !== 'heads' || account.role === 'ADMIN',
         'Only ADMIN accounts can review cases from the Heads department.'
+      );
+      A.assert(
+        A.canAssignDepartmentHead(account, department),
+        'Head HR can only be assigned to the HR department.'
       );
       assignments.push({ department, email: account.email });
     }

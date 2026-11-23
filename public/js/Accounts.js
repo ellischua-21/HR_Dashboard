@@ -218,9 +218,9 @@ function renderAccountManagement(result) {
   [
     ['users', 'am_users', true],
     ['supervisors', 'am_supervisors', true],
-    ['heads', 'am_heads', false],
+    ['heads', 'am_heads', true],
     ['hr', 'am_hr', 'hr'],
-    ['admins', 'am_admins', false]
+    ['admins', 'am_admins', true]
   ].forEach(([group, id, canAssignHead]) => {
     const body = $(id);
     body.replaceChildren();
@@ -228,7 +228,7 @@ function renderAccountManagement(result) {
     if (!accounts.length) {
       appendEmptyRow(
         body,
-        canAssignHead === true ? 7 : canAssignHead === 'hr' ? 6 : 5,
+        canAssignHead === 'hr' ? 8 : 7,
         'No accounts in this list.'
       );
       return;
@@ -240,7 +240,37 @@ function renderAccountManagement(result) {
         accountCell(account.email),
         accountCell(account.role)
       );
-      if (canAssignHead === true) {
+      if (canAssignHead === 'hr') {
+        const toggleCell = document.createElement('td');
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        const selectedHr = stagedHrHeadEmail(result.accounts.hr);
+        const selected = selectedHr === account.email;
+        toggle.className =
+          'ghost hr-head-toggle' + (selected ? ' selected' : '');
+        toggle.textContent = selected ? 'On' : 'Off';
+        toggle.setAttribute('aria-pressed', String(selected));
+        toggle.setAttribute(
+          'aria-label',
+          `${selected ? 'Remove' : 'Designate'} ${account.full_name || account.email} as Head HR; Save Changes to apply`
+        );
+        toggle.dataset.inactive = String(!account.active);
+        toggle.disabled = accountSaveBusy || !account.active;
+        toggle.onclick = () => {
+          if (accountSaveBusy) return;
+          pendingHrHeadEmail =
+            selectedHr === account.email ? '' : account.email;
+          hrHeadChanged =
+            pendingHrHeadEmail !==
+            (result.accounts.hr.find((item) => item.is_hr_head)?.email || '');
+          if (!hrHeadChanged) pendingHrHeadEmail = undefined;
+          renderAccountManagement(result);
+          updateAccountSaveButton();
+        };
+        toggleCell.appendChild(toggle);
+        row.appendChild(toggleCell);
+      }
+      if (canAssignHead === true || canAssignHead === 'hr') {
         row.appendChild(
           accountCell(
             [
@@ -252,15 +282,31 @@ function renderAccountManagement(result) {
           )
         );
         const assignmentCell = document.createElement('td');
-        const reviewerRole = account.role === 'STAFF' ? 'Supervisor' : 'Head';
+        const reviewerRole = ['STAFF', 'SUPERVISOR'].includes(account.role)
+          ? 'Supervisor/Head'
+          : account.role === 'HR'
+            ? 'Head'
+          : FormStatus.reviewerLabel(account.role);
         const saved = {
           headEmail: account.assigned_head_email || '',
           secondaryHeadEmail: account.secondary_head_email || ''
         };
         const staged = pendingHeadAssignments.get(account.email) || saved;
         const selections = {};
+        const reviewerOptions = account.role === 'HR'
+          ? [...(result.accounts.hr || []), ...(result.accounts.admins || [])].filter(reviewer => reviewer.active)
+          : account.role === 'ADMIN'
+          ? (result.accounts.admins || []).filter(reviewer => reviewer.active)
+          : ['STAFF', 'SUPERVISOR'].includes(account.role)
+          ? [...new Map(
+              [...(result.availableSupervisors || []), ...(result.availableHeads || [])]
+                .map(reviewer => [reviewer.email, reviewer])
+            ).values()]
+          : FormStatus.assignedReviewerRole(account.role) === 'SUPERVISOR'
+            ? result.availableSupervisors || []
+            : result.availableHeads || [];
         for (const [key, label] of [
-          ['headEmail', reviewerRole],
+          ['headEmail', reviewerRole + (['HR', 'ADMIN'].includes(account.role) ? ' (optional)' : '')],
           ['secondaryHeadEmail', `Second ${reviewerRole} (optional)`]
         ]) {
           const wrapper = document.createElement('label');
@@ -271,12 +317,9 @@ function renderAccountManagement(result) {
           const none = document.createElement('option');
           none.value = '';
           none.textContent =
-            key === 'headEmail' ? `Select a ${reviewerRole}` : 'None';
+            key === 'headEmail' && FormStatus.assignedReviewerRole(account.role) ? `Select a ${reviewerRole}` : 'None';
           select.appendChild(none);
-          (account.role === 'STAFF'
-            ? result.availableSupervisors || []
-            : result.availableHeads || []
-          )
+          reviewerOptions
             .filter((optionAccount) => optionAccount.email !== account.email)
             .forEach((optionAccount) => {
               const option = document.createElement('option');
@@ -308,39 +351,6 @@ function renderAccountManagement(result) {
           accountCell(formatAccountDate(account.created_at))
         );
         row.appendChild(assignmentCell);
-      } else if (canAssignHead === 'hr') {
-        const toggleCell = document.createElement('td');
-        const toggle = document.createElement('button');
-        toggle.type = 'button';
-        const selectedHr = stagedHrHeadEmail(result.accounts.hr);
-        const selected = selectedHr === account.email;
-        toggle.className =
-          'ghost hr-head-toggle' + (selected ? ' selected' : '');
-        toggle.textContent = selected ? 'On' : 'Off';
-        toggle.setAttribute('aria-pressed', String(selected));
-        toggle.setAttribute(
-          'aria-label',
-          `${selected ? 'Remove' : 'Designate'} ${account.full_name || account.email} as Head HR; Save Changes to apply`
-        );
-        toggle.dataset.inactive = String(!account.active);
-        toggle.disabled = accountSaveBusy || !account.active;
-        toggle.onclick = () => {
-          if (accountSaveBusy) return;
-          pendingHrHeadEmail =
-            selectedHr === account.email ? '' : account.email;
-          hrHeadChanged =
-            pendingHrHeadEmail !==
-            (result.accounts.hr.find((item) => item.is_hr_head)?.email || '');
-          if (!hrHeadChanged) pendingHrHeadEmail = undefined;
-          renderAccountManagement(result);
-          updateAccountSaveButton();
-        };
-        toggleCell.appendChild(toggle);
-        row.append(
-          toggleCell,
-          accountCell(account.active ? 'Active' : 'Inactive'),
-          accountCell(formatAccountDate(account.created_at))
-        );
       } else {
         row.append(
           accountCell(account.active ? 'Active' : 'Inactive'),
