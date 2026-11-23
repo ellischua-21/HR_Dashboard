@@ -1,6 +1,113 @@
 (function () {
   let configured = false;
   let pending = false;
+  let linkTarget = null;
+  let selectedEmployee = null;
+  let linkSaving = false;
+  const linkDialog = $('attendance-link-dialog');
+  const employeeCaption = (employee) =>
+    [
+      employee.seq_no != null ? `No. ${employee.seq_no}` : '',
+      employee.emp_no,
+      employee.department
+    ].filter(Boolean);
+  const employeeSearch = window.createEmployeeSearch({
+    input: $('attendance-link-search'),
+    suggestions: $('attendance-link-results'),
+    getOwner: () => `${session?.email}|${JSON.stringify(linkTarget)}`,
+    search: async (query) =>
+      (await api('listEmployees', { search: query, pageSize: 20 })).rows,
+    details: employeeCaption,
+    onClear: () => {
+      selectedEmployee = null;
+      $('attendance-link-selected').textContent = '';
+    },
+    onSelect: (employee) => {
+      selectedEmployee = employee;
+      $('attendance-link-selected').textContent =
+        employeeCaption(employee).join(' · ');
+    }
+  });
+
+  async function openEmployeeLink(record) {
+    if (pending || linkSaving) return;
+    setPending(true);
+    const owner = session.email;
+    try {
+      const target = {
+        date: record.date,
+        providerAccount: record.providerAccount,
+        scannerNo: record.employeeNo
+      };
+      const context = await api('getAttendanceIdentity', target);
+      if (owner !== session?.email || $('view-attendance').hidden) return;
+      employeeSearch.reset();
+      linkTarget = {
+        ...target,
+        previousEmployeeId: context.previousEmployeeId,
+        scannerName: context.scannerName
+      };
+      $('attendance-link-scanner').textContent =
+        `${context.scannerName} · ID ${record.employeeNo} · ${context.providerName}`;
+      $('attendance-link-status').textContent = context.employee
+        ? `${context.status} match: ${context.employee.name}`
+        : 'Select the correct employee record. Duplicate names require HR confirmation.';
+      if (context.employee) {
+        selectedEmployee = context.employee;
+        $('attendance-link-search').value = context.employee.name;
+        $('attendance-link-selected').textContent = employeeCaption(
+          context.employee
+        ).join(' · ');
+      }
+      linkDialog.showModal();
+      $('attendance-link-search').focus();
+    } catch (error) {
+      AppErrors.show(error.message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  $('attendance-link-cancel').onclick = () => linkDialog.close();
+  linkDialog.addEventListener('close', () => {
+    employeeSearch.reset();
+    linkTarget = null;
+  });
+  $('attendance-link-form').onsubmit = async (event) => {
+    event.preventDefault();
+    if (linkSaving) return;
+    if (!selectedEmployee || !linkTarget) {
+      AppErrors.show('Select an employee from the suggestions.');
+      return;
+    }
+    const employee = selectedEmployee;
+    const target = { ...linkTarget, employeeId: employee.record_id };
+    linkSaving = true;
+    try {
+      if (
+        !(await appConfirm(
+          `Link ${$('attendance-link-scanner').textContent} to ${employee.name} (${employeeCaption(employee).join(' · ')})? This controls which employee can see these attendance records.`,
+          { title: 'Confirm attendance link', confirmText: 'Confirm link' }
+        ))
+      )
+        return;
+      $('attendance-link-save').disabled = true;
+      $('attendance-link-cancel').disabled = true;
+      $('attendance-link-search').disabled = true;
+      await api('confirmAttendanceIdentity', target);
+      linkDialog.close();
+      AppFeedback.success(
+        'Attendance linked. The employee can refresh their Daily Attendance.'
+      );
+    } catch (error) {
+      AppErrors.show(error.message);
+    } finally {
+      linkSaving = false;
+      $('attendance-link-save').disabled = false;
+      $('attendance-link-cancel').disabled = false;
+      $('attendance-link-search').disabled = false;
+    }
+  };
   const timeLogs = AttendanceUI.createTimeLogPopover($('attendance-time-logs'));
   const columns = [
     ['firstName', 'First Name'],
@@ -74,6 +181,26 @@
     rows.forEach((record) => {
       const row = document.createElement('tr');
       columns.forEach(([key]) => {
+        if (
+          key === 'employeeNo' &&
+          can('emp.write') &&
+          record.providerAccount &&
+          record.employeeNo
+        ) {
+          const cell = AppUI.tableCell(record.employeeNo);
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'ghost attendance-link-button';
+          button.textContent = 'Link employee';
+          button.setAttribute(
+            'aria-label',
+            `Link ${record.firstName} ${record.lastName}, scanner ID ${record.employeeNo}, to an employee`
+          );
+          button.onclick = () => openEmployeeLink(record);
+          cell.appendChild(button);
+          row.appendChild(cell);
+          return;
+        }
         if (key === 'timeLogs') {
           const cell = AppUI.tableCell('');
           cell.className = 'attendance-time-logs-cell';

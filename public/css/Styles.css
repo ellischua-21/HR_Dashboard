@@ -809,6 +809,17 @@ button.ghost {
   overflow-wrap: anywhere;
   text-overflow: clip;
 }
+.attendance-link-button {
+  display: block;
+  max-width: 100%;
+  margin-top: 6px;
+  padding: 4px;
+  font-size: 12px;
+  white-space: normal;
+}
+#attendance-link-form .head-search-results {
+  position: static;
+}
 .attendance-table thead th {
   position: sticky;
   top: 0;

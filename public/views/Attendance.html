@@ -40,13 +40,58 @@
         <span id="attendance-loading" class="loading-slot"></span>
       </div>
     </form>
-    <div class="tablewrap attendance-table-scroll" tabindex="0" aria-label="Attendance table. Scroll inside this area vertically and horizontally to view records and columns.">
-      <table class="attendance-table" aria-label="Employee attendance transactions">
+    <div
+      class="tablewrap attendance-table-scroll"
+      tabindex="0"
+      aria-label="Attendance table. Scroll inside this area vertically and horizontally to view records and columns."
+    >
+      <table
+        class="attendance-table"
+        aria-label="Employee attendance transactions"
+      >
         <thead id="attendance-head"></thead>
         <tbody id="attendance-body"></tbody>
       </table>
     </div>
-    <div id="attendance-time-logs" class="attendance-time-logs" role="region" aria-label="Time Logs" hidden></div>
-    <p id="attendance-info" class="note attendance-table-info" role="status"></p>
+    <div
+      id="attendance-time-logs"
+      class="attendance-time-logs"
+      role="region"
+      aria-label="Time Logs"
+      hidden
+    ></div>
+    <p
+      id="attendance-info"
+      class="note attendance-table-info"
+      role="status"
+    ></p>
   </section>
 </section>
+<dialog id="attendance-link-dialog" aria-labelledby="attendance-link-title">
+  <form id="attendance-link-form">
+    <h2 id="attendance-link-title">Link attendance to employee</h2>
+    <p id="attendance-link-scanner"></p>
+    <p id="attendance-link-status" class="note"></p>
+    <label for="attendance-link-search"
+      >Employee
+      <input
+        id="attendance-link-search"
+        type="search"
+        placeholder="Search name or employee number"
+        required
+      />
+      <div
+        id="attendance-link-results"
+        class="head-search-results"
+        hidden
+      ></div>
+    </label>
+    <p id="attendance-link-selected" class="note"></p>
+    <div class="actions">
+      <button id="attendance-link-cancel" class="ghost" type="button">
+        Cancel
+      </button>
+      <button id="attendance-link-save" type="submit">Confirm link</button>
+    </div>
+  </form>
+</dialog>

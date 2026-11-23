@@ -119,3 +119,31 @@ missing scans do not prove a break was taken incorrectly.
 
 Hover over a break badge to see its reason. Break badges do not replace the main
 attendance status. The status filter applies to the main attendance status.
+
+## Personal-dashboard identity links
+
+The existing Daily Attendance card reads the same calculated times and raw logs
+as HR Attendance. The server derives the employee from the authenticated account;
+caller-supplied employee selectors cannot change that identity.
+
+Automatic matching requires a unique normalized first-and-last-name match in the
+employee roster and one unconfirmed scanner identity for that employee in the
+selected day's returned records. Matching ignores case, accents, punctuation, and
+extra whitespace; it does not use partial or fuzzy name matching. Scanner IDs do
+not need to equal employee numbers. Duplicate employee names or multiple matching
+scanner identities need HR/Admin confirmation, including identities in different
+connected accounts. Archived records are not eligible targets.
+
+In HR Attendance, **Link employee** under ID opens a search of employee records.
+Suggestions show No., employee number, and department to distinguish duplicate
+names. After confirmation, `attendance_employee_links` stores the provider-account
+namespace, scanner ID, normalized scanner name, employee record ID, confirming HR
+account, and confirmation time. The table is created idempotently at startup.
+Only HR/Admin with employee-write permission can save a link; writes and audit
+events share a transaction. Concurrent changes require reopening the dialog.
+
+Confirmed links override automatic matching and can be corrected through the same
+action. If the scanner's name changes or its linked employee is archived, the link
+is withheld pending a new confirmation. Configure a replacement scanner account
+under a new account namespace rather than reusing an old namespace with different
+people. A day with no scanner data stays blank; a link cannot invent missing scans.

@@ -1247,18 +1247,20 @@ Every listed value, account or browser variant is required. Preserve per-variant
 **Module and Feature:** Personal dashboard — Identity collision privacy  
 **Priority:** Critical  
 **Test Type:** Security  
-**Required Role:** STAFF  
-**Preconditions:** Isolated provider fixture: same employee number for another name/account and no correct matching name.
+**Required Role:** STAFF and HR/ADMIN
+**Preconditions:** Isolated provider fixtures with a unique first/last name and differing scanner/HRIS numbers; duplicate employee names; same-name scanner identities across accounts.
 
 **Test Steps:**
 
-1. Load own Daily Attendance.
-2. Inspect the error and captured getMyDailyAttendance request.
-3. Add an employee selector argument for another employee in a replay.
+1. Load own Daily Attendance for the unique name with a different scanner number. Verify its times and Time Logs.
+2. Introduce duplicate employee names or same-name scanner identities. Refresh the personal dashboard.
+3. As HR/Admin, open Attendance, choose **Link employee** under the scanner ID, search the employee, check No./employee number/department, and confirm.
+4. Refresh each duplicate employee's personal dashboard; reopen the HR dialog and verify the saved link. Rename the scanner identity and verify confirmation is required again.
+5. Replay with another employee selector, an unauthorized STAFF confirmer, and a stale prior employee ID.
 
-**Expected Result:** Mismatched scanner identity returns an error rather than another person’s scans; caller cannot select another employee because identity derives from session.
+**Expected Result:** Unique names load despite different numbers. Ambiguous identities are withheld until confirmed. Only the selected employee sees the confirmed scans; saved links survive reload. Changed scanner names need confirmation again. Unauthorized confirmations and stale saves are rejected, and caller selectors cannot change self-service identity.
 
-**Data Integrity Check:** No unrelated scan payload; accented-name matching should be checked with actual QA identities.
+**Data Integrity Check:** No unrelated scan payload; link and audit are committed together. Confirmed links preserve provider-account boundaries. Use isolated data for link mutations.
 
 **Result:** Not Tested — choose Pass / Fail / Blocked / Not Tested.  
 **Notes / Evidence:** ____________________  

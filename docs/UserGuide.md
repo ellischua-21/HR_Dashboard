@@ -42,6 +42,8 @@ You can return to it using the first item in the menu.
 - **Daily Attendance** shows your Time In, AM Out/In, Lunch Out/In, PM Out/In,
   and Time Out. Use the arrows to change day or choose a date from the calendar.
   Select **Refresh** to retrieve the latest records. A dash means no time is available.
+  Unique first-and-last-name matches load automatically even when scanner IDs differ
+  from employee numbers. If HR confirmation is requested, ask HR to link the record.
 - Select **Time Logs** at the top of Daily Attendance to see each scan, its device name,
   and device serial number. Click outside that box or press Escape to close it.
 
@@ -261,7 +263,14 @@ accounts appear in the same list, grouped by department.
 4. Select **Refresh** to request the latest records.
 5. Use **Previous page** and **Next page** for additional records.
 
-Attendance is for viewing. To request a correction, use the appropriate time form
+HR/Admin can use **Link employee** below a scanner ID to confirm or correct its
+employee link. Search for the employee and check their No., employee number, and
+department before confirming. This saved link controls personal-dashboard access;
+it does not edit scanner punches. Duplicate names remain hidden from personal
+dashboards until HR confirms the correct record. A renamed scanner identity needs
+confirmation again.
+
+To request a correction to attendance times, use the appropriate time form
 or contact HR. Scanner-account connections are managed by the system administrator.
 
 ## 7. Use Incident Management

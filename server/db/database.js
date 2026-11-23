@@ -40,6 +40,18 @@ async function initializeDatabase() {
     KEY idx_employee_employment_date (${quote('date_employed')})
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
+  await pool.query(`CREATE TABLE IF NOT EXISTS attendance_employee_links (
+    provider_account VARCHAR(64) COLLATE utf8mb4_bin NOT NULL,
+    scanner_no VARCHAR(191) COLLATE utf8mb4_bin NOT NULL,
+    scanner_name VARCHAR(500) NOT NULL,
+    employee_id VARCHAR(20) NOT NULL,
+    confirmed_by VARCHAR(191) NOT NULL,
+    confirmed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (provider_account, scanner_no),
+    KEY idx_attendance_employee (employee_id),
+    CONSTRAINT fk_attendance_employee FOREIGN KEY (employee_id) REFERENCES employees(record_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
   const [regularizedColumn] = await pool.query("SHOW COLUMNS FROM employees LIKE 'regularized_on'");
   if (!regularizedColumn.length)
     await pool.query('ALTER TABLE employees ADD COLUMN regularized_on DATE NULL');

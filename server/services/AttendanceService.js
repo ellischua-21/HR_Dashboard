@@ -1,6 +1,10 @@
 const { requirePerm } = require('../middleware/Auth');
 const { httpError } = require('../utils/HttpError');
 const { pool } = require('../db/database');
+const {
+  attendanceIdentities,
+  saveAttendanceIdentity
+} = require('./AttendanceIdentityService');
 const { isValidDate, manilaDate } = require('../../shared/DateUtils');
 const {
   ATTENDANCE_RULES,
@@ -44,6 +48,7 @@ async function requireAttendanceAccess(req) {
   if (!['HR', 'ADMIN'].includes(user.role)) {
     throw httpError('Only HR and Admin can view attendance.', 403);
   }
+  return user;
 }
 
 function normalizeQuery(input = {}) {
@@ -550,9 +555,15 @@ async function loadAttendance(query, cacheKey) {
       409
     );
   const batches = await Promise.all(
-    providers.accounts.map(async ({ client, name }) => {
+    providers.accounts.map(async ({ client, name, prefix }) => {
       try {
-        return await loadAccountAttendance(client, query);
+        const batch = await loadAccountAttendance(client, query);
+        batch.rows = batch.rows.map((row) => ({
+          ...row,
+          providerAccount: prefix,
+          providerName: name
+        }));
+        return batch;
       } catch (error) {
         throw httpError(
           name +
@@ -618,6 +629,68 @@ async function listAttendance(req, input) {
   };
 }
 
+async function attendanceIdentityRow(input) {
+  if (
+    !input ||
+    typeof input !== 'object' ||
+    Array.isArray(input) ||
+    typeof input.providerAccount !== 'string' ||
+    input.providerAccount.length > 64 ||
+    typeof input.scannerNo !== 'string' ||
+    !input.scannerNo ||
+    input.scannerNo.length > 191 ||
+    !providers.accounts.some(
+      (account) => account.prefix === input.providerAccount
+    )
+  )
+    throw httpError('Choose a valid scanner record.', 400);
+  if (!isValidDate(input.date))
+    throw httpError('Choose a valid attendance date.', 400);
+  const cached = await readAttendance(
+    normalizeQuery({ dateFrom: input.date, dateTo: input.date })
+  );
+  const row = cached.rows.find(
+    (record) =>
+      record.providerAccount === input.providerAccount &&
+      record.employeeNo === input.scannerNo
+  );
+  if (!row)
+    throw httpError(
+      'This scanner record is unavailable. Refresh Attendance.',
+      409
+    );
+  return { row, rows: cached.rows };
+}
+
+async function getAttendanceIdentity(req, input) {
+  await requireAttendanceAccess(req);
+  const { row, rows } = await attendanceIdentityRow(input);
+  const identities = await attendanceIdentities(rows);
+  const match = identities.find((item) => item.row === row);
+  return {
+    status: match.status,
+    employee: match.employee || null,
+    previousEmployeeId: match.previousEmployeeId,
+    providerName: row.providerName,
+    scannerName: [row.firstName, row.lastName].filter(Boolean).join(' ')
+  };
+}
+
+async function confirmAttendanceIdentity(req, input) {
+  const user = await requireAttendanceAccess(req);
+  await requirePerm(req, 'emp.write');
+  const { row } = await attendanceIdentityRow(input);
+  if (
+    input.scannerName !==
+    [row.firstName, row.lastName].filter(Boolean).join(' ')
+  )
+    throw httpError(
+      'This scanner identity changed. Reopen it before confirming.',
+      409
+    );
+  return saveAttendanceIdentity(user, row, input);
+}
+
 async function getMyDailyAttendance(req, input = {}) {
   const user = await requirePerm(req, 'employee.self');
   if (!input || typeof input !== 'object' || Array.isArray(input))
@@ -627,36 +700,31 @@ async function getMyDailyAttendance(req, input = {}) {
     'SELECT emp_no, first_name, last_name FROM employees WHERE record_id = ? LIMIT 1',
     [user.employee_id]
   );
-  if (!employee?.emp_no)
-    throw httpError('Your employee number is missing. Contact HR.', 409);
+  if (!employee)
+    throw httpError('Your employee record is unavailable. Contact HR.', 409);
   if (!providers.configuration().configured)
     throw httpError('Attendance is unavailable. Contact HR.', 409);
   const cached = await readAttendance(query, input.refresh === true);
-  const numbered = cached.rows.filter(
-    (row) =>
-      row.employeeNo.trim() === String(employee.emp_no).trim() &&
-      row.date === query.dateFrom
+  const identities = await attendanceIdentities(
+    cached.rows.filter((row) => row.date === query.dateFrom)
   );
-  // Scanner IDs are account-scoped. Check the employee's registered name as well
-  // so a matching ID in another provider account cannot reveal somebody else's scans.
-  const words = (value) =>
-    String(value || '')
-      .normalize('NFKD')
-      .replace(/\p{M}/gu, '')
-      .toLowerCase()
-      .match(/[\p{L}\p{N}]+/gu) || [];
-  const identity = words(
-    `${employee.first_name || ''} ${employee.last_name || ''}`
-  );
-  const rows = numbered.filter((row) => {
-    const name = words(`${row.firstName} ${row.lastName}`);
-    return identity.length > 0 && identity.every((word) => name.includes(word));
-  });
-  if (numbered.length && !rows.length)
+  if (
+    identities.some(
+      (match) =>
+        match.needsConfirmation &&
+        (match.previousEmployeeId === user.employee_id ||
+          match.candidates.some(
+            (candidate) => candidate.record_id === user.employee_id
+          ))
+    )
+  )
     throw httpError(
-      'Your scanner identity does not match your employee record. Contact HR.',
+      'HR must confirm your attendance link before these records can be shown. Contact HR.',
       409
     );
+  const rows = identities
+    .filter((match) => match.employee?.record_id === user.employee_id)
+    .map((match) => match.row);
   const events = rows
     .flatMap((row) =>
       (row.timeLogs || []).map((log) => {
@@ -711,6 +779,8 @@ module.exports = {
   getAttendanceContext,
   listAttendance,
   getMyDailyAttendance,
+  getAttendanceIdentity,
+  confirmAttendanceIdentity,
   normalizeQuery,
   normalizeRecords,
   normalizeDailySummaries,
