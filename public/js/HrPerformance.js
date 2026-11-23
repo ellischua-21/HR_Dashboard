@@ -246,7 +246,9 @@
           ? 'Not Available'
           : DateUtils.formatDateTime(new Date(task.lastActionMs))
       );
-      const actions = cell(row, '');
+      const actionCell = cell(row, '');
+      const actions = el('div', undefined, 'actions');
+      actionCell.appendChild(actions);
       const view = el('button', 'View', 'ghost');
       view.type = 'button';
       view.onclick = () =>
@@ -264,10 +266,8 @@
         load,
         true
       );
-      // The task table already displays owner and time in their own columns.
-      ownership.querySelector('.task-ownership-details')?.remove();
       if (task.canViewCase !== false) actions.appendChild(view);
-      actions.append(log, ownership);
+      actions.append(log, ...ownership.querySelectorAll('button'));
       body.appendChild(row);
     });
     if (!body.children.length) AppUI.emptyRow(body, 10, 'No matching tasks.');

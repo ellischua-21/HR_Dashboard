@@ -124,6 +124,7 @@
   function editor(parent, title, build) {
     const wrap = node('section', undefined, 'workflow-action'),
       body = node('div', undefined, 'workflow-action-body');
+    body.id = `incident-workflow-section-${++fieldId}`;
     body.hidden = true;
     const toggle = button(
       wrap,
@@ -135,6 +136,7 @@
       true
     );
     toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-controls', body.id);
     const original = toggle.onclick;
     toggle.onclick = async () => {
       await original();
@@ -774,20 +776,17 @@
       const seventh = section(root, 'VII. Employee’s Written Explanation');
       details(seventh, [
         ['Employee Statement', incident.explanation.statement],
-        ['Submitted On', dateTime(incident.explanation.submittedAt)],
-        [
-          'Hearing Requested',
-          incident.explanation.hearingRequested ? 'Yes' : 'No'
-        ]
+        ['Submitted On', dateTime(incident.explanation.submittedAt)]
       ]);
       attachments(seventh, incident, 7);
-      signed(
-        seventh,
-        'Employee Signature',
-        incident.explanation.signature,
-        incident.explanation.employeeName,
-        incident.explanation.submittedAt
-      );
+      if (incident.explanation.signature !== incident.receipt?.signature)
+        signed(
+          seventh,
+          'Employee Signature',
+          incident.explanation.signature,
+          incident.explanation.employeeName,
+          incident.explanation.submittedAt
+        );
     }
     if (
       includeBlankSections &&
@@ -798,8 +797,7 @@
       details(seventh, [
         ['Employee Statement', ''],
         ['Supporting Documents Submitted', ''],
-        ['Date Submitted', ''],
-        ['Employee Signature', '']
+        ['Date Submitted', '']
       ]);
     }
     if (incident.hrReview && incident.rights.maxSection >= 8) {
@@ -878,16 +876,16 @@
         'badge'
       )
     );
-    let statement, files, hearing, sign;
+    let statement, files, sign;
     const f = form(panel, 'Submit Explanation', async () =>
       commit(
         incident,
         'SUBMIT_EXPLANATION',
-        { ...(await value()), signature: sign() },
+        { ...(await value()), ...(sign ? { signature: sign() } : {}) },
         reload,
         incident.receivedAt
-          ? 'Submit this signed explanation? It will be preserved and cannot be overwritten.'
-          : 'Acknowledge receipt and submit this signed explanation? Your signature confirms receipt and your explanation. The existing deadline will not change. Your submission will be preserved and cannot be overwritten.'
+          ? 'Submit this explanation using your recorded acknowledgment signature? It will be preserved and cannot be overwritten.'
+          : 'Acknowledge receipt and submit this explanation? The existing deadline will not change. Your submission and acknowledgment signature will be preserved and cannot be overwritten.'
       )
     );
     statement = input(f.element, 'VII. Your Written Explanation', {
@@ -895,21 +893,12 @@
       required: true,
       value: incident.explanationDraft?.statement
     });
-    hearing = input(f.element, 'Request An Administrative Hearing', {
-      type: 'checkbox'
-    });
-    hearing.checked = Boolean(incident.explanationDraft?.hearingRequested);
     files = input(f.element, 'Supporting Documents', { type: 'file' });
     attachments(f.element, incident, 7);
-    sign = signature(
-      f.element,
-      incident.receivedAt
-        ? 'Employee Explanation Signature'
-        : 'Employee Receipt And Explanation Signature'
-    );
+    if (!incident.receivedAt)
+      sign = signature(f.element, 'Employee Acknowledgment Of Receipt');
     const value = async () => ({
       statement: statement.value,
-      hearingRequested: hearing.checked,
       files: await readIncidentEvidenceFiles(files.files)
     });
     const actions = f.finish();
@@ -1186,7 +1175,9 @@
     if (incident.phase === 'MANAGEMENT')
       root.appendChild(node('p', 'Awaiting Management Approval.', 'badge'));
     if (incident.phase === 'FINAL_ACTION') {
-      button(root, 'Issue Approved Final Decision', () =>
+      const actions = node('div', undefined, 'actions');
+      root.appendChild(actions);
+      button(actions, 'Issue Approved Final Decision', () =>
         commit(
           incident,
           'ISSUE_DECISION',
@@ -1196,7 +1187,7 @@
         )
       );
       button(
-        root,
+        actions,
         'Revise Evaluation',
         () =>
           commit(
@@ -1241,7 +1232,7 @@
     for (const sibling of incident.siblings) {
       const b = button(
         links,
-        `${sibling.caseNumber} · ${sibling.reportedEmployeeName} · ${window.IncidentProgress.label(sibling.status)}`,
+        `${sibling.caseNumber} · ${sibling.reportedEmployeeName}`,
         () => window.IncidentTrack.select(sibling.id),
         Number(sibling.id) !== incident.id
       );
@@ -1251,8 +1242,10 @@
       );
     }
     group.appendChild(links);
+    const documentActions = node('div', undefined, 'actions');
+    group.appendChild(documentActions);
     button(
-      group,
+      documentActions,
       'View Document',
       () => {
         const preview = window.open('', '_blank');
@@ -1381,8 +1374,7 @@
     if (incident.internalActivity?.length) {
       const panel = section(root, 'Internal Activity History');
       for (const entry of incident.internalActivity)
-        details(panel, [
-          ['Action', FormStatus.titleCase(entry.action)],
+        details(section(panel, FormStatus.titleCase(entry.action)), [
           ['Performed By', entry.performedBy],
           ['Date And Time', dateTime(entry.createdAt)],
           ['Remarks', entry.details]

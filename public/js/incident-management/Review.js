@@ -83,7 +83,21 @@
       view.type = 'button';
       view.onclick = () =>
         window.openIncidentRoute(incident.id, 'incident-track');
-      row.append(details, view);
+      const actions = el('div', 'actions');
+      if (incident.canTakeTask)
+        actions.appendChild(
+          TaskUI.render(
+            {
+              type: 'INCIDENT',
+              resourceId: incident.id,
+              canTake: true
+            },
+            fetchList,
+            true
+          )
+        );
+      actions.appendChild(view);
+      row.append(details, actions);
       list.appendChild(row);
     }
     list.scrollTop = scrollTop;

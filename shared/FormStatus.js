@@ -7,7 +7,10 @@
     return String(value || '')
       .toLowerCase()
       .replaceAll('_', ' ')
-      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+      .replace(/\b\w/g, (letter) => letter.toUpperCase())
+      .replace(/\b(?:IR|NTE|HR|HRIS|FTE|HMO|SIL|SL|VL|CSV|PDF)\b/gi, (word) =>
+        word.toUpperCase()
+      );
   }
 
   function assignedReviewerRole(accountRole) {

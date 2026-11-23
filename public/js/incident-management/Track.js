@@ -19,12 +19,7 @@
     value ? DateUtils.formatDateTime(value) : 'Not reached';
   const label = (item) =>
     `${item.caseNumber} · ${item.subject} · ${item.reportedEmployeeName}`;
-  const statusLabel = (value) =>
-    value
-      .replaceAll('_', ' ')
-      .toLowerCase()
-      .replace(/\b\w/g, (letter) => letter.toUpperCase())
-      .replace(/\bNte\b/g, 'NTE');
+  const statusLabel = (value) => FormStatus.titleCase(value);
   const visible = () => !byId('view-incident-track').hidden;
   const isCurrent = (ticket, owner) =>
     ticket === requestId && owner === session?.email;

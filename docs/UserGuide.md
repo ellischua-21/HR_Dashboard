@@ -285,8 +285,8 @@ or contact HR. Scanner-account connections are managed by the system administrat
 | HR | Track, Review, Code of Conduct; the designated Head HR also sees File |
 | ADMIN | File, Track, Review, Code of Conduct; filing and HEAD review require a department assignment |
 
-All accounts use the same circle tracker: **IR Filed > NTE Issued > Closed**.
-Other actions keep the current stage. A case can contain several Incident Reports,
+All accounts use the same circle tracker: **IR Filed > Under HEAD Review > NTE Issued > Under HR Review > Closed**.
+The tracker shows the active review stage; the header uses the selected report's actual IR/NTE number. HEAD review begins after filing, and HR review begins when an explanation is submitted. A case can contain several Incident Reports,
 with a separate IR number and outcome for each report added with **File Another**.
 The employee concerned, reported employee, involved people and witnesses listed
 in one report share that report's IR number; adding people does not create reports. Use **Related
@@ -373,19 +373,19 @@ For each IR, the assigned HEAD can:
 3. The response deadline starts **immediately when HEAD issues the NTE** and is
    five calendar days after the issuance date, including weekends and holidays.
    Track shows the countdown; signing does not start or reset it.
-4. The explanation field and signature are available immediately. Complete
+4. The explanation field and acknowledgment signature are available immediately. Complete
    Section VII and attach supporting documents. **Save Draft** works before
    signing; drafts do not record receipt or move the case to HR.
-5. Draw the **Employee Receipt And Explanation Signature** and select
+5. Draw the **Employee Acknowledgment Of Receipt** once and select
    **Submit Explanation**. Confirming records receipt and the explanation
    together. Receipt confirms delivery, not admission of the allegation. An
-   existing receipt is retained. The submitted statement and signature are
+   existing receipt is reused without a second signature pad. The submitted statement and signature are
    preserved and cannot be overwritten.
 
 An employee can **Request An Extension** while an explanation is outstanding.
 HR can approve the requested days, choose a different number of additional
-calendar days, or reject the request. The employee can also request an
-administrative hearing when submitting the explanation.
+calendar days, or reject the request. Only the owning HR can schedule and complete
+an administrative hearing; the employee response has no hearing-request option.
 
 An overdue response is marked overdue and HR is notified. Overdue status does
 not establish a violation or automatically impose a sanction.

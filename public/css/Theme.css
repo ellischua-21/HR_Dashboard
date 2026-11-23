@@ -359,6 +359,16 @@
       inset 0 3px 0 var(--detail-accent),
       0 5px 16px rgb(85 55 34 / 7%);
   }
+  .workflow-action > button.ghost {
+    background-color: var(--ui-clay-soft);
+    border-color: var(--ui-clay);
+    box-shadow: inset 4px 0 0 var(--ui-clay);
+  }
+  .workflow-action > button.ghost[aria-expanded='true'],
+  .workflow-action > button.ghost:not(:disabled):hover {
+    background-color: #efd0b9;
+    border-color: var(--ui-clay);
+  }
   .incident-form .incident-report-core-section {
     box-shadow: none;
   }
@@ -410,7 +420,7 @@
     color: #726356;
   }
 
-  /* Preserve the eight circular markers, connectors, scroll area and state labels. */
+  /* Preserve circular markers, connectors, scroll area and state labels. */
   .incident-track-marker {
     border-color: #ddcbb8;
     background: #faf4eb;

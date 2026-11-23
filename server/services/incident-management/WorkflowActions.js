@@ -229,12 +229,15 @@ async function explanation(req, id, input = {}, submit = false) {
     const statement = submit
       ? A.explanation(input.statement, 'Employee Explanation')
       : A.text(input.statement, 'Employee Explanation', false);
-    const record = {
-      statement,
-      hearingRequested: Boolean(input.hearingRequested)
-    };
+    A.assert(
+      !input.hearingRequested,
+      'Only HR can arrange an administrative hearing.'
+    );
+    const record = { statement };
     if (submit) {
-      record.signature = normalizeSignature(input.signature);
+      record.signature = normalizeSignature(
+        row.receipt?.signature || input.signature
+      );
       record.submittedAt = A.now();
       record.employeeName = user.full_name || user.email;
       record.employeeEmail = user.email;

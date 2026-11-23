@@ -3290,11 +3290,11 @@ Execution Scope separates live observation of business records from QA-only work
 
 **Test Steps:**
 
-1. Save explanation draft with attachment and hearing-request choice.
-2. Reload, reopen, draw explanation signature and submit with sufficient statement.
+1. Save an explanation draft with an attachment; verify no employee hearing-request control is present.
+2. Reload and submit a sufficient explanation using the existing acknowledgment; if none exists, sign the acknowledgment once. Verify no second signature is requested.
 3. Try resubmitting/editing explanation through stale UI/API.
 
-**Expected Result:** Draft restores for owner without prior receipt; submission requires a signature and records any missing receipt in the same transaction; submitted explanation immutable; HR becomes eligible only after submission; pending extension resolves if explanation arrives first.
+**Expected Result:** Draft restores for owner without prior receipt; submission reuses the acknowledgment signature or records the one missing acknowledgment in the same transaction; submitted explanation immutable; HR becomes eligible only after submission; pending extension resolves if explanation arrives first.
 
 **Data Integrity Check:** Draft cleared; submitted statement/signature/version snapshot retained; evidence preserved without unintended duplicate uploads.
 
@@ -3410,9 +3410,9 @@ Execution Scope separates live observation of business records from QA-only work
 
 **Test Steps:**
 
-1. Open Review → For Review and View to Track.
-2. Try evaluation before Take Task, then take it as HR-A.
-3. Open same case as HR-B.
+1. Open Review → For Review and verify Take Task on the outside case card; View still opens Track.
+2. Try evaluation before Take Task, then take it from the outside card as HR-A.
+3. Refresh the list and open the same case as HR-B; the claimed card no longer offers Take Task.
 
 **Expected Result:** Only uninvolved HR may take/process; HR-B can view authorized content but cannot process another owner’s task; timer starts when taken, not at filing.
 
@@ -3454,15 +3454,15 @@ Execution Scope separates live observation of business records from QA-only work
 **Test Type:** Integration  
 **Required Role:** Owning HR and HR-B  
 **Execution Scope:** QA only
-**Preconditions:** Owned HR-phase report; optional employee hearing request.
+**Preconditions:** Owned HR-phase report; reported employee and HR-B accounts available.
 
 **Test Steps:**
 
 1. Schedule Hearing with details and inspect notifications/timer.
-2. Attempt duplicate scheduling, processing and completion as HR-B.
+2. Attempt duplicate scheduling, processing and completion as HR-B, and replay HEARING and hearingRequested=true as the reported employee.
 3. As owner enter completion remarks and mark completed.
 
-**Expected Result:** Scheduled hearing pauses processing/time and notifies involved people; only owner completes; required details/remarks enforced; resume follows completion and other outstanding waits.
+**Expected Result:** Scheduled hearing pauses processing/time and notifies involved people; only owning HR schedules/completes; employee hearing requests and direct hearing mutations reject; required details/remarks enforced; resume follows completion and other outstanding waits.
 
 **Data Integrity Check:** Hearing details, completion time/remarks and task history retained.
 
@@ -3798,7 +3798,7 @@ Execution Scope separates live observation of business records from QA-only work
 2. Inspect sections, headings, long narrative/signatures and dates.
 3. Close remaining sibling and reload shared circles.
 
-**Expected Result:** Documents match authorized saved content; initial IR/NTE sections appropriate; shared IR Filed/NTE Issued/Closed progress waits for every report to close; one closure does not imply all outcomes match.
+**Expected Result:** Documents match authorized saved content; initial IR/NTE sections appropriate; the header uses the actual selected IR/NTE number, related-report buttons omit status and use spaced action rows, and shared five-stage IR Filed/Under HEAD Review/NTE Issued/Under HR Review/Closed progress waits for every report to close; one closure does not imply all outcomes match.
 
 **Data Integrity Check:** Printing changes no snapshots; siblings retain separate notices/decisions.
 

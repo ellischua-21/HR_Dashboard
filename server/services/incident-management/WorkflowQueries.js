@@ -21,7 +21,8 @@ async function rows(req) {
       (SELECT MAX(a.created_at) FROM incident_activity a WHERE a.incident_id=r.id AND a.action IN ('CLOSED_FOR_DOCUMENTATION','INVESTIGATION_CLOSED','DECISION_CASE_CLOSED'))) AS closedAt,
     JSON_UNQUOTE(JSON_EXTRACT(w.decision,'$.outcome')) AS decisionOutcome,
     w.closure_reason AS closureReason,(SELECT d.outcome FROM incident_decisions d WHERE d.incident_id=r.id AND d.status='ISSUED' ORDER BY d.id DESC LIMIT 1) AS legacyOutcome,
-    task.owner_email AS taskOwner
+    task.owner_email AS taskOwner,task.id AS taskId,task.state AS taskState,
+    w.explanation_submitted_at AS explanationSubmittedAt
     FROM incident_reports r LEFT JOIN incident_workflows w ON w.incident_id=r.id
     LEFT JOIN hr_tasks task ON task.resource_type='INCIDENT' AND task.resource_id=r.id AND task.phase='HR'
     WHERE ${scope.sql} ORDER BY r.created_at DESC,r.id DESC`,
@@ -119,7 +120,18 @@ async function review(req, input = {}) {
     ])
   );
   return {
-    cases: list.map(publicRow),
+    cases: list.map((row) => ({
+      ...publicRow(row),
+      canTakeTask:
+        user.role === 'HR' &&
+        !row.legacy &&
+        row.status !== 'CLOSED' &&
+        !Number(row.userInvolved) &&
+        row.phase === 'HR' &&
+        Boolean(row.explanationSubmittedAt && row.taskId) &&
+        !row.taskOwner &&
+        row.taskState === 'READY'
+    })),
     total: list.length,
     categories,
     summary

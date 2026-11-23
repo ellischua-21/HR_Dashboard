@@ -2667,8 +2667,8 @@ legend {
 }
 .incident-track-progress {
   display: grid;
-  grid-template-columns: repeat(8, minmax(132px, 1fr));
-  min-width: 1056px;
+  grid-template-columns: repeat(var(--incident-stage-count, 8), minmax(132px, 1fr));
+  min-width: calc(var(--incident-stage-count, 8) * 132px);
   padding: 0;
   margin: 0;
   list-style: none;
@@ -2771,7 +2771,7 @@ legend {
 }
 @media (max-width: 700px) {
   .incident-track-progress {
-    grid-template-columns: repeat(8, 132px);
+    grid-template-columns: repeat(var(--incident-stage-count, 8), 132px);
   }
   .incident-track-actions > button {
     min-height: 44px;
@@ -3198,6 +3198,7 @@ legend {
 .performance-scroll button { margin: 2px; }
 .performance-scroll .performance-reviewers-table { width: 100%; min-width: 1180px; }
 .performance-tasks-table { width: 1780px; }
+.performance-tasks-table .actions { margin: 0; }
 .performance-tasks-table th:last-child, .performance-tasks-table td:last-child { width: 280px; min-width: 280px; }
 .performance-assignments-table { width: 100%; min-width: 1020px; }
 .workflow-form { display: grid; gap: 16px; min-width: 0; }
@@ -3214,7 +3215,9 @@ legend {
 .workflow-details dt { font-size: .85rem; color: var(--muted); margin-bottom: 4px; }
 .workflow-details dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
 .workflow-action { margin-block: 12px; }
-.workflow-action > button { width: 100%; text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.workflow-action > button { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 46px; text-align: left; font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
+.workflow-action > button::after { content: ''; flex: 0 0 8px; width: 8px; height: 8px; margin: 0 5px 4px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); }
+.workflow-action > button[aria-expanded="true"]::after { transform: rotate(225deg); margin-top: 6px; margin-bottom: 0; }
 .workflow-related-reports .actions { flex-wrap: wrap; }
 .workflow-related-reports button, .workflow-form button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .workflow-action-body { border: 1px solid var(--rule); border-radius: 8px; padding: 16px; margin-top: 8px; }

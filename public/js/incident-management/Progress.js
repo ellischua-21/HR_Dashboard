@@ -37,11 +37,7 @@
       (stage) => stage.key === tracking.currentStage
     );
     root.replaceChildren(
-      el(
-        'h3',
-        '',
-        `${incident.caseReference || incident.caseNumber} · ${incident.subject}`
-      ),
+      el('h3', '', `${incident.caseNumber} · ${incident.subject}`),
       el(
         'p',
         '',
@@ -59,6 +55,7 @@
       'Case progress. Scroll horizontally to view all stages.'
     );
     const list = el('ol', 'incident-track-progress');
+    list.style.setProperty('--incident-stage-count', tracking.stages.length);
     list.setAttribute('aria-label', 'Incident stages');
     tracking.stages.forEach((stage, index) => {
       const step = el('li', `incident-track-step is-${stage.state}`);

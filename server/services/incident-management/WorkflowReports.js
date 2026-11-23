@@ -376,11 +376,22 @@ const labels = {
 };
 function tracking(row, siblings) {
   const closed = siblings.every((r) => r.status === 'CLOSED'),
-    nte = siblings.some((r) => r.nte_issued_at);
-  const currentStage = closed ? 'CLOSED' : nte ? 'NTE ISSUED' : 'IR FILED';
+    nte = siblings.some((r) => r.nte_issued_at),
+    hr = siblings.some((r) => r.explanation_submitted_at);
+  const currentStage = closed
+    ? 'CLOSED'
+    : hr
+      ? 'UNDER_HR_REVIEW'
+      : nte
+        ? 'NTE ISSUED'
+        : 'UNDER_HEAD_REVIEW';
   const created = siblings.map((r) => r.created_at).sort()[0];
   const issued = siblings
     .map((r) => r.nte_issued_at)
+    .filter(Boolean)
+    .sort()[0];
+  const reviewStarted = siblings
+    .map((r) => r.explanation_submitted_at)
     .filter(Boolean)
     .sort()[0];
   const ended = closed
@@ -390,17 +401,20 @@ function tracking(row, siblings) {
         .sort()
         .at(-1)
     : null;
+  const stages = [
+    ['IR FILED', 'IR Filed', created],
+    ['UNDER_HEAD_REVIEW', 'Under HEAD Review', created],
+    ['NTE ISSUED', 'NTE Issued', issued],
+    ['UNDER_HR_REVIEW', 'Under HR Review', reviewStarted],
+    ['CLOSED', 'Closed', ended]
+  ];
   return {
     currentStage,
     closed,
     completedProcess: closed,
     closureReason: closed ? 'All reports in this case are closed.' : '',
     closedAt: ended,
-    stages: [
-      ['IR FILED', 'IR Filed', created],
-      ['NTE ISSUED', 'NTE Issued', issued],
-      ['CLOSED', 'Closed', ended]
-    ].map(([key, label, reachedAt], i) => ({
+    stages: stages.map(([key, label, reachedAt], i) => ({
       key,
       label,
       reachedAt: reachedAt || null,
@@ -409,7 +423,7 @@ function tracking(row, siblings) {
           ? closed
             ? 'completed'
             : 'current'
-          : i < ['IR FILED', 'NTE ISSUED', 'CLOSED'].indexOf(currentStage)
+          : i < stages.findIndex(([stageKey]) => stageKey === currentStage)
             ? reachedAt
               ? 'completed'
               : 'skipped'
@@ -460,7 +474,7 @@ async function view(req, incidentId) {
       [row.reporter_email, row.reported_employee_email, row.id]
     ),
     A.pool.execute(
-      'SELECT r.status,r.created_at,w.nte_issued_at,w.closed_at FROM incident_reports r JOIN incident_workflows w ON w.incident_id=r.id WHERE r.group_id=?',
+      'SELECT r.status,r.created_at,w.nte_issued_at,w.explanation_submitted_at,w.closed_at FROM incident_reports r JOIN incident_workflows w ON w.incident_id=r.id WHERE r.group_id=?',
       [row.group_id]
     )
   ]);
