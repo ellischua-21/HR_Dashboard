@@ -152,10 +152,12 @@ Login uses `POST /api/login` with `{email,password}`, logout `POST /api/logout`;
 | Announcement creation | No | No | No | Yes | Yes |
 | Inbox / own password / COC matrix reading | Yes | Yes | Yes | Yes | Yes |
 | Incident filing | No | Yes | Yes | Only designated Head HR | Only ADMIN with department HEAD assignment |
-| Incident Review page | No | No | Assigned cases | Uninvolved after NTE; saved assigned HR department HEAD-stage case also visible before NTE | Assigned HEAD/Management/shared Heads-pool scope |
+| Incident Review page | No | No | Assigned cases | Reviews the whole NTE and employee explanation after the explanation is submitted; HR reviewer must not be personally involved in the incident | Assigned HEAD/Management/shared Heads-pool scope |
 | Incident History page | Own accessible cases | Own accessible cases | Use Review Closed | Use Review Closed | Use Review Closed within scope |
 | COC matrix editing | No | No | No | Yes | No |
 | Other employees’ finalized violation history | No | No | No | Yes | Yes, through authorized employee history reader |
+
+For incident review, HR evaluation begins only after the reported employee submits an explanation. HR does not prepare the ordinary IR or issue its NTE. In this plan, "uninvolved HR" means an HR reviewer who is not the filer, reported employee, or another participant in that incident; it is a conflict-of-interest condition, not the review start time. The current application permits HR to view an issued NTE and decide extension requests earlier, but neither starts the HR evaluation task or its clock. A saved Head HR assignment acting as a department HEAD is a separate capacity.
 
 Head HR is a designation on HR, not a sixth role. Reporting eligibility: STAFF/SUPERVISOR → SUPERVISOR/HEAD/ADMIN; HEAD → HEAD/ADMIN; HR → HR/ADMIN; ADMIN → ADMIN. Self-assignment is forbidden. Primary is required for STAFF/SUPERVISOR/HEAD and optional for HR/ADMIN; the optional second must be distinct and requires a primary. Either stored reviewer can complete the one first-review stage; both approvals are not required. HR reporting assignments do not replace designated Head HR form routing. ADMIN role alone grants neither blanket incident access nor HR processing. Residual `extra_perms` cannot restore role-only privileged permissions. Current active identity is re-read server-side on protected requests.
 
@@ -184,7 +186,7 @@ Public status stays **IR FILED → NTE ISSUED → CLOSED**. The visual tracker h
 | Reported employee | Sections I–VII, own explanation draft, issued final decision; own extension records. |
 | Filer / witness / other participant | Sections I–IV; own targeted information request/response; no internal assessment or another recipient’s private response. |
 | Assigned HEAD | Sections I–VII, own NTE draft, authorized requests and issued final decision. |
-| Uninvolved HR after NTE issue | Sections I–VIII; eligible HR ownership required for processing. Extension review before explanation is a separate permitted action. |
+| HR reviewing the submitted explanation | Sections I–VIII, including the whole NTE and submitted explanation; formal evaluation requires explanation submission and HR task ownership. Earlier issued-NTE viewing and extension decisions do not start HR evaluation. |
 | Assigned ADMIN reviewer / designated Management approver | Authorized internal material under case assignment; assigned ADMIN HEAD and Management actions remain separate from HR ownership. |
 
 Assigned ADMIN max-section access, shared-pool eligibility and targeted requests require exact role/involvement checks. Test raw JSON and downloaded/printed content, not only visible section headings. Legacy version-1 rules are separate: only HR has legacy internal review visibility; ADMIN participants/assigned HEADs retain their narrower historical permissions. New current writes to legacy records are unavailable.

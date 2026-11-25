@@ -392,9 +392,13 @@ not establish a violation or automatically impose a sanction.
 
 ### HR: evaluate, obtain approval, and close
 
-HR sees cases from NTE issuance onward. Review filters are **All**, **NTE Issued**,
-**For Review**, and **Closed**. A submitted explanation moves the item into HR's
-For Review filter; the circle stage remains NTE Issued.
+HR's formal review begins only after the reported employee submits an explanation.
+HR then reviews the whole NTE, explanation, IR and supporting records. The case
+enters **For Review**, and the tracker advances to **Under HR Review**. Review
+filters are **All**, **NTE Issued**, **For Review**, and **Closed**. Earlier access
+to an issued NTE or an extension request does not start HR evaluation or its clock.
+The reviewing HR must not be the filer, reported employee, or another participant
+in the incident.
 
 1. Open the case and select **Take Task** after the employee has submitted the
    explanation. Another HR may view it, but only its owner may process it.

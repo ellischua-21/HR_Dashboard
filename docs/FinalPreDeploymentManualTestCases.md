@@ -3407,15 +3407,17 @@ Execution Scope separates live observation of business records from QA-only work
 **Test Type:** Functional  
 **Required Role:** Uninvolved HR-A and HR-B  
 **Execution Scope:** QA only
-**Preconditions:** Employee explanation submitted; no task owner.
+**Preconditions:** QA incident available through HEAD review, NTE issuance, employee explanation draft and submission; HR-A/HR-B are not incident participants. No HR task owner.
 
 **Test Steps:**
 
-1. Open Review → For Review and verify Take Task on the outside case card; View still opens Track.
-2. Try evaluation before Take Task, then take it from the outside card as HR-A.
-3. Refresh the list and open the same case as HR-B; the claimed card no longer offers Take Task.
+1. Before the explanation is submitted, verify IR filing, NTE drafting/issuance, acknowledgment and an explanation draft do not enable HR Take Task/evaluation or start HR time. Issued-NTE viewing and extension handling may be available.
+2. Submit the employee explanation, then open Review → For Review as HR-A. Verify the tracker shows Under HR Review, the outside card offers Take Task, and View opens the full permitted NTE and submitted explanation.
+3. Try evaluation before Take Task, then take the task from the outside card as HR-A.
+4. Refresh the list and open the same case as HR-B; the claimed card no longer offers Take Task.
+5. As owner HR-A, review the whole NTE, employee explanation, IR and supporting records.
 
-**Expected Result:** Only uninvolved HR may take/process; HR-B can view authorized content but cannot process another owner’s task; timer starts when taken, not at filing.
+**Expected Result:** Formal HR evaluation starts only after explanation submission and requires HR task ownership. "Uninvolved" means the HR reviewer is not the filer, reported employee or another incident participant. HR-B can view authorized content but cannot process another owner’s task; HR time starts when taken, not at IR filing or NTE issuance.
 
 **Data Integrity Check:** One task identity/owner; no HR time charged to HEAD/employee phase.
 
