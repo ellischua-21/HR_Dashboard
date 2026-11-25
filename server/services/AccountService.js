@@ -8,6 +8,7 @@ const { logAudit } = require('./AuditService');
 const { hashPassword, verifyPassword } = require('../utils/Password');
 const { sanitize } = require('../utils/Validation');
 const { getAccountEmployee } = require('../utils/EmployeeIdentity');
+const { canAssignDepartmentHead } = require('../../shared/IncidentWorkflow');
 const {
   assignedReviewerRole,
   assignedReviewerRoles
@@ -619,13 +620,13 @@ async function applyAccountRequest(admin, requestId, connection) {
        UNION SELECT email FROM account_requests WHERE email <> ? AND (assigned_head_email = ? OR secondary_head_email = ?)
        UNION SELECT user_email FROM user_forms WHERE status = 'PENDING' AND
          (user_email = ? OR head_reviewer_email = ? OR secondary_head_reviewer_email = ?)
-       UNION SELECT reviewer_email FROM incident_department_reviewers WHERE reviewer_email = ?
        UNION SELECT management_email FROM incident_workflow_settings WHERE management_email = ?
-       UNION SELECT assigned_head_email FROM incident_reports WHERE status <> 'CLOSED' AND assigned_head_email = ? LIMIT 1`,
-      Array(11).fill(email)
+       UNION SELECT assigned_head_email FROM incident_reports WHERE status <> 'CLOSED' AND assigned_head_email = ?
+         AND ? NOT IN ('HEAD', 'ADMIN') LIMIT 1`,
+      [...Array(10).fill(email), role]
     );
     if (dependencies.length)
-      throw httpError('Resolve pending forms and reassign this account\'s reviewer, department, or Management responsibilities before changing its role.', 409);
+      throw httpError('Resolve pending forms, reporting assignments, Management duties, or incompatible open incident reviews before changing this account role.', 409);
   }
   if (
     assignedReviewerRole(role) &&
@@ -683,6 +684,30 @@ async function applyAccountRequest(admin, requestId, connection) {
       accountRequest.password_hash
     ]
   );
+  if (existingAccount && existingAccount.role !== role) {
+    const [assignments] = await connection.execute(
+      'SELECT department FROM incident_department_reviewers WHERE reviewer_email = ? FOR UPDATE',
+      [accountRequest.email]
+    );
+    const removed = assignments.filter(({ department }) =>
+      !canAssignDepartmentHead({ role, is_hr_head: existingAccount.is_hr_head }, department)
+    );
+    for (const { department } of removed)
+      await connection.execute(
+        'DELETE FROM incident_department_reviewers WHERE reviewer_email = ? AND department = ?',
+        [accountRequest.email, department]
+      );
+    if (removed.length) {
+      await connection.execute('UPDATE hr_task_revision SET revision = revision + 1 WHERE id = 1');
+      await logAudit(
+        admin.email,
+        'INCIDENT_REVIEWER_ASSIGNMENTS_CLEARED',
+        '',
+        `${accountRequest.email}: ${removed.length} incompatible assignment(s) cleared after role change to ${role}`,
+        connection
+      );
+    }
+  }
   await connection.execute('DELETE FROM account_requests WHERE id = ?', [
     accountRequest.id
   ]);

@@ -692,11 +692,8 @@ function updateRegistrationRoleHelp() {
   const supportsReviewers = FormStatus.assignedReviewerRoles(role).length > 0;
   secondary.disabled = !supportsReviewers;
   $('r_secondary_head_search').disabled = !supportsReviewers;
-  registrationSecondarySearch?.reset();
-  if (registrationReviewerSearch) registrationReviewerSearch.reset();
   const search = $('ff_reports_to');
   if (search) {
-    search.value = '';
     search.disabled = hasEmail && !supportsReviewers;
     search.dataset.requiredIndicator = String(
       hasEmail && Boolean(FormStatus.assignedReviewerRole(role))

@@ -83,7 +83,7 @@ async function save(req, input = {}, executor = null) {
       seen.add(assignmentKey);
       departmentCounts.set(departmentKey, assignmentCount);
       const [[account]] = await db.execute(
-        "SELECT email,role,is_hr_head FROM user_roles WHERE LOWER(email) = LOWER(?) AND (role IN ('HEAD','ADMIN') OR (role = 'HR' AND is_hr_head = 1)) AND active = 1 AND EXISTS (SELECT 1 FROM employees e WHERE LOWER(e.personal_email)=LOWER(user_roles.email) AND e.record_status<>'Archived')",
+        "SELECT email,role,is_hr_head FROM user_roles WHERE LOWER(email) = LOWER(?) AND (role IN ('HEAD','ADMIN') OR (role = 'HR' AND is_hr_head = 1)) AND active = 1 AND EXISTS (SELECT 1 FROM employees e WHERE LOWER(e.personal_email)=LOWER(user_roles.email) AND e.record_status<>'Archived') FOR UPDATE",
         [email]
       );
       A.assert(

@@ -593,14 +593,20 @@ the current or pending role and assigned reviewers. Choose the changes and save;
 HR changes need ADMIN approval in Account Requests; ADMIN changes take effect immediately. A blank Password
 keeps the current or pending password. Enter and confirm a new password only to
 replace it. Editing employee details alone does not create an account request.
+Changing Assigned Role keeps the current Reports To and Secondary Head names
+and linked accounts. If a selected reviewer is not eligible for the new role,
+choose an eligible replacement before saving; selections are not silently cleared.
 An imported employee with Primary Email can also request their first account
 from this card; that request needs a password.
 
 Only ADMIN can choose ADMIN in Assigned Role during registration or editing;
 HR cannot grant ADMIN access. ADMIN account saves take effect immediately.
 Only ADMIN can request changes to an ADMIN account. Approval cannot remove the
-last active ADMIN, and an account's pending forms and reviewer responsibilities
-must be resolved before its role changes. Changing the password or reviewers
+last active ADMIN. Pending forms, reporting assignments, Management duties, and
+open incident reviews that the new role cannot perform must be resolved first.
+An Incident Reviewers assignment alone does not block a role change: compatible
+assignments stay, and incompatible department assignments are cleared automatically
+in the same save and recorded in the audit history. Changing the password or reviewers
 without changing role does not require clearing those responsibilities.
 FTE Allocation may be left blank in both registration and editing.
 
